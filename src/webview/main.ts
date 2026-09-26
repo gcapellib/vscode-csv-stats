@@ -287,24 +287,28 @@ function bandCell(modelIndex: number): HTMLElement {
   cell.appendChild(line('stat', `Distinct ${count(column.distinct)} (${percent(column.distinctShare)})`));
   if (column.allDistinct) cell.appendChild(line('note', 'every value occurs once'));
 
+  // Le corps du bandeau — histogramme ou palmarès — est un bloc à part, pour
+  // qu'un seul écart le sépare du décompte au-dessus, quel que soit son contenu.
+  const body = document.createElement('div');
+  body.className = 'band-body';
   if (column.histogram.length > 0) {
-    cell.appendChild(histogram(column, colours, state.widths[modelIndex]));
+    body.appendChild(histogram(column, colours, state.widths[modelIndex]));
     const bounds = document.createElement('div');
     bounds.className = 'bounds';
-    bounds.innerHTML = '';
     const min = document.createElement('span');
     min.textContent = `Min ${num(column.min ?? 0)}`;
     const max = document.createElement('span');
     max.textContent = `Max ${num(column.max ?? 0)}`;
     bounds.append(min, max);
-    cell.appendChild(bounds);
+    body.appendChild(bounds);
   } else {
     for (const share of column.top) {
-      cell.appendChild(valueLine(share.value, share.share, colours.text, colours.accent));
+      body.appendChild(valueLine(share.value, share.share, colours.text, colours.accent));
     }
-    if (column.top.length === 0) cell.appendChild(line('type', 'no values'));
-    if (column.otherCount > 0) cell.appendChild(valueLine('Other', column.otherShare, colours.text, colours.text, true));
+    if (column.top.length === 0) body.appendChild(line('type', 'no values'));
+    if (column.otherCount > 0) body.appendChild(valueLine('Other', column.otherShare, colours.text, colours.text, true));
   }
+  cell.appendChild(body);
 
   cell.addEventListener('mousemove', (event) => {
     if ((event.target as HTMLElement).closest('.bar')) return;

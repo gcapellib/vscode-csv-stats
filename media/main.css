@@ -264,9 +264,14 @@ body {
   text-overflow: ellipsis;
 }
 
+/* Un seul écart sépare le décompte de ce qui suit, histogramme ou palmarès. */
+.band-body {
+  margin-top: 16px;
+}
+
 .hist {
   display: block;
-  margin: 8px 0 4px;
+  margin: 0 0 6px;
 }
 
 .bar {
