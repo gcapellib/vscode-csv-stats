@@ -36,6 +36,14 @@ export interface ColumnStats {
   max: number | null;
   /** Vrai quand chaque valeur renseignée n'apparaît qu'une fois. */
   allDistinct: boolean;
+  /** Statistiques descriptives ; nulles hors colonne numérique. */
+  mean: number | null;
+  median: number | null;
+  q1: number | null;
+  q3: number | null;
+  deviation: number | null;
+  /** Valeurs hors de [Q1 − 1,5 IQR ; Q3 + 1,5 IQR]. */
+  outliers: number;
   /** 20 classes entre min et max ; vide pour une colonne texte. */
   histogram: number[];
   /** Valeurs les plus fréquentes ; vide pour une colonne mesurable. */
@@ -85,6 +93,12 @@ export function compute(table: CsvTable, columnIndex: number, forced?: ColumnTyp
     allDistinct: counts.size === present && present >= MIN_ROWS_FOR_DISTINCT_NOTE,
     min: null,
     max: null,
+    mean: null,
+    median: null,
+    q1: null,
+    q3: null,
+    deviation: null,
+    outliers: 0,
     histogram: [],
     top: [],
     otherCount: 0,
@@ -128,6 +142,70 @@ function fillDistribution(stats: ColumnStats, counts: Map<string, number>, decim
     histogram[bin] += occurrences;
   }
   stats.histogram = histogram;
+  fillDescriptive(stats, counts, decimalComma);
+}
+
+/**
+ * Moyenne, médiane, quartiles et écart-type.
+ *
+ * Tout se tire de la table de fréquences, parcourue une fois triée : les
+ * quantiles n'exigent pas de trier les lignes, seulement les valeurs distinctes,
+ * souvent cent fois moins nombreuses.
+ */
+function fillDescriptive(stats: ColumnStats, counts: Map<string, number>, decimalComma: boolean): void {
+  const pairs: Array<[number, number]> = [];
+  let population = 0;
+  let sum = 0;
+  for (const [raw, occurrences] of counts) {
+    const value = parseNumber(raw, decimalComma);
+    if (value === null) continue;
+    pairs.push([value, occurrences]);
+    population += occurrences;
+    sum += value * occurrences;
+  }
+  if (population === 0) return;
+  pairs.sort((left, right) => left[0] - right[0]);
+
+  const mean = sum / population;
+  stats.mean = mean;
+
+  let squares = 0;
+  for (const [value, occurrences] of pairs) squares += occurrences * (value - mean) ** 2;
+  // Écart-type d'échantillon : le fichier est une observation, pas la population
+  // entière. Sur une seule valeur, la dispersion n'a pas de sens.
+  stats.deviation = population > 1 ? Math.sqrt(squares / (population - 1)) : 0;
+
+  const quantile = (fraction: number): number => {
+    // Interpolation linéaire entre statistiques d'ordre, comme numpy.
+    const position = fraction * (population - 1);
+    const lowIndex = Math.floor(position);
+    const weight = position - lowIndex;
+    const low = orderStatistic(pairs, lowIndex);
+    const high = weight === 0 ? low : orderStatistic(pairs, lowIndex + 1);
+    return low + (high - low) * weight;
+  };
+  stats.q1 = quantile(0.25);
+  stats.median = quantile(0.5);
+  stats.q3 = quantile(0.75);
+
+  const spread = stats.q3 - stats.q1;
+  const floor = stats.q1 - 1.5 * spread;
+  const ceiling = stats.q3 + 1.5 * spread;
+  let outliers = 0;
+  for (const [value, occurrences] of pairs) {
+    if (value < floor || value > ceiling) outliers += occurrences;
+  }
+  stats.outliers = outliers;
+}
+
+/** Valeur de rang `index` dans la série, lue depuis les effectifs cumulés. */
+function orderStatistic(pairs: Array<[number, number]>, index: number): number {
+  let seen = 0;
+  for (const [value, occurrences] of pairs) {
+    seen += occurrences;
+    if (index < seen) return value;
+  }
+  return pairs[pairs.length - 1][0];
 }
 
 function fillTopValues(stats: ColumnStats, counts: Map<string, number>): void {

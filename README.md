@@ -29,8 +29,10 @@ Above every column, a band reports:
 - the count and share of distinct values;
 - a note when every value occurs exactly once — not a type, a fact about the
   spread, which warns you that the ranking just below ranks nothing;
-- for a numeric column, a 20-bin histogram, then **Min on the left and Max on
-  the right**; hovering a bar shows that bin's range and count, and hovering the
+- for a numeric column, a 20-bin histogram, then **Min / Max** and
+  **Mean / Median** — the two figures you want at a glance, the rest one click
+  away in **Column details**, which adds quartiles, standard deviation, an
+  outlier count and a box plot; hovering a bar shows that bin's range and count, and hovering the
   rest of the band gives the column's full name and its summary;
 - for a text column, the three most frequent values and their share, followed by
   an **Other** row carrying the remainder, so the percentages always add up to
@@ -40,7 +42,9 @@ The **Insights** button in the toolbar folds the bands away when you only want
 the table, and unfolds them again. Because they can be folded, the bands are not
 stingy with space: a readable chart beats one that merely fits.
 
-Below that, the data table: click a header to sort, click a cell to mark it —
+Below that, the data table: click a header to sort — ascending, then
+descending, then back to the file's own order, because without that third state
+the original order is lost on the first click with no way back — click a cell to mark it —
 the whole row takes a translucent veil and the cell itself darkens and gets a
 frame. Ctrl-click (Cmd on macOS) marks several rows, and clicking a lone marked
 row unmarks it. The veil is laid over the column colour rather than replacing
@@ -131,7 +135,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.7.0.vsix
+code --install-extension csv-stats-0.8.0.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**

@@ -217,9 +217,13 @@ function measureWidths(): void {
     if (column && column.min !== null) {
       // La colonne doit loger ce que son bandeau annonce : des bornes tronquées
       // en « Min 98,… » ne renseignent plus sur rien.
+      // La colonne doit loger les deux lignes de bornes : tronquées, elles ne
+      // renseignent plus sur rien.
+      const pair = (left: string, right: string) => widthOf(left) + widthOf(right) + 24;
       widest = Math.max(
         widest,
-        widthOf(`Min ${num(column.min ?? 0)}`) + widthOf(`Max ${num(column.max ?? 0)}`) + 16,
+        pair(`Min ${num(column.min ?? 0)}`, `Max ${num(column.max ?? 0)}`),
+        column.mean === null ? 0 : pair(`Mean ${num(column.mean)}`, `Median ${num(column.median ?? 0)}`),
       );
     }
     return Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, widest + 28)));
@@ -369,6 +373,15 @@ function bandCell(modelIndex: number): HTMLElement {
     max.textContent = `Max ${num(column.max ?? 0)}`;
     bounds.append(min, max);
     body.appendChild(bounds);
+    if (column.mean !== null) {
+      const central = document.createElement('div');
+      central.className = 'bounds';
+      central.append(
+        textSpan(`Mean ${num(column.mean)}`),
+        textSpan(`Median ${num(column.median ?? 0)}`),
+      );
+      body.appendChild(central);
+    }
   } else {
     for (const share of column.top) {
       body.appendChild(
@@ -514,8 +527,12 @@ function paintHead(): void {
       cell.appendChild(arrow);
     }
     cell.addEventListener('click', () => {
-      const ascending = state.sort?.index === modelIndex ? !state.sort.ascending : true;
-      state.sort = { index: modelIndex, ascending };
+      // Trois états, et non deux : croissant, décroissant, puis retour à l'ordre
+      // du fichier. Sans le troisième, l'ordre d'origine est perdu dès le
+      // premier clic et rien ne permet d'y revenir.
+      if (state.sort?.index !== modelIndex) state.sort = { index: modelIndex, ascending: true };
+      else if (state.sort.ascending) state.sort = { index: modelIndex, ascending: false };
+      else state.sort = null;
       rebuildView();
       paint();
     });
@@ -618,6 +635,8 @@ function openMenu(modelIndex: number, anchor: HTMLElement): void {
   const column = state.stats[modelIndex];
   type Entry = [string, () => void] | 'separator' | { heading: string };
   const entries: Entry[] = [
+    ['Column details…', () => openDetails(modelIndex, anchor)],
+    'separator',
     ['Sort ascending', () => applySort(modelIndex, true)],
     ['Sort descending', () => applySort(modelIndex, false)],
     [
@@ -950,7 +969,126 @@ function openRangePicker(columnIndex: number, anchor: HTMLElement): void {
   low.focus();
 }
 
+/**
+ * Panneau de détail d'une colonne.
+ *
+ * Le bandeau doit rester compact ; tout ce qu'il ne peut pas porter sans devenir
+ * illisible vient ici, à un clic. C'est aussi l'endroit où logeront plus tard
+ * les signaux de qualité, sans rouvrir la question de la place.
+ */
+function openDetails(columnIndex: number, anchor: HTMLElement): void {
+  const column = state.stats[columnIndex];
+  if (!column) return;
+  elements.picker.textContent = '';
+  elements.picker.classList.add('wide');
+
+  const title = document.createElement('div');
+  title.className = 'picker-title';
+  title.textContent = column.name;
+  elements.picker.appendChild(title);
+
+  const filtered = state.filters.length > 0;
+  const scope = document.createElement('div');
+  scope.className = 'picker-note';
+  scope.textContent = filtered
+    ? `computed on the ${count(column.total)} rows kept by the active filters`
+    : `computed on all ${count(column.total)} rows`;
+  elements.picker.appendChild(scope);
+
+  const table = document.createElement('div');
+  table.className = 'detail-grid';
+  const add = (label: string, value: string) => {
+    table.append(textSpan(label), Object.assign(textSpan(value), { className: 'detail-value' }));
+  };
+  add('Type', column.type);
+  add('Rows', count(column.total));
+  add('Missing', `${count(column.missing)} (${percent(column.missingShare)})`);
+  add('Distinct', `${count(column.distinct)} (${percent(column.distinctShare)})`);
+  if (column.mean !== null) {
+    add('Min', num(column.min ?? 0));
+    add('Max', num(column.max ?? 0));
+    add('Mean', num(column.mean));
+    add('Median', num(column.median ?? 0));
+    add('Q1', num(column.q1 ?? 0));
+    add('Q3', num(column.q3 ?? 0));
+    add('Std deviation', num(column.deviation ?? 0));
+    add('Outliers', `${count(column.outliers)} (${percent(column.total === 0 ? 0 : column.outliers / column.total)})`);
+  }
+  elements.picker.appendChild(table);
+
+  if (column.mean !== null) elements.picker.appendChild(boxPlot(column, palette(columnIndex)));
+
+  const footer = document.createElement('div');
+  footer.className = 'picker-footer';
+  const close = document.createElement('button');
+  close.className = 'picker-button primary';
+  close.textContent = 'Close';
+  close.addEventListener('click', closePicker);
+  footer.appendChild(close);
+  elements.picker.appendChild(footer);
+
+  placeFloating(elements.picker, anchor);
+}
+
+/**
+ * Boîte à moustaches : la boîte va de Q1 à Q3, le trait marque la médiane, les
+ * moustaches s'arrêtent à 1,5 écart interquartile.
+ */
+function boxPlot(column: ColumnStats, colours: Palette): SVGSVGElement {
+  const width = 300;
+  const height = 56;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'boxplot');
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+  const min = column.min ?? 0;
+  const max = column.max ?? 0;
+  const span = max - min || 1;
+  const x = (value: number) => 6 + ((value - min) / span) * (width - 12);
+  const spread = (column.q3 ?? 0) - (column.q1 ?? 0);
+  const lowWhisker = Math.max(min, (column.q1 ?? 0) - 1.5 * spread);
+  const highWhisker = Math.min(max, (column.q3 ?? 0) + 1.5 * spread);
+
+  const line = (x1: number, y1: number, x2: number, y2: number) => {
+    const element = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    element.setAttribute('x1', String(x1));
+    element.setAttribute('y1', String(y1));
+    element.setAttribute('x2', String(x2));
+    element.setAttribute('y2', String(y2));
+    element.setAttribute('stroke', colours.accent);
+    element.setAttribute('stroke-width', '2');
+    svg.appendChild(element);
+  };
+
+  const middle = 22;
+  line(x(lowWhisker), middle, x(highWhisker), middle);
+  line(x(lowWhisker), middle - 8, x(lowWhisker), middle + 8);
+  line(x(highWhisker), middle - 8, x(highWhisker), middle + 8);
+
+  const box = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  box.setAttribute('x', String(x(column.q1 ?? 0)));
+  box.setAttribute('y', String(middle - 12));
+  box.setAttribute('width', String(Math.max(1, x(column.q3 ?? 0) - x(column.q1 ?? 0))));
+  box.setAttribute('height', '24');
+  box.setAttribute('fill', colours.accent);
+  box.setAttribute('fill-opacity', '0.35');
+  box.setAttribute('stroke', colours.accent);
+  svg.appendChild(box);
+  line(x(column.median ?? 0), middle - 12, x(column.median ?? 0), middle + 12);
+
+  const caption = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  caption.setAttribute('x', '6');
+  caption.setAttribute('y', String(height - 6));
+  caption.setAttribute('font-size', '11');
+  caption.setAttribute('fill', 'currentColor');
+  caption.setAttribute('opacity', '0.7');
+  caption.textContent = `${num(min)} … ${num(max)}`;
+  svg.appendChild(caption);
+  return svg;
+}
+
 function closePicker(): void {
+  elements.picker.classList.remove('wide');
   elements.picker.hidden = true;
 }
 

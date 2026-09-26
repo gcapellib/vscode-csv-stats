@@ -189,9 +189,17 @@ body {
   cursor: pointer;
 }
 
+/* « Clear all » ne doit pas se chercher : c'est la sortie de secours quand on a
+   filtré trois fois et qu'on ne sait plus ce qu'on regarde. */
 .chip-clear {
-  border-style: dashed;
-  color: var(--vscode-descriptionForeground);
+  border-color: transparent;
+  background: var(--vscode-button-background, rgb(60 120 200));
+  color: var(--vscode-button-foreground, #fff);
+  font-weight: 600;
+}
+
+.chip-clear:hover {
+  background: var(--vscode-button-hoverBackground, rgb(80 140 220));
 }
 
 .chip-filter:hover,
@@ -424,6 +432,29 @@ body {
   background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
   color: var(--vscode-menu-foreground, var(--vscode-foreground));
   box-shadow: 0 4px 12px rgb(0 0 0 / 35%);
+}
+
+#picker.wide {
+  width: 340px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  padding: 6px 0;
+}
+
+.detail-value {
+  text-align: right;
+  font-weight: 600;
+}
+
+.boxplot {
+  display: block;
+  width: 100%;
+  height: auto;
+  color: var(--vscode-foreground);
 }
 
 #picker {
