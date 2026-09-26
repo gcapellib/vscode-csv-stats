@@ -2,6 +2,9 @@
    colonnes portent une couleur propre, celle de la palette choisie. */
 :root {
   --row-height: 22px;
+  /* Volontairement en gris translucide : la même valeur se pose aussi bien sur
+     un fond clair que sombre, et sur les fonds colorés des palettes. */
+  --grid: rgb(128 128 128 / 24%);
 }
 
 * {
@@ -163,27 +166,30 @@ body {
   min-width: 100%;
 }
 
+/* Bandeau et en-tête gèlent d'un seul bloc. Les faire coller séparément
+   demandait de calculer la hauteur du bandeau en JavaScript, et le moindre
+   retard de ce calcul ouvrait un interstice par lequel les lignes défilaient. */
+#frozen {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--vscode-editor-background);
+}
+
 #band,
 #head {
-  position: sticky;
-  z-index: 2;
   display: flex;
   background: var(--vscode-editor-background);
 }
 
-#band {
-  top: 0;
-}
-
 #head {
-  top: var(--band-height, 0);
   border-bottom: 1px solid var(--vscode-panel-border);
 }
 
 .band-cell {
   position: relative;
   flex: 0 0 auto;
-  padding: 10px 12px 14px;
+  padding: 10px 12px 20px;
   border-top: 3px solid transparent;
   border-right: 1px solid var(--vscode-panel-border);
   overflow: hidden;
@@ -269,7 +275,7 @@ body {
 
 .head-cell {
   flex: 0 0 auto;
-  padding: 3px 6px;
+  padding: 5px 8px;
   border-right: 1px solid var(--vscode-panel-border);
   background: var(--vscode-editorGroupHeader-tabsBackground);
   color: var(--vscode-foreground);
@@ -300,8 +306,10 @@ body {
 
 .cell {
   flex: 0 0 auto;
-  padding: 2px 6px;
+  padding: 2px 8px;
   height: var(--row-height);
+  border-right: 1px solid var(--grid);
+  border-bottom: 1px solid var(--grid);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

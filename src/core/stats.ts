@@ -8,7 +8,7 @@
  * effectif.
  */
 import type { CsvTable } from './csv';
-import { decideType, parseDate, parseNumber, type ColumnType, type DateOrder } from './types';
+import { decideType, parseNumber, MIN_ROWS_FOR_DISTINCT_NOTE, type ColumnType } from './types';
 
 export { parseNumber, type ColumnType } from './types';
 
@@ -24,8 +24,6 @@ export interface ColumnStats {
   name: string;
   index: number;
   type: ColumnType;
-  /** Renseigné pour une colonne date : min et max sont alors des millisecondes. */
-  dateOrder?: DateOrder;
   /** Nombre de lignes de la table. */
   total: number;
   missing: number;
@@ -36,7 +34,9 @@ export interface ColumnStats {
   distinctShare: number;
   min: number | null;
   max: number | null;
-  /** 20 classes entre min et max ; vide quand la colonne n'est pas ordonnable. */
+  /** Vrai quand chaque valeur renseignée n'apparaît qu'une fois. */
+  allDistinct: boolean;
+  /** 20 classes entre min et max ; vide pour une colonne texte. */
   histogram: number[];
   /** Valeurs les plus fréquentes ; vide pour une colonne mesurable. */
   top: ValueShare[];
@@ -50,11 +50,6 @@ const TOP_VALUES = 3;
 
 export function isMissing(raw: string): boolean {
   return raw.trim() === '';
-}
-
-/** Les types dont les valeurs s'ordonnent sur un axe, et méritent un histogramme. */
-function isMeasurable(type: ColumnType): boolean {
-  return type === 'numeric' || type === 'date';
 }
 
 export function compute(table: CsvTable, columnIndex: number, forced?: ColumnType): ColumnStats {
@@ -75,22 +70,19 @@ export function compute(table: CsvTable, columnIndex: number, forced?: ColumnTyp
   const present = total - missing;
   const keys = [...counts.keys()];
   const name = table.headers[columnIndex] ?? `column ${columnIndex + 1}`;
-  const detected = decideType(keys, present, decimalComma, name);
-  // Un type forcé depuis le menu prime, mais l'ordre des dates reste celui que
-  // la détection a su lire : l'utilisateur choisit le type, pas le format.
-  const type = forced ?? detected.type;
+  const type = forced ?? decideType(keys, present, decimalComma);
 
   const stats: ColumnStats = {
     name,
     index: columnIndex,
     type,
-    dateOrder: detected.dateOrder,
     total,
     missing,
     distinct: counts.size,
     present,
     missingShare: total === 0 ? 0 : missing / total,
     distinctShare: present === 0 ? 0 : counts.size / present,
+    allDistinct: counts.size === present && present >= MIN_ROWS_FOR_DISTINCT_NOTE,
     min: null,
     max: null,
     histogram: [],
@@ -99,7 +91,7 @@ export function compute(table: CsvTable, columnIndex: number, forced?: ColumnTyp
     otherShare: 0,
   };
 
-  if (isMeasurable(type)) {
+  if (type === 'numeric') {
     fillDistribution(stats, counts, decimalComma);
     // Un type forcé peut ne rien donner de mesurable : mieux vaut un palmarès
     // qu'un histogramme vide.
@@ -107,12 +99,8 @@ export function compute(table: CsvTable, columnIndex: number, forced?: ColumnTyp
     stats.histogram = [];
   }
 
-  fillTopValues(stats, counts, type);
+  fillTopValues(stats, counts);
   return stats;
-}
-
-function readValue(raw: string, type: ColumnType, decimalComma: boolean, order?: DateOrder): number | null {
-  return type === 'date' ? parseDate(raw, order ?? 'iso') : parseNumber(raw, decimalComma);
 }
 
 function fillDistribution(stats: ColumnStats, counts: Map<string, number>, decimalComma: boolean): void {
@@ -120,7 +108,7 @@ function fillDistribution(stats: ColumnStats, counts: Map<string, number>, decim
   let max = Number.NEGATIVE_INFINITY;
   let seen = 0;
   for (const raw of counts.keys()) {
-    const value = readValue(raw, stats.type, decimalComma, stats.dateOrder);
+    const value = parseNumber(raw, decimalComma);
     if (value === null) continue;
     seen++;
     if (value < min) min = value;
@@ -133,7 +121,7 @@ function fillDistribution(stats: ColumnStats, counts: Map<string, number>, decim
   const span = max - min;
   const histogram = new Array<number>(HISTOGRAM_BINS).fill(0);
   for (const [raw, occurrences] of counts) {
-    const value = readValue(raw, stats.type, decimalComma, stats.dateOrder);
+    const value = parseNumber(raw, decimalComma);
     if (value === null) continue;
     const bin =
       span <= 0 ? 0 : Math.min(HISTOGRAM_BINS - 1, Math.floor(((value - min) / span) * HISTOGRAM_BINS));
@@ -142,15 +130,11 @@ function fillDistribution(stats: ColumnStats, counts: Map<string, number>, decim
   stats.histogram = histogram;
 }
 
-function fillTopValues(stats: ColumnStats, counts: Map<string, number>, type: ColumnType): void {
-  // Un identifiant n'a pas de palmarès : toutes ses valeurs valent une occurrence.
-  if (type === 'id') return;
-  // Une colonne booléenne montre ses deux faces, pas un palmarès tronqué.
-  const wanted = type === 'boolean' ? counts.size : TOP_VALUES;
+function fillTopValues(stats: ColumnStats, counts: Map<string, number>): void {
   const ordered = [...counts.entries()].sort(
     (left, right) => right[1] - left[1] || (left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0),
   );
-  stats.top = ordered.slice(0, wanted).map(([value, count]) => ({
+  stats.top = ordered.slice(0, TOP_VALUES).map(([value, count]) => ({
     value,
     count,
     share: stats.present === 0 ? 0 : count / stats.present,

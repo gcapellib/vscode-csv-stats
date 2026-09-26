@@ -38,7 +38,7 @@ describe('StatsComputer', () => {
 
   it('donne le top 3 par fréquence', () => {
     const stats = statsOf('ville\nLyon\nLyon\nLyon\nNantes\nNantes\nBrest\nCaen\n')[0];
-    assert.equal(stats.type, 'categorical');
+    assert.equal(stats.type, 'text');
     assert.deepEqual(
       stats.top.map((entry) => entry.value),
       ['Lyon', 'Nantes', 'Brest'],
@@ -80,8 +80,8 @@ describe('StatsComputer', () => {
     assert.equal(sum(stats.histogram), 2);
   });
 
-  it('cesse d’être numérique dès une seule valeur non numérique', () => {
-    assert.equal(statsOf('prix\n10\n20\nn d\n')[0].type, 'categorical');
+  it('bascule en texte dès une seule valeur non numérique', () => {
+    assert.equal(statsOf('prix\n10\n20\nn d\n')[0].type, 'text');
   });
 
   it('traite une colonne entièrement vide comme du texte sans top', () => {
@@ -122,6 +122,16 @@ describe('StatsComputer', () => {
     const stats = statsOf('prix\n5\n5\n5\n')[0];
     assert.equal(stats.histogram[0], 3);
     assert.equal(sum(stats.histogram), 3);
+  });
+
+  it('signale une colonne dont chaque valeur est unique', () => {
+    // Ce n'est pas un type : c'est un constat de répartition, qui prévient que
+    // le palmarès affiché juste en dessous ne hiérarchise rien.
+    const unique = 'ref\n' + Array.from({ length: 30 }, (_, i) => `A-${i}\n`).join('');
+    assert.equal(statsOf(unique)[0].allDistinct, true);
+    assert.equal(statsOf('ville\nLyon\nLyon\nNantes\n')[0].allDistinct, false);
+    // Sur trois lignes, « toutes distinctes » ne veut rien dire.
+    assert.equal(statsOf('ville\nLyon\nNantes\nBrest\n')[0].allDistinct, false);
   });
 
   it('remplit chaque classe du min au max', () => {

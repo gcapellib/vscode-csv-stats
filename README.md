@@ -24,19 +24,17 @@ the file.
 
 Above every column, a band reports:
 
-- the detected type — **numeric**, **date**, **boolean**, **identifier**,
-  **category** or **text**;
+- the detected type — **numeric** or **text**;
 - the count and share of missing values;
 - the count and share of distinct values;
-- for a numeric or date column, a 20-bin histogram, then **Min on the left and
-  Max on the right**; hovering a bar shows that bin's range and count, and
-  hovering the rest of the band gives the column's full name and its summary;
-- for a boolean column, both sides and their share;
-- for an identifier, simply how many values there are — a histogram of values
-  that each occur once would say nothing;
-- for a category or free text, the three most frequent values and their share,
-  followed by an **Other** row carrying the remainder, so the percentages always
-  add up to 100%.
+- a note when every value occurs exactly once — not a type, a fact about the
+  spread, which warns you that the ranking just below ranks nothing;
+- for a numeric column, a 20-bin histogram, then **Min on the left and Max on
+  the right**; hovering a bar shows that bin's range and count, and hovering the
+  rest of the band gives the column's full name and its summary;
+- for a text column, the three most frequent values and their share, followed by
+  an **Other** row carrying the remainder, so the percentages always add up to
+  100%.
 
 The **Insights** button in the toolbar folds the bands away when you only want
 the table, and unfolds them again. Because they can be folded, the bands are not
@@ -48,23 +46,19 @@ rendered, which keeps the display smooth at a hundred thousand rows.
 ## Column menu
 
 Three dots at the top right of each band: sort ascending or descending, a
-contains-filter, rename, drop the column, and read the column as another type.
+contains-filter, rename, drop the column, and read the column as the other type.
 
 These are all **view actions**: the file is never rewritten. Reopening the tab
 restores the original state. Forcing a type keeps only the values that read that
 way, without requiring that all of them do — that is the whole point of a manual
 override.
 
-Types are decided from the **distinct values**, not from every row: a
-hundred-thousand-row file often holds only a few hundred different values, which
-makes the guess a hundred times cheaper. A few rules are worth knowing. A column
-of `0` and `1` is read as boolean rather than as a measure. Day-first and
-month-first dates are told apart on the whole column — `03/04/2026` reads both
-ways, it takes a `25/12/2026` to settle it — and day-first wins when nothing
-settles it. And all-distinct values alone do not make an identifier: a fine
-measurement is all-distinct too, so an identifier must also have a constant width
-or a name that says so, and must not contain spaces — otherwise every free-text
-comment would pass for a reference.
+**Two types, and two only.** A CSV carries none — everything in it is text — so
+any typology is an inference, and an inference can be wrong. The one kept here
+invents nothing: a column whose every present value reads as a number is numeric,
+everything else is text. Types are decided from the **distinct values**, not from
+every row: a hundred-thousand-row file often holds only a few hundred different
+values, which makes the guess a hundred times cheaper.
 
 ## Palettes
 
@@ -107,7 +101,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.3.0.vsix
+code --install-extension csv-stats-0.4.0.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**

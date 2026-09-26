@@ -23,19 +23,3 @@ export function num(value: number): string {
   if (magnitude >= 1e7 || (value !== 0 && magnitude < 1e-4)) return value.toExponential(3);
   return DECIMALS.format(value);
 }
-
-/**
- * Une date, en ISO. L'heure n'apparaît que si elle porte une information : une
- * colonne de dates pures n'a pas à traîner des « 00:00 » partout.
- */
-export function date(epochMs: number): string {
-  const value = new Date(epochMs);
-  const day = value.toISOString().slice(0, 10);
-  const hasTime = value.getUTCHours() || value.getUTCMinutes() || value.getUTCSeconds();
-  return hasTime ? `${day} ${value.toISOString().slice(11, 16)}` : day;
-}
-
-/** Une borne de colonne, lue selon son type. */
-export function bound(value: number, type: string): string {
-  return type === 'date' ? date(value) : num(value);
-}

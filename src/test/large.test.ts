@@ -33,9 +33,9 @@ describe('charge', () => {
     const stats = computeAll(table);
     const statsMs = Math.round(performance.now() - beforeStats);
 
-    // La colonne « id » n'est pas une mesure : toutes ses valeurs sont distinctes.
-    assert.equal(stats[0].type, 'id');
-    assert.equal(stats[1].type, 'categorical');
+    assert.equal(stats[0].type, 'numeric');
+    assert.equal(stats[0].allDistinct, true);
+    assert.equal(stats[1].type, 'text');
     assert.equal(stats[2].type, 'numeric');
     assert.equal(stats[2].missing, 2_000);
 

@@ -5,9 +5,9 @@
  * cent mille lignes. Le bandeau et l'en-tête restent collés en haut et défilent
  * horizontalement avec les colonnes, si bien que l'alignement est structurel.
  */
-import { bound, count, percent } from '../core/format';
+import { count, num, percent } from '../core/format';
 import { type ColumnStats } from '../core/stats';
-import { parseDate, parseNumber, type ColumnType } from '../core/types';
+import { parseNumber, type ColumnType } from '../core/types';
 import { paletteFor, THEMES, themeById, type CsvTheme, type Palette } from '../core/themes';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
@@ -25,16 +25,9 @@ const HIST_HEIGHT = 96;
 const WIDTH_SAMPLE_ROWS = 60;
 const OVERSCAN = 8;
 
-const COLUMN_TYPES: ColumnType[] = ['numeric', 'date', 'boolean', 'id', 'categorical', 'text'];
+const COLUMN_TYPES: ColumnType[] = ['numeric', 'text'];
 
-const TYPE_LABELS: Record<ColumnType, string> = {
-  numeric: 'Numeric',
-  date: 'Date',
-  boolean: 'Boolean',
-  id: 'Identifier',
-  categorical: 'Category',
-  text: 'Text',
-};
+const TYPE_LABELS: Record<ColumnType, string> = { numeric: 'Numeric', text: 'Text' };
 
 const elements = {
   toolbar: byId('toolbar'),
@@ -200,7 +193,7 @@ function measureWidths(): void {
       // en « Min 98,… » ne renseignent plus sur rien.
       widest = Math.max(
         widest,
-        widthOf(`Min ${bound(column.min ?? 0, column.type)}`) + widthOf(`Max ${bound(column.max ?? 0, column.type)}`) + 16,
+        widthOf(`Min ${num(column.min ?? 0)}`) + widthOf(`Max ${num(column.max ?? 0)}`) + 16,
       );
     }
     return Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, widest + 28)));
@@ -229,20 +222,15 @@ function rebuildView(): void {
 
   const sort = state.sort;
   if (sort) {
-    const column = state.stats[sort.index];
+    const numeric = state.stats[sort.index]?.type === 'numeric';
     const decimalComma = state.delimiter === ';';
-    // Une date se compare comme une date, sans quoi « 30/06 » précéderait
-    // « 15/01 » au seul motif que 3 vient après 1.
-    const ordered = column?.type === 'numeric' || column?.type === 'date';
-    const read = (raw: string) =>
-      column?.type === 'date' ? parseDate(raw, column.dateOrder ?? 'iso') : parseNumber(raw, decimalComma);
     const direction = sort.ascending ? 1 : -1;
     view.sort((left, right) => {
       const a = state.rows[left]?.[sort.index] ?? '';
       const b = state.rows[right]?.[sort.index] ?? '';
-      if (ordered) {
-        const x = read(a);
-        const y = read(b);
+      if (numeric) {
+        const x = parseNumber(a, decimalComma);
+        const y = parseNumber(b, decimalComma);
         // Les cellules illisibles vont en fin de tri, quel que soit le sens.
         if (x === null && y === null) return 0;
         if (x === null) return 1;
@@ -261,8 +249,6 @@ function paint(): void {
   if (!state.ready) return;
   elements.sheet.style.width = `${totalWidth()}px`;
   paintBand();
-  // L'en-tête se colle juste sous le bandeau, dont la hauteur dépend du contenu.
-  elements.head.style.top = `${state.bandVisible ? elements.band.offsetHeight : 0}px`;
   paintHead();
   paintRows();
 }
@@ -299,6 +285,7 @@ function bandCell(modelIndex: number): HTMLElement {
   cell.appendChild(line('type', column.type));
   cell.appendChild(line('stat', `Missing ${count(column.missing)} (${percent(column.missingShare)})`));
   cell.appendChild(line('stat', `Distinct ${count(column.distinct)} (${percent(column.distinctShare)})`));
+  if (column.allDistinct) cell.appendChild(line('note', 'every value occurs once'));
 
   if (column.histogram.length > 0) {
     cell.appendChild(histogram(column, colours, state.widths[modelIndex]));
@@ -306,13 +293,11 @@ function bandCell(modelIndex: number): HTMLElement {
     bounds.className = 'bounds';
     bounds.innerHTML = '';
     const min = document.createElement('span');
-    min.textContent = `Min ${bound(column.min ?? 0, column.type)}`;
+    min.textContent = `Min ${num(column.min ?? 0)}`;
     const max = document.createElement('span');
-    max.textContent = `Max ${bound(column.max ?? 0, column.type)}`;
+    max.textContent = `Max ${num(column.max ?? 0)}`;
     bounds.append(min, max);
     cell.appendChild(bounds);
-  } else if (column.type === 'id') {
-    cell.appendChild(line('note', `${count(column.distinct)} values, all distinct`));
   } else {
     for (const share of column.top) {
       cell.appendChild(valueLine(share.value, share.share, colours.text, colours.accent));
@@ -390,7 +375,7 @@ function histogram(column: ColumnStats, colours: Palette, width: number): SVGSVG
     target.setAttribute('fill', 'transparent');
     const low = (column.min ?? 0) + (span * index) / bins;
     const high = index === bins - 1 ? (column.max ?? 0) : (column.min ?? 0) + (span * (index + 1)) / bins;
-    const range = span <= 0 ? bound(column.min ?? 0, column.type) : `${bound(low, column.type)} – ${bound(high, column.type)}`;
+    const range = span <= 0 ? num(column.min ?? 0) : `${num(low)} – ${num(high)}`;
     const share = column.present === 0 ? 0 : value / column.present;
     target.addEventListener('mousemove', (event) => {
       event.stopPropagation();
@@ -451,8 +436,7 @@ function paintRows(): void {
     for (const modelIndex of state.order) {
       const colours = palette(modelIndex);
       const cell = document.createElement('div');
-      const type = state.stats[modelIndex].type;
-      cell.className = type === 'numeric' || type === 'id' ? 'cell num' : 'cell';
+      cell.className = state.stats[modelIndex].type === 'numeric' ? 'cell num' : 'cell';
       cell.style.width = `${state.widths[modelIndex]}px`;
       cell.style.background = colours.cell;
       cell.style.color = colours.text;
