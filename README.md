@@ -46,6 +46,11 @@ texte uni (vingt), fond uni et texte coloré par colonne à la manière d'une
 coloration syntaxique (dix), et les deux à la fois (dix). Le choix est retenu
 d'une session à l'autre.
 
+Chaque entrée porte un aperçu de sa palette : cinq pastilles montrant le fond de
+colonne **et** la couleur d'encre. Les deux sont nécessaires — une palette à fond
+uni ne se distingue que par son encre, et un aperçu qui n'en montrerait que le
+fond les rendrait toutes identiques.
+
 Une palette n'énumère pas ses couleurs : elle fixe une liste de teintes et un
 style qui en dérive les intensités, pour le thème clair comme pour le sombre.
 S'y ajoute une rampe de luminosité, car la teinte seule ne sépare pas deux
@@ -89,7 +94,7 @@ npm run package  # produit csv-stats-<version>.vsix
 ## Installer
 
 ```bash
-code --install-extension csv-stats-0.1.0.vsix
+code --install-extension csv-stats-0.2.0.vsix
 ```
 
 Ou, dans VS Code : vue **Extensions** → `…` → **Install from VSIX…**

@@ -7,7 +7,7 @@
  */
 import { count, num, percent } from '../core/format';
 import { parseNumber, type ColumnStats } from '../core/stats';
-import { paletteFor, THEMES, themeById, type Palette } from '../core/themes';
+import { paletteFor, THEMES, themeById, type CsvTheme, type Palette } from '../core/themes';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
@@ -20,7 +20,10 @@ const OVERSCAN = 8;
 
 const elements = {
   toolbar: byId('toolbar'),
-  theme: byId('theme') as HTMLSelectElement,
+  themeButton: byId('theme-button'),
+  themeSwatch: byId('theme-swatch'),
+  themeLabel: byId('theme-label'),
+  themePopup: byId('theme-popup'),
   shape: byId('shape'),
   notice: byId('notice'),
   scroller: byId('scroller'),
@@ -84,7 +87,9 @@ function palette(modelIndex: number): Palette {
 }
 
 new MutationObserver(() => {
-  if (state.ready) paint();
+  if (!state.ready) return;
+  buildThemePicker();
+  paint();
 }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
 // ------------------------------------------------------------------- messages
@@ -103,7 +108,7 @@ window.addEventListener('message', (event: MessageEvent) => {
       if (message.truncated) {
         elements.notice.textContent = `Truncated: only the first ${count(state.rowCount)} rows are analysed.`;
       }
-      buildThemeSelect();
+      buildThemePicker();
       break;
     case 'rows': {
       const start = message.start as number;
@@ -556,30 +561,115 @@ function toggleInsights(): void {
 
 // ----------------------------------------------------------------- palettes
 
-function buildThemeSelect(): void {
-  elements.theme.textContent = '';
-  const groups: Array<[string, typeof THEMES]> = [
-    ['Coloured background', THEMES.slice(0, 20)],
-    ['Coloured text', THEMES.slice(20, 30)],
-    ['Both', THEMES.slice(30)],
-  ];
-  for (const [label, themes] of groups) {
-    const group = document.createElement('optgroup');
-    group.label = label;
-    for (const theme of themes) {
-      const option = document.createElement('option');
-      option.value = theme.id;
-      option.textContent = theme.label;
-      option.selected = theme.id === state.themeId;
-      group.appendChild(option);
-    }
-    elements.theme.appendChild(group);
+const THEME_GROUPS: Array<[string, typeof THEMES]> = [
+  ['Coloured background', THEMES.slice(0, 20)],
+  ['Coloured text', THEMES.slice(20, 30)],
+  ['Both', THEMES.slice(30)],
+];
+
+/**
+ * Aperçu d'une palette : une pastille par teinte, chacune portant son fond et un
+ * trait de sa couleur de texte.
+ *
+ * Les deux sont nécessaires — une palette à fond uni ne se distingue que par son
+ * encre, et une pastille qui n'en montrerait que le fond les rendrait toutes
+ * identiques.
+ */
+function swatch(theme: CsvTheme): HTMLElement {
+  const dark = isDark();
+  const element = document.createElement('span');
+  element.className = 'swatch';
+  for (let column = 0; column < 5; column++) {
+    const colours = paletteFor(theme, column, dark);
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.style.background = colours.band;
+    const ink = document.createElement('span');
+    ink.className = 'chip-ink';
+    ink.style.background = colours.text;
+    chip.appendChild(ink);
+    element.appendChild(chip);
   }
-  elements.theme.addEventListener('change', () => {
-    state.themeId = elements.theme.value;
-    vscode.postMessage({ type: 'selectTheme', id: state.themeId });
-    paint();
+  return element;
+}
+
+function buildThemePicker(): void {
+  elements.themePopup.textContent = '';
+  for (const [label, themes] of THEME_GROUPS) {
+    const heading = document.createElement('div');
+    heading.className = 'theme-group';
+    heading.textContent = label;
+    elements.themePopup.appendChild(heading);
+    for (const theme of themes) {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'theme-item';
+      item.setAttribute('role', 'option');
+      item.dataset.id = theme.id;
+      item.append(swatch(theme), textSpan(theme.label));
+      item.addEventListener('click', () => {
+        state.themeId = theme.id;
+        vscode.postMessage({ type: 'selectTheme', id: theme.id });
+        closeThemePopup();
+        buildThemePicker();
+        paint();
+      });
+      elements.themePopup.appendChild(item);
+    }
+  }
+  showCurrentTheme();
+}
+
+function textSpan(text: string): HTMLElement {
+  const span = document.createElement('span');
+  span.textContent = text;
+  return span;
+}
+
+function showCurrentTheme(): void {
+  const theme = themeById(state.themeId);
+  elements.themeLabel.textContent = theme.label;
+  elements.themeSwatch.replaceWith(Object.assign(swatch(theme), { id: 'theme-swatch' }));
+  elements.themeSwatch = byId('theme-swatch');
+  elements.themePopup.querySelectorAll<HTMLElement>('.theme-item').forEach((item) => {
+    item.classList.toggle('current', item.dataset.id === state.themeId);
   });
 }
+
+function openThemePopup(): void {
+  elements.themePopup.style.visibility = 'hidden';
+  elements.themePopup.hidden = false;
+  const box = elements.themeButton.getBoundingClientRect();
+  const popup = elements.themePopup.getBoundingClientRect();
+  elements.themePopup.style.left = `${Math.max(4, Math.min(box.left, window.innerWidth - popup.width - 8))}px`;
+  elements.themePopup.style.top = `${Math.max(4, Math.min(box.bottom + 2, window.innerHeight - popup.height - 8))}px`;
+  elements.themePopup.style.visibility = 'visible';
+  elements.themeButton.setAttribute('aria-expanded', 'true');
+  elements.themePopup.querySelector<HTMLElement>('.theme-item.current')?.scrollIntoView({ block: 'nearest' });
+}
+
+function closeThemePopup(): void {
+  elements.themePopup.hidden = true;
+  elements.themeButton.setAttribute('aria-expanded', 'false');
+}
+
+elements.themeButton.addEventListener('click', () => {
+  if (elements.themePopup.hidden) openThemePopup();
+  else closeThemePopup();
+});
+
+document.addEventListener('mousedown', (event) => {
+  const target = event.target as HTMLElement;
+  if (elements.themePopup.hidden) return;
+  if (elements.themePopup.contains(target) || elements.themeButton.contains(target)) return;
+  closeThemePopup();
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    closeThemePopup();
+    closeMenu();
+  }
+});
 
 vscode.postMessage({ type: 'ready' });
