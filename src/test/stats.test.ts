@@ -1,0 +1,139 @@
+import { strict as assert } from 'node:assert';
+import { describe, it } from 'node:test';
+import { parse } from '../core/csv';
+import { compute, computeAll, HISTOGRAM_BINS, parseNumber } from '../core/stats';
+
+function statsOf(text: string) {
+  return computeAll(parse(text));
+}
+
+describe('StatsComputer', () => {
+  it('détecte une colonne numérique avec min, max et histogramme', () => {
+    const stats = statsOf('prix\n10\n20\n30\n')[0];
+    assert.equal(stats.type, 'numeric');
+    assert.equal(stats.min, 10);
+    assert.equal(stats.max, 30);
+    assert.equal(stats.histogram.length, HISTOGRAM_BINS);
+    assert.equal(sum(stats.histogram), 3);
+    assert.equal(stats.top.length, 0);
+  });
+
+  it('force le type en texte, même si tout est numérique', () => {
+    const forced = compute(parse('prix\n10\n20\n30\n'), 0, 'text');
+    assert.equal(forced.type, 'text');
+    assert.equal(forced.min, null);
+    assert.equal(forced.top.length, 3);
+  });
+
+  it('force le type en numérique sur les seules valeurs lisibles', () => {
+    // Un forçage manuel ne peut pas exiger que tout soit numérique : c'est
+    // précisément parce que la colonne ne l'est pas tout à fait qu'on force.
+    const forced = compute(parse('prix\n10\nn d\n30\n'), 0, 'numeric');
+    assert.equal(forced.type, 'numeric');
+    assert.equal(forced.min, 10);
+    assert.equal(forced.max, 30);
+    assert.equal(sum(forced.histogram), 2);
+    assert.equal(forced.distinct, 3);
+  });
+
+  it('donne le top 3 par fréquence', () => {
+    const stats = statsOf('ville\nLyon\nLyon\nLyon\nNantes\nNantes\nBrest\nCaen\n')[0];
+    assert.equal(stats.type, 'text');
+    assert.deepEqual(
+      stats.top.map((entry) => entry.value),
+      ['Lyon', 'Nantes', 'Brest'],
+    );
+    assert.deepEqual(
+      stats.top.map((entry) => entry.count),
+      [3, 2, 1],
+    );
+    assert.equal(stats.min, null);
+  });
+
+  it('regroupe le reste sous Other pour totaliser 100 %', () => {
+    const stats = statsOf('ville\nLyon\nLyon\nLyon\nNantes\nNantes\nBrest\nCaen\nRennes\nTours\n')[0];
+    assert.equal(stats.present, 9);
+    // Lyon 3 + Nantes 2 + Brest 1 = 6 ; restent Caen, Rennes, Tours.
+    assert.equal(stats.otherCount, 3);
+    const total = stats.top.reduce((acc, entry) => acc + entry.share, 0) + stats.otherShare;
+    assert.ok(Math.abs(total - 1) < 1e-9, `total des parts : ${total}`);
+  });
+
+  it('laisse Other à zéro quand il n’y a rien à regrouper', () => {
+    const stats = statsOf('ville\nLyon\nNantes\nBrest\n')[0];
+    assert.equal(stats.otherCount, 0);
+    assert.equal(stats.otherShare, 0);
+  });
+
+  it('compte les valeurs manquantes et les exclut des distinctes', () => {
+    const stats = statsOf('ville,pays\nLyon,FR\n,FR\nLyon,FR\n   ,FR\nNantes,FR\n')[0];
+    assert.equal(stats.total, 5);
+    assert.equal(stats.missing, 2);
+    assert.equal(stats.present, 3);
+    assert.equal(stats.distinct, 2);
+  });
+
+  it('garde numérique une colonne trouée', () => {
+    const stats = statsOf('prix,pays\n10,FR\n,FR\n30,FR\n')[0];
+    assert.equal(stats.type, 'numeric');
+    assert.equal(stats.missing, 1);
+    assert.equal(sum(stats.histogram), 2);
+  });
+
+  it('bascule en texte dès une seule valeur non numérique', () => {
+    assert.equal(statsOf('prix\n10\n20\nn d\n')[0].type, 'text');
+  });
+
+  it('traite une colonne entièrement vide comme du texte sans top', () => {
+    const stats = statsOf('a,b\n1,\n2,\n')[1];
+    assert.equal(stats.type, 'text');
+    assert.equal(stats.missing, 2);
+    assert.equal(stats.distinct, 0);
+    assert.equal(stats.top.length, 0);
+    assert.equal(stats.distinctShare, 0);
+  });
+
+  it('reconnaît la virgule décimale dans un fichier à point-virgule', () => {
+    const stats = statsOf('ville;surface\nLyon;47,9\nNantes;65,2\n')[1];
+    assert.equal(stats.type, 'numeric');
+    assert.equal(stats.min, 47.9);
+    assert.equal(stats.max, 65.2);
+  });
+
+  it('ignore la virgule décimale dans un fichier à virgule', () => {
+    assert.equal(parseNumber('47,9', false), null);
+    assert.equal(parseNumber('47,9', true), 47.9);
+  });
+
+  it('tolère les espaces de milliers, y compris insécables', () => {
+    assert.equal(parseNumber('1 234 567', false), 1234567);
+    assert.equal(parseNumber('1 234 567', false), 1234567);
+    assert.equal(parseNumber('1 234 567', false), 1234567);
+  });
+
+  it('rejette les formes trompeuses', () => {
+    for (const candidate of ['1f', '0x1A', 'NaN', 'Infinity', '1.2.3', '12-', '']) {
+      assert.equal(parseNumber(candidate, false), null, `« ${candidate} » ne doit pas être un nombre`);
+    }
+    assert.equal(parseNumber('-1.5e3', false), -1500);
+  });
+
+  it('concentre une colonne constante dans la première classe', () => {
+    const stats = statsOf('prix\n5\n5\n5\n')[0];
+    assert.equal(stats.histogram[0], 3);
+    assert.equal(sum(stats.histogram), 3);
+  });
+
+  it('remplit chaque classe du min au max', () => {
+    const text = 'prix\n' + Array.from({ length: HISTOGRAM_BINS }, (_, index) => `${index}\n`).join('');
+    const stats = statsOf(text)[0];
+    assert.ok(
+      stats.histogram.every((value) => value === 1),
+      stats.histogram.join(','),
+    );
+  });
+});
+
+function sum(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0);
+}

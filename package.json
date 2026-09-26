@@ -1,0 +1,83 @@
+{
+  "name": "csv-stats",
+  "displayName": "CSV Stats",
+  "description": "A statistical overview of CSV files inside the editor, a simplified take on Data Wrangler.",
+  "version": "0.1.0",
+  "publisher": "gcapellib",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gcapellib/vscode-csv-stats"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Data Science",
+    "Visualization"
+  ],
+  "keywords": [
+    "csv",
+    "statistics",
+    "data",
+    "rainbow"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "csvStats.editor",
+        "displayName": "CSV Stats",
+        "selector": [
+          {
+            "filenamePattern": "*.csv"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "commands": [
+      {
+        "command": "csvStats.open",
+        "title": "Open in CSV Stats",
+        "category": "CSV Stats"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "csvStats.open",
+          "when": "resourceExtname == .csv",
+          "group": "navigation@90"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "csvStats.open",
+          "when": "resourceExtname == .csv",
+          "group": "navigation@90"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "csvStats.open",
+          "when": "resourceExtname == .csv"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "node esbuild.mjs",
+    "test": "npm run compile && node --test out/test/*.test.js",
+    "package": "npm run build && vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "1.90.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.0"
+  }
+}

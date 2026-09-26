@@ -1,0 +1,11 @@
+reference;ville;adresse;surface;prix;statut
+A-001;Lyon;"12, rue de la Paix";47,5;285000;vendu
+A-002;Nantes;"3, quai de la Fosse";65,2;312000;disponible
+A-003;Brest;"8, rue Jean Jaurès";38,0;149000;disponible
+A-004;Lyon;"44, cours Vitton";92,4;610000;sous offre
+A-005;Caen;"1, place Saint-Sauveur";;98000;disponible
+A-006;Lyon;"7, rue Mercière";55,8;398000;vendu
+A-007;Nantes;"21, rue Crébillon";71,0;455000;vendu
+A-008;Brest;"2, avenue Clemenceau";44,3;;disponible
+A-009;Lyon;"90, rue Duguesclin";120,6;845000;sous offre
+A-010;Caen;"16, rue Écuyère";33,9;121000;disponible

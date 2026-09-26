@@ -1,0 +1,250 @@
+/* La vue emprunte les couleurs et la typographie de l'éditeur : seules les
+   colonnes portent une couleur propre, celle de la palette choisie. */
+:root {
+  --row-height: 22px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+  overflow: hidden;
+}
+
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+#toolbar label {
+  color: var(--vscode-descriptionForeground);
+}
+
+#theme {
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border: 1px solid var(--vscode-dropdown-border);
+  padding: 2px 4px;
+}
+
+#shape,
+#notice {
+  color: var(--vscode-descriptionForeground);
+  margin-left: 8px;
+}
+
+#scroller {
+  position: absolute;
+  inset: 40px 0 0 0;
+  overflow: auto;
+}
+
+#sheet {
+  position: relative;
+  min-width: 100%;
+}
+
+#band,
+#head {
+  position: sticky;
+  z-index: 2;
+  display: flex;
+  background: var(--vscode-editor-background);
+}
+
+#band {
+  top: 0;
+}
+
+#head {
+  top: var(--band-height, 0);
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.band-cell {
+  position: relative;
+  flex: 0 0 auto;
+  padding: 6px 6px 8px;
+  border-top: 3px solid transparent;
+  border-right: 1px solid var(--vscode-panel-border);
+  overflow: hidden;
+  line-height: 1.45;
+}
+
+.band-cell .type {
+  opacity: 0.62;
+}
+
+.band-cell .stat {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dots {
+  position: absolute;
+  /* Indispensable : les lignes en opacity < 1 créent un contexte d'empilement et
+     recouvraient ce bouton, qui ne recevait alors aucun clic. */
+  z-index: 1;
+  top: 2px;
+  right: 4px;
+  width: 20px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 12px;
+}
+
+.dots:hover {
+  opacity: 1;
+}
+
+.value {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.value.dim {
+  opacity: 0.62;
+}
+
+.value-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.bounds {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  opacity: 0.62;
+}
+
+/* Min et Max restent chacun d'un seul tenant : coupés, ils perdent leur sens. */
+.bounds span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hist {
+  display: block;
+  margin: 2px 0;
+}
+
+.bar {
+  cursor: default;
+}
+
+.head-cell {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border-right: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-editorGroupHeader-tabsBackground);
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.head-cell:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.arrow {
+  opacity: 0.7;
+}
+
+#body {
+  position: relative;
+}
+
+.row {
+  position: absolute;
+  left: 0;
+  display: flex;
+  height: var(--row-height);
+}
+
+.cell {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  height: var(--row-height);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cell.num {
+  text-align: right;
+}
+
+#tooltip {
+  position: fixed;
+  z-index: 10;
+  max-width: 320px;
+  padding: 5px 8px;
+  border: 1px solid var(--vscode-editorHoverWidget-border);
+  background: var(--vscode-editorHoverWidget-background);
+  color: var(--vscode-editorHoverWidget-foreground);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 30%);
+  pointer-events: none;
+}
+
+#menu {
+  position: fixed;
+  z-index: 20;
+  min-width: 220px;
+  padding: 4px 0;
+  border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border));
+  background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  box-shadow: 0 4px 12px rgb(0 0 0 / 35%);
+}
+
+#menu hr {
+  margin: 4px 6px;
+  border: none;
+  border-top: 1px solid var(--vscode-panel-border);
+}
+
+.menu-item {
+  display: block;
+  width: 100%;
+  padding: 4px 14px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
+  color: var(--vscode-menu-selectionForeground, inherit);
+}
+
+[hidden] {
+  display: none !important;
+}
