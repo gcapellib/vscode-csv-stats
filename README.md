@@ -68,6 +68,8 @@ chargement.
 
 ## Construire
 
+dans ./vscode-csv-stats-main/
+
 ```bash
 npm install
 npm test       # parsing, statistiques et palettes
