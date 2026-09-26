@@ -150,6 +150,7 @@ body {
 }
 
 #shape,
+#selection,
 #notice {
   color: var(--vscode-descriptionForeground);
   margin-left: 8px;
@@ -322,6 +323,22 @@ body {
 
 .cell.num {
   text-align: right;
+}
+
+/* La sélection prend toute la ligne et efface les teintes de colonne : une
+   ligne retenue doit se voir sans hésitation, fût-ce au prix de l'arc-en-ciel. */
+.row.selected .cell {
+  background: var(--vscode-list-activeSelectionBackground, rgb(128 128 128 / 40%));
+  color: var(--vscode-list-activeSelectionForeground, inherit);
+}
+
+.row.selected {
+  outline: 1px solid var(--vscode-focusBorder, rgb(128 128 128 / 60%));
+  outline-offset: -1px;
+}
+
+.row {
+  cursor: default;
 }
 
 #tooltip {

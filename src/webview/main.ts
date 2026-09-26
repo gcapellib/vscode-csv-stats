@@ -37,6 +37,7 @@ const elements = {
   themeLabel: byId('theme-label'),
   themePopup: byId('theme-popup'),
   shape: byId('shape'),
+  selection: byId('selection'),
   notice: byId('notice'),
   scroller: byId('scroller'),
   sheet: byId('sheet'),
@@ -67,6 +68,11 @@ interface State {
   /** Lignes retenues après filtre et tri, par index de modèle. */
   view: number[];
   bandVisible: boolean;
+  /**
+   * Lignes sélectionnées, par index du modèle et non de l'affichage : la
+   * sélection survit ainsi au tri comme au filtrage.
+   */
+  selected: Set<number>;
   themeId: string;
   ready: boolean;
 }
@@ -83,6 +89,7 @@ const state: State = {
   filters: new Map(),
   view: [],
   bandVisible: true,
+  selected: new Set<number>(),
   themeId: THEMES[0].id,
   ready: false,
 };
@@ -435,15 +442,21 @@ function paintRows(): void {
     const cells = state.rows[rowIndex];
     if (!cells) continue;
     const row = document.createElement('div');
-    row.className = 'row';
+    const isSelected = state.selected.has(rowIndex);
+    row.className = isSelected ? 'row selected' : 'row';
     row.style.top = `${position * ROW_HEIGHT}px`;
+    row.addEventListener('mousedown', (event) => select(rowIndex, event.ctrlKey || event.metaKey));
     for (const modelIndex of state.order) {
       const colours = palette(modelIndex);
       const cell = document.createElement('div');
       cell.className = state.stats[modelIndex].type === 'numeric' ? 'cell num' : 'cell';
       cell.style.width = `${state.widths[modelIndex]}px`;
-      cell.style.background = colours.cell;
-      cell.style.color = colours.text;
+      // Une ligne sélectionnée laisse la feuille de style décider de son fond :
+      // un style en ligne l'emporterait sur toute règle, sélection comprise.
+      if (!isSelected) {
+        cell.style.background = colours.cell;
+        cell.style.color = colours.text;
+      }
       cell.textContent = cells[modelIndex] ?? '';
       row.appendChild(cell);
     }
@@ -451,6 +464,22 @@ function paintRows(): void {
   }
   elements.body.textContent = '';
   elements.body.appendChild(fragment);
+}
+
+function select(rowIndex: number, add: boolean): void {
+  if (add) {
+    if (!state.selected.delete(rowIndex)) state.selected.add(rowIndex);
+  } else {
+    const alone = state.selected.size === 1 && state.selected.has(rowIndex);
+    state.selected.clear();
+    if (!alone) state.selected.add(rowIndex);
+  }
+  updateSelectionCount();
+  paintRows();
+}
+
+function updateSelectionCount(): void {
+  elements.selection.textContent = state.selected.size === 0 ? '' : `${count(state.selected.size)} selected`;
 }
 
 elements.scroller.addEventListener('scroll', () => {

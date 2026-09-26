@@ -186,6 +186,7 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
   </button>
   <div id="theme-popup" role="listbox" hidden></div>
   <span id="shape"></span>
+  <span id="selection"></span>
   <span id="notice"></span>
 </div>
 <div id="scroller"><div id="sheet">
