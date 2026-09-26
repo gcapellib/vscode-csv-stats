@@ -73,6 +73,8 @@ interface State {
    * sélection survit ainsi au tri comme au filtrage.
    */
   selected: Set<number>;
+  /** Cellule cliquée en dernier : la ligne se teinte, celle-ci s'encadre. */
+  active: { row: number; column: number } | null;
   themeId: string;
   ready: boolean;
 }
@@ -90,6 +92,7 @@ const state: State = {
   view: [],
   bandVisible: true,
   selected: new Set<number>(),
+  active: null,
   themeId: THEMES[0].id,
   ready: false,
 };
@@ -445,19 +448,21 @@ function paintRows(): void {
     const isSelected = state.selected.has(rowIndex);
     row.className = isSelected ? 'row selected' : 'row';
     row.style.top = `${position * ROW_HEIGHT}px`;
-    row.addEventListener('mousedown', (event) => select(rowIndex, event.ctrlKey || event.metaKey));
     for (const modelIndex of state.order) {
       const colours = palette(modelIndex);
       const cell = document.createElement('div');
+      const isActive = state.active?.row === rowIndex && state.active.column === modelIndex;
       cell.className = state.stats[modelIndex].type === 'numeric' ? 'cell num' : 'cell';
+      if (isActive) cell.classList.add('active');
       cell.style.width = `${state.widths[modelIndex]}px`;
-      // Une ligne sélectionnée laisse la feuille de style décider de son fond :
-      // un style en ligne l'emporterait sur toute règle, sélection comprise.
-      if (!isSelected) {
-        cell.style.background = colours.cell;
-        cell.style.color = colours.text;
-      }
+      // La teinte de colonne reste posée même sur une ligne marquée : le
+      // marquage se fait par un voile par-dessus, non en remplaçant la couleur.
+      cell.style.background = colours.cell;
+      cell.style.color = colours.text;
       cell.textContent = cells[modelIndex] ?? '';
+      cell.addEventListener('mousedown', (event) =>
+        select(rowIndex, modelIndex, event.ctrlKey || event.metaKey),
+      );
       row.appendChild(cell);
     }
     fragment.appendChild(row);
@@ -466,13 +471,15 @@ function paintRows(): void {
   elements.body.appendChild(fragment);
 }
 
-function select(rowIndex: number, add: boolean): void {
+function select(rowIndex: number, columnIndex: number, add: boolean): void {
+  state.active = { row: rowIndex, column: columnIndex };
   if (add) {
     if (!state.selected.delete(rowIndex)) state.selected.add(rowIndex);
   } else {
     const alone = state.selected.size === 1 && state.selected.has(rowIndex);
     state.selected.clear();
     if (!alone) state.selected.add(rowIndex);
+    else state.active = null;
   }
   updateSelectionCount();
   paintRows();

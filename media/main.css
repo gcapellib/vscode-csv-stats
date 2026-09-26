@@ -325,16 +325,18 @@ body {
   text-align: right;
 }
 
-/* La sélection prend toute la ligne et efface les teintes de colonne : une
-   ligne retenue doit se voir sans hésitation, fût-ce au prix de l'arc-en-ciel. */
+/* Deux niveaux de marquage. La ligne reçoit un voile translucide, posé par
+   ombre interne plutôt qu'en remplaçant le fond : la teinte de colonne reste
+   visible dessous. La cellule cliquée, elle, assombrit davantage et s'encadre. */
 .row.selected .cell {
-  background: var(--vscode-list-activeSelectionBackground, rgb(128 128 128 / 40%));
-  color: var(--vscode-list-activeSelectionForeground, inherit);
+  box-shadow: inset 0 0 0 999px rgb(140 140 140 / 20%);
 }
 
-.row.selected {
-  outline: 1px solid var(--vscode-focusBorder, rgb(128 128 128 / 60%));
-  outline-offset: -1px;
+.cell.active,
+.row.selected .cell.active {
+  box-shadow: inset 0 0 0 999px rgb(0 0 0 / 26%);
+  outline: 2px solid var(--vscode-focusBorder, rgb(120 170 255 / 90%));
+  outline-offset: -2px;
 }
 
 .row {

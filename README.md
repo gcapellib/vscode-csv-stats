@@ -40,9 +40,11 @@ The **Insights** button in the toolbar folds the bands away when you only want
 the table, and unfolds them again. Because they can be folded, the bands are not
 stingy with space: a readable chart beats one that merely fits.
 
-Below that, the data table: click a header to sort, click a row to mark it —
-Ctrl-click (Cmd on macOS) marks several, and clicking a lone marked row unmarks
-it. The selection is held by row index rather than by position on screen, so it
+Below that, the data table: click a header to sort, click a cell to mark it —
+the whole row takes a translucent veil and the cell itself darkens and gets a
+frame. Ctrl-click (Cmd on macOS) marks several rows, and clicking a lone marked
+row unmarks it. The veil is laid over the column colour rather than replacing
+it, so the palette stays readable under the selection. The selection is held by row index rather than by position on screen, so it
 survives sorting, filtering and scrolling. Only the visible rows are rendered,
 which keeps the display smooth at a hundred thousand rows.
 
@@ -104,7 +106,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.5.0.vsix
+code --install-extension csv-stats-0.5.1.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**
