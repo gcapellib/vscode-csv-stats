@@ -8,11 +8,17 @@ The interface is **in English**, numbers included: comma thousands separator and
 decimal point. The table itself shows the cells exactly as they are written in
 the file.
 
-<img width="2557" height="1436" alt="image" src="https://github.com/user-attachments/assets/ba124c28-ae8c-48fa-a299-287c5c41e628" />
+![The stats band over a 7,200-row file, Rainbow palette, with a histogram tooltip](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-rainbow.png)
 
-<img width="2557" height="1436" alt="image" src="https://github.com/user-attachments/assets/543b3b9b-2bef-4349-befb-2887e564ca0c" />
+*Hovering a histogram bar gives that bin's range and count.*
 
-<img width="724" height="846" alt="image" src="https://github.com/user-attachments/assets/a4f5485a-0849-4c54-92ab-6b827dfed40e" />
+![The same file with the Console palette, where each column carries its own ink colour](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-console.png)
+
+*The Console palette leaves the background alone and colours the text instead.*
+
+![The palette picker, with a preview of each palette](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-themes.png)
+
+*Forty palettes, each previewed by five chips showing background and ink.*
 
 ## What the tab shows
 
@@ -83,7 +89,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.2.3.vsix
+code --install-extension csv-stats-0.2.4.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**
