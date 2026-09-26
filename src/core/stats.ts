@@ -1,9 +1,16 @@
 /**
- * Statistiques par colonne — mêmes règles que le plugin PyCharm du même nom.
+ * Statistiques par colonne.
+ *
+ * Le parcours est colonne par colonne — et non ligne par ligne — pour que la
+ * table de fréquences soit libérée avant de passer à la colonne suivante : une
+ * seule table vit à la fois, quel que soit le nombre de colonnes. Tout ce qui
+ * suit se calcule ensuite sur les seules valeurs distinctes, pondérées par leur
+ * effectif.
  */
 import type { CsvTable } from './csv';
+import { decideType, parseDate, parseNumber, type ColumnType, type DateOrder } from './types';
 
-export type ColumnType = 'numeric' | 'text';
+export { parseNumber, type ColumnType } from './types';
 
 /** Une valeur et sa part dans les valeurs renseignées de la colonne. */
 export interface ValueShare {
@@ -17,6 +24,8 @@ export interface ColumnStats {
   name: string;
   index: number;
   type: ColumnType;
+  /** Renseigné pour une colonne date : min et max sont alors des millisecondes. */
+  dateOrder?: DateOrder;
   /** Nombre de lignes de la table. */
   total: number;
   missing: number;
@@ -27,11 +36,11 @@ export interface ColumnStats {
   distinctShare: number;
   min: number | null;
   max: number | null;
-  /** 20 classes entre min et max ; vide pour une colonne texte. */
+  /** 20 classes entre min et max ; vide quand la colonne n'est pas ordonnable. */
   histogram: number[];
-  /** Trois valeurs les plus fréquentes ; vide pour une colonne numérique. */
+  /** Valeurs les plus fréquentes ; vide pour une colonne mesurable. */
   top: ValueShare[];
-  /** Ce que le top 3 laisse de côté, pour que les parts totalisent 100 %. */
+  /** Ce que le palmarès laisse de côté, pour que les parts totalisent 100 %. */
   otherCount: number;
   otherShare: number;
 }
@@ -39,50 +48,19 @@ export interface ColumnStats {
 export const HISTOGRAM_BINS = 20;
 const TOP_VALUES = 3;
 
-/** Chiffres, séparateur décimal point, exposant optionnel. */
-const NUMBER = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/;
-
-const SPACES = /[   ]/g;
-
-/**
- * Convertit une cellule en nombre, ou renvoie null.
- *
- * `decimalComma` est vrai pour les fichiers à point-virgule, où la virgule est le
- * séparateur décimal usuel. Les espaces, y compris insécables, sont traités comme
- * séparateurs de milliers.
- */
-export function parseNumber(raw: string, decimalComma: boolean): number | null {
-  let text = raw.trim();
-  if (text === '') return null;
-  text = text.replace(SPACES, '');
-  if (decimalComma && text.includes(',') && !text.includes('.')) text = text.replace(',', '.');
-  if (!NUMBER.test(text)) return null;
-  const value = Number(text);
-  return Number.isFinite(value) ? value : null;
-}
-
 export function isMissing(raw: string): boolean {
   return raw.trim() === '';
 }
 
-/**
- * Statistiques d'une colonne, en une passe sur la colonne seule.
- *
- * Le parcours est colonne par colonne — et non ligne par ligne — pour que la
- * table de fréquences soit libérée avant de passer à la colonne suivante : une
- * seule table vit à la fois, quel que soit le nombre de colonnes.
- *
- * `forced` vient du menu de la colonne. Forcer « numeric » retient les seules
- * valeurs qui se lisent comme des nombres, sans exiger qu'elles le soient toutes
- * — c'est précisément parce que la colonne ne l'est pas tout à fait qu'on force.
- */
+/** Les types dont les valeurs s'ordonnent sur un axe, et méritent un histogramme. */
+function isMeasurable(type: ColumnType): boolean {
+  return type === 'numeric' || type === 'date';
+}
+
 export function compute(table: CsvTable, columnIndex: number, forced?: ColumnType): ColumnStats {
   const decimalComma = table.delimiter === ';';
   const counts = new Map<string, number>();
   let missing = 0;
-  let numeric = 0;
-  let min = Number.POSITIVE_INFINITY;
-  let max = Number.NEGATIVE_INFINITY;
 
   for (const row of table.rows) {
     const raw = row[columnIndex];
@@ -91,69 +69,95 @@ export function compute(table: CsvTable, columnIndex: number, forced?: ColumnTyp
       continue;
     }
     counts.set(raw, (counts.get(raw) ?? 0) + 1);
-    const value = parseNumber(raw, decimalComma);
-    if (value !== null) {
-      numeric++;
-      if (value < min) min = value;
-      if (value > max) max = value;
-    }
   }
 
   const total = table.rows.length;
   const present = total - missing;
-  const isNumeric =
-    forced === 'text' ? false : forced === 'numeric' ? numeric > 0 : present > 0 && numeric === present;
+  const keys = [...counts.keys()];
   const name = table.headers[columnIndex] ?? `column ${columnIndex + 1}`;
+  const detected = decideType(keys, present, decimalComma, name);
+  // Un type forcé depuis le menu prime, mais l'ordre des dates reste celui que
+  // la détection a su lire : l'utilisateur choisit le type, pas le format.
+  const type = forced ?? detected.type;
 
-  const base = {
+  const stats: ColumnStats = {
     name,
     index: columnIndex,
+    type,
+    dateOrder: detected.dateOrder,
     total,
     missing,
     distinct: counts.size,
     present,
     missingShare: total === 0 ? 0 : missing / total,
     distinctShare: present === 0 ? 0 : counts.size / present,
-  };
-
-  if (!isNumeric) {
-    const top = [...counts.entries()]
-      .sort((left, right) => right[1] - left[1] || (left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0))
-      .slice(0, TOP_VALUES)
-      .map(([value, count]) => ({ value, count, share: present === 0 ? 0 : count / present }));
-    const taken = top.reduce((sum, entry) => sum + entry.count, 0);
-    return {
-      ...base,
-      type: 'text',
-      min: null,
-      max: null,
-      histogram: [],
-      top,
-      otherCount: present - taken,
-      otherShare: present === 0 ? 0 : (present - taken) / present,
-    };
-  }
-
-  const histogram = new Array<number>(HISTOGRAM_BINS).fill(0);
-  const span = max - min;
-  for (const [raw, occurrences] of counts) {
-    const value = parseNumber(raw, decimalComma);
-    if (value === null) continue;
-    const bin =
-      span <= 0 ? 0 : Math.min(HISTOGRAM_BINS - 1, Math.max(0, Math.floor(((value - min) / span) * HISTOGRAM_BINS)));
-    histogram[bin] += occurrences;
-  }
-
-  return {
-    ...base,
-    type: 'numeric',
-    min,
-    max,
-    histogram,
+    min: null,
+    max: null,
+    histogram: [],
     top: [],
     otherCount: 0,
     otherShare: 0,
   };
+
+  if (isMeasurable(type)) {
+    fillDistribution(stats, counts, decimalComma);
+    // Un type forcé peut ne rien donner de mesurable : mieux vaut un palmarès
+    // qu'un histogramme vide.
+    if (stats.min !== null) return stats;
+    stats.histogram = [];
+  }
+
+  fillTopValues(stats, counts, type);
+  return stats;
+}
+
+function readValue(raw: string, type: ColumnType, decimalComma: boolean, order?: DateOrder): number | null {
+  return type === 'date' ? parseDate(raw, order ?? 'iso') : parseNumber(raw, decimalComma);
+}
+
+function fillDistribution(stats: ColumnStats, counts: Map<string, number>, decimalComma: boolean): void {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  let seen = 0;
+  for (const raw of counts.keys()) {
+    const value = readValue(raw, stats.type, decimalComma, stats.dateOrder);
+    if (value === null) continue;
+    seen++;
+    if (value < min) min = value;
+    if (value > max) max = value;
+  }
+  if (seen === 0) return;
+
+  stats.min = min;
+  stats.max = max;
+  const span = max - min;
+  const histogram = new Array<number>(HISTOGRAM_BINS).fill(0);
+  for (const [raw, occurrences] of counts) {
+    const value = readValue(raw, stats.type, decimalComma, stats.dateOrder);
+    if (value === null) continue;
+    const bin =
+      span <= 0 ? 0 : Math.min(HISTOGRAM_BINS - 1, Math.floor(((value - min) / span) * HISTOGRAM_BINS));
+    histogram[bin] += occurrences;
+  }
+  stats.histogram = histogram;
+}
+
+function fillTopValues(stats: ColumnStats, counts: Map<string, number>, type: ColumnType): void {
+  // Un identifiant n'a pas de palmarès : toutes ses valeurs valent une occurrence.
+  if (type === 'id') return;
+  // Une colonne booléenne montre ses deux faces, pas un palmarès tronqué.
+  const wanted = type === 'boolean' ? counts.size : TOP_VALUES;
+  const ordered = [...counts.entries()].sort(
+    (left, right) => right[1] - left[1] || (left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0),
+  );
+  stats.top = ordered.slice(0, wanted).map(([value, count]) => ({
+    value,
+    count,
+    share: stats.present === 0 ? 0 : count / stats.present,
+  }));
+  const taken = stats.top.reduce((sum, entry) => sum + entry.count, 0);
+  stats.otherCount = stats.present - taken;
+  stats.otherShare = stats.present === 0 ? 0 : stats.otherCount / stats.present;
 }
 
 /** Statistiques de toutes les colonnes. `onColumnDone` alimente la progression. */

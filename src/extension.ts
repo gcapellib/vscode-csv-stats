@@ -4,6 +4,7 @@ import { compute, computeAll, type ColumnStats, type ColumnType } from './core/s
 
 const VIEW_TYPE = 'csvStats.editor';
 const THEME_KEY = 'csvStats.theme';
+const INSIGHTS_KEY = 'csvStats.insights';
 
 /** Au-delà, on refuse de charger plutôt que de saturer la mémoire de l'hôte. */
 const MAX_FILE_BYTES = 300 * 1024 * 1024;
@@ -75,6 +76,9 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
         case 'selectTheme':
           await this.context.globalState.update(THEME_KEY, message.id as string);
           break;
+        case 'setInsights':
+          await this.context.globalState.update(INSIGHTS_KEY, message.visible as boolean);
+          break;
         case 'prompt': {
           const answer = await vscode.window.showInputBox({
             title: message.title as string,
@@ -132,6 +136,7 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
             rowCount: table.rows.length,
             stats,
             theme: this.context.globalState.get<string>(THEME_KEY),
+            insights: this.context.globalState.get<boolean>(INSIGHTS_KEY) ?? true,
           });
 
           for (let start = 0; start < table.rows.length; start += CHUNK_ROWS) {
@@ -169,6 +174,10 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
 </head>
 <body>
 <div id="toolbar">
+  <button id="insights-toggle" type="button" aria-expanded="true" title="Show or hide the statistics bands">
+    <span class="chevron">▾</span> Insights
+  </button>
+  <span class="toolbar-sep"></span>
   <span class="toolbar-label">Theme</span>
   <button id="theme-button" type="button" aria-haspopup="listbox" aria-expanded="false">
     <span id="theme-swatch" class="swatch"></span>

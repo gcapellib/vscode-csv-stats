@@ -5,21 +5,40 @@
  * cent mille lignes. Le bandeau et l'en-tête restent collés en haut et défilent
  * horizontalement avec les colonnes, si bien que l'alignement est structurel.
  */
-import { count, num, percent } from '../core/format';
-import { parseNumber, type ColumnStats } from '../core/stats';
+import { bound, count, percent } from '../core/format';
+import { type ColumnStats } from '../core/stats';
+import { parseDate, parseNumber, type ColumnType } from '../core/types';
 import { paletteFor, THEMES, themeById, type CsvTheme, type Palette } from '../core/themes';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
 
 const ROW_HEIGHT = 22;
-const MIN_WIDTH = 150;
-const MAX_WIDTH = 340;
+const MIN_WIDTH = 210;
+const MAX_WIDTH = 460;
+/**
+ * Hauteur de l'histogramme. Le bandeau peut se replier d'un clic, donc il n'a
+ * plus à être avare de sa place : un graphique lisible vaut mieux qu'un
+ * graphique qui tient.
+ */
+const HIST_HEIGHT = 96;
 const WIDTH_SAMPLE_ROWS = 60;
 const OVERSCAN = 8;
 
+const COLUMN_TYPES: ColumnType[] = ['numeric', 'date', 'boolean', 'id', 'categorical', 'text'];
+
+const TYPE_LABELS: Record<ColumnType, string> = {
+  numeric: 'Numeric',
+  date: 'Date',
+  boolean: 'Boolean',
+  id: 'Identifier',
+  categorical: 'Category',
+  text: 'Text',
+};
+
 const elements = {
   toolbar: byId('toolbar'),
+  insightsToggle: byId('insights-toggle'),
   themeButton: byId('theme-button'),
   themeSwatch: byId('theme-swatch'),
   themeLabel: byId('theme-label'),
@@ -104,6 +123,7 @@ window.addEventListener('message', (event: MessageEvent) => {
       state.rowCount = message.rowCount as number;
       state.order = state.headers.map((_, index) => index);
       state.themeId = themeById(message.theme as string | undefined).id;
+      if (message.insights === false) toggleInsights(false);
       elements.shape.textContent = `${count(state.rowCount)} rows × ${count(state.headers.length)} columns`;
       if (message.truncated) {
         elements.notice.textContent = `Truncated: only the first ${count(state.rowCount)} rows are analysed.`;
@@ -175,10 +195,13 @@ function measureWidths(): void {
       if (value) widest = Math.max(widest, widthOf(value));
     }
     const column = state.stats[index];
-    if (column?.type === 'numeric') {
+    if (column && column.min !== null) {
       // La colonne doit loger ce que son bandeau annonce : des bornes tronquées
       // en « Min 98,… » ne renseignent plus sur rien.
-      widest = Math.max(widest, widthOf(`Min ${num(column.min ?? 0)}`) + widthOf(`Max ${num(column.max ?? 0)}`) + 10);
+      widest = Math.max(
+        widest,
+        widthOf(`Min ${bound(column.min ?? 0, column.type)}`) + widthOf(`Max ${bound(column.max ?? 0, column.type)}`) + 16,
+      );
     }
     return Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, widest + 28)));
   });
@@ -206,15 +229,20 @@ function rebuildView(): void {
 
   const sort = state.sort;
   if (sort) {
-    const numeric = state.stats[sort.index]?.type === 'numeric';
+    const column = state.stats[sort.index];
     const decimalComma = state.delimiter === ';';
+    // Une date se compare comme une date, sans quoi « 30/06 » précéderait
+    // « 15/01 » au seul motif que 3 vient après 1.
+    const ordered = column?.type === 'numeric' || column?.type === 'date';
+    const read = (raw: string) =>
+      column?.type === 'date' ? parseDate(raw, column.dateOrder ?? 'iso') : parseNumber(raw, decimalComma);
     const direction = sort.ascending ? 1 : -1;
     view.sort((left, right) => {
       const a = state.rows[left]?.[sort.index] ?? '';
       const b = state.rows[right]?.[sort.index] ?? '';
-      if (numeric) {
-        const x = parseNumber(a, decimalComma);
-        const y = parseNumber(b, decimalComma);
+      if (ordered) {
+        const x = read(a);
+        const y = read(b);
         // Les cellules illisibles vont en fin de tri, quel que soit le sens.
         if (x === null && y === null) return 0;
         if (x === null) return 1;
@@ -272,17 +300,19 @@ function bandCell(modelIndex: number): HTMLElement {
   cell.appendChild(line('stat', `Missing ${count(column.missing)} (${percent(column.missingShare)})`));
   cell.appendChild(line('stat', `Distinct ${count(column.distinct)} (${percent(column.distinctShare)})`));
 
-  if (column.type === 'numeric') {
+  if (column.histogram.length > 0) {
     cell.appendChild(histogram(column, colours, state.widths[modelIndex]));
     const bounds = document.createElement('div');
     bounds.className = 'bounds';
     bounds.innerHTML = '';
     const min = document.createElement('span');
-    min.textContent = `Min ${num(column.min ?? 0)}`;
+    min.textContent = `Min ${bound(column.min ?? 0, column.type)}`;
     const max = document.createElement('span');
-    max.textContent = `Max ${num(column.max ?? 0)}`;
+    max.textContent = `Max ${bound(column.max ?? 0, column.type)}`;
     bounds.append(min, max);
     cell.appendChild(bounds);
+  } else if (column.type === 'id') {
+    cell.appendChild(line('note', `${count(column.distinct)} values, all distinct`));
   } else {
     for (const share of column.top) {
       cell.appendChild(valueLine(share.value, share.share, colours.text, colours.accent));
@@ -325,8 +355,8 @@ function valueLine(label: string, share: number, colour: string, shareColour: st
  * quoi un creux se confondrait avec une absence de données.
  */
 function histogram(column: ColumnStats, colours: Palette, width: number): SVGSVGElement {
-  const height = 34;
-  const inner = width - 12;
+  const height = HIST_HEIGHT;
+  const inner = width - 20;
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('class', 'hist');
   svg.setAttribute('width', String(inner));
@@ -360,7 +390,7 @@ function histogram(column: ColumnStats, colours: Palette, width: number): SVGSVG
     target.setAttribute('fill', 'transparent');
     const low = (column.min ?? 0) + (span * index) / bins;
     const high = index === bins - 1 ? (column.max ?? 0) : (column.min ?? 0) + (span * (index + 1)) / bins;
-    const range = span <= 0 ? num(column.min ?? 0) : `${num(low)} – ${num(high)}`;
+    const range = span <= 0 ? bound(column.min ?? 0, column.type) : `${bound(low, column.type)} – ${bound(high, column.type)}`;
     const share = column.present === 0 ? 0 : value / column.present;
     target.addEventListener('mousemove', (event) => {
       event.stopPropagation();
@@ -421,7 +451,8 @@ function paintRows(): void {
     for (const modelIndex of state.order) {
       const colours = palette(modelIndex);
       const cell = document.createElement('div');
-      cell.className = state.stats[modelIndex].type === 'numeric' ? 'cell num' : 'cell';
+      const type = state.stats[modelIndex].type;
+      cell.className = type === 'numeric' || type === 'id' ? 'cell num' : 'cell';
       cell.style.width = `${state.widths[modelIndex]}px`;
       cell.style.background = colours.cell;
       cell.style.color = colours.text;
@@ -469,23 +500,36 @@ function escape(text: string): string {
  */
 function openMenu(modelIndex: number, anchor: HTMLElement): void {
   const column = state.stats[modelIndex];
-  const target = column.type === 'numeric' ? 'text' : 'numeric';
-  const entries: Array<[string, () => void] | 'separator'> = [
+  type Entry = [string, () => void] | 'separator' | { heading: string };
+  const entries: Entry[] = [
     ['Sort ascending', () => applySort(modelIndex, true)],
     ['Sort descending', () => applySort(modelIndex, false)],
     ['Filter…', () => void applyFilter(modelIndex)],
     'separator',
     ['Rename column', () => void applyRename(modelIndex)],
     ['Drop column', () => applyDrop(modelIndex)],
-    [`Change column type to ${target}`, () => vscode.postMessage({ type: 'changeType', index: modelIndex, forced: target })],
     'separator',
-    [state.bandVisible ? 'Hide column insights' : 'Show column insights', toggleInsights],
+    { heading: 'Read this column as' },
+    ...COLUMN_TYPES.map(
+      (type): Entry => [
+        // La coche dit ce que la colonne est aujourd'hui, détecté ou forcé.
+        `${type === column.type ? '\u2713' : '\u2007'}  ${TYPE_LABELS[type]}`,
+        () => vscode.postMessage({ type: 'changeType', index: modelIndex, forced: type }),
+      ],
+    ),
   ];
 
   elements.menu.textContent = '';
   for (const entry of entries) {
     if (entry === 'separator') {
       elements.menu.appendChild(document.createElement('hr'));
+      continue;
+    }
+    if ('heading' in entry) {
+      const heading = document.createElement('div');
+      heading.className = 'menu-heading';
+      heading.textContent = entry.heading;
+      elements.menu.appendChild(heading);
       continue;
     }
     const [label, action] = entry;
@@ -554,10 +598,22 @@ function applyDrop(modelIndex: number): void {
   paint();
 }
 
-function toggleInsights(): void {
-  state.bandVisible = !state.bandVisible;
+/**
+ * Replie ou deplie les bandeaux.
+ *
+ * L'interrupteur vit dans la barre d'outils, et non dans le bandeau : quand il y
+ * etait, le replier supprimait le seul bouton capable de le rappeler.
+ */
+function toggleInsights(visible = !state.bandVisible): void {
+  state.bandVisible = visible;
+  elements.insightsToggle.setAttribute('aria-expanded', String(visible));
+  const chevron = elements.insightsToggle.querySelector('.chevron');
+  if (chevron) chevron.textContent = visible ? '\u25BE' : '\u25B8';
+  vscode.postMessage({ type: 'setInsights', visible });
   paint();
 }
+
+elements.insightsToggle.addEventListener('click', () => toggleInsights());
 
 // ----------------------------------------------------------------- palettes
 

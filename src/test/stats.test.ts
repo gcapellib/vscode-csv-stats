@@ -38,7 +38,7 @@ describe('StatsComputer', () => {
 
   it('donne le top 3 par fréquence', () => {
     const stats = statsOf('ville\nLyon\nLyon\nLyon\nNantes\nNantes\nBrest\nCaen\n')[0];
-    assert.equal(stats.type, 'text');
+    assert.equal(stats.type, 'categorical');
     assert.deepEqual(
       stats.top.map((entry) => entry.value),
       ['Lyon', 'Nantes', 'Brest'],
@@ -80,8 +80,8 @@ describe('StatsComputer', () => {
     assert.equal(sum(stats.histogram), 2);
   });
 
-  it('bascule en texte dès une seule valeur non numérique', () => {
-    assert.equal(statsOf('prix\n10\n20\nn d\n')[0].type, 'text');
+  it('cesse d’être numérique dès une seule valeur non numérique', () => {
+    assert.equal(statsOf('prix\n10\n20\nn d\n')[0].type, 'categorical');
   });
 
   it('traite une colonne entièrement vide comme du texte sans top', () => {
@@ -125,10 +125,17 @@ describe('StatsComputer', () => {
   });
 
   it('remplit chaque classe du min au max', () => {
-    const text = 'prix\n' + Array.from({ length: HISTOGRAM_BINS }, (_, index) => `${index}\n`).join('');
-    const stats = statsOf(text)[0];
+    // Le doublon est indispensable : sans lui, vingt entiers tous distincts
+    // seraient un identifiant, l'histogramme serait vide, et l'assertion
+    // passerait à vide — « toutes les classes valent 1 » est vrai d'un tableau
+    // sans classe.
+    const values = [...Array.from({ length: HISTOGRAM_BINS }, (_, index) => index), 0];
+    const stats = statsOf('prix\n' + values.map((value) => `${value}\n`).join(''))[0];
+    assert.equal(stats.type, 'numeric');
+    assert.equal(stats.histogram.length, HISTOGRAM_BINS);
+    assert.equal(stats.histogram[0], 2);
     assert.ok(
-      stats.histogram.every((value) => value === 1),
+      stats.histogram.slice(1).every((value) => value === 1),
       stats.histogram.join(','),
     );
   });

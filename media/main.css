@@ -34,6 +34,32 @@ body {
   color: var(--vscode-descriptionForeground);
 }
 
+.toolbar-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--vscode-panel-border);
+}
+
+#insights-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border));
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+#insights-toggle:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+#insights-toggle .chevron {
+  opacity: 0.8;
+}
+
 #theme-button {
   display: inline-flex;
   align-items: center;
@@ -157,15 +183,18 @@ body {
 .band-cell {
   position: relative;
   flex: 0 0 auto;
-  padding: 6px 6px 8px;
+  padding: 10px 12px 14px;
   border-top: 3px solid transparent;
   border-right: 1px solid var(--vscode-panel-border);
   overflow: hidden;
-  line-height: 1.45;
+  line-height: 1.75;
 }
 
 .band-cell .type {
   opacity: 0.62;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.92em;
 }
 
 .band-cell .stat {
@@ -182,8 +211,8 @@ body {
   z-index: 1;
   top: 2px;
   right: 4px;
-  width: 20px;
-  height: 16px;
+  width: 24px;
+  height: 20px;
   padding: 0;
   border: none;
   background: transparent;
@@ -218,8 +247,8 @@ body {
 .bounds {
   display: flex;
   justify-content: space-between;
-  gap: 6px;
-  opacity: 0.62;
+  gap: 8px;
+  opacity: 0.72;
 }
 
 /* Min et Max restent chacun d'un seul tenant : coupés, ils perdent leur sens. */
@@ -231,7 +260,7 @@ body {
 
 .hist {
   display: block;
-  margin: 2px 0;
+  margin: 8px 0 4px;
 }
 
 .bar {
@@ -309,6 +338,18 @@ body {
   margin: 4px 6px;
   border: none;
   border-top: 1px solid var(--vscode-panel-border);
+}
+
+.menu-heading {
+  padding: 6px 14px 2px;
+  color: var(--vscode-descriptionForeground);
+  text-transform: uppercase;
+  font-size: 0.85em;
+  letter-spacing: 0.04em;
+}
+
+.band-cell .note {
+  opacity: 0.72;
 }
 
 .menu-item {

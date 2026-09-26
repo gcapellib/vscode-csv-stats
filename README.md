@@ -24,15 +24,23 @@ the file.
 
 Above every column, a band reports:
 
-- the detected type — **numeric** or **text**;
+- the detected type — **numeric**, **date**, **boolean**, **identifier**,
+  **category** or **text**;
 - the count and share of missing values;
 - the count and share of distinct values;
-- for a numeric column, a 20-bin histogram, then **Min on the left and Max on
-  the right**; hovering a bar shows that bin's range and count, and hovering the
-  rest of the band gives the column's full name and its summary;
-- for a text column, the three most frequent values and their share, followed by
-  an **Other** row carrying the remainder — so the percentages always add up to
-  100%.
+- for a numeric or date column, a 20-bin histogram, then **Min on the left and
+  Max on the right**; hovering a bar shows that bin's range and count, and
+  hovering the rest of the band gives the column's full name and its summary;
+- for a boolean column, both sides and their share;
+- for an identifier, simply how many values there are — a histogram of values
+  that each occur once would say nothing;
+- for a category or free text, the three most frequent values and their share,
+  followed by an **Other** row carrying the remainder, so the percentages always
+  add up to 100%.
+
+The **Insights** button in the toolbar folds the bands away when you only want
+the table, and unfolds them again. Because they can be folded, the bands are not
+stingy with space: a readable chart beats one that merely fits.
 
 Below that, the data table: click a header to sort, and only the visible rows are
 rendered, which keeps the display smooth at a hundred thousand rows.
@@ -40,13 +48,23 @@ rendered, which keeps the display smooth at a hundred thousand rows.
 ## Column menu
 
 Three dots at the top right of each band: sort ascending or descending, a
-contains-filter, rename, drop the column, flip the detected type, and hide the
-band.
+contains-filter, rename, drop the column, and read the column as another type.
 
 These are all **view actions**: the file is never rewritten. Reopening the tab
-restores the original state. Forcing the type to `numeric` keeps only the values
-that read as numbers, without requiring that all of them do — that is the whole
-point of a manual override.
+restores the original state. Forcing a type keeps only the values that read that
+way, without requiring that all of them do — that is the whole point of a manual
+override.
+
+Types are decided from the **distinct values**, not from every row: a
+hundred-thousand-row file often holds only a few hundred different values, which
+makes the guess a hundred times cheaper. A few rules are worth knowing. A column
+of `0` and `1` is read as boolean rather than as a measure. Day-first and
+month-first dates are told apart on the whole column — `03/04/2026` reads both
+ways, it takes a `25/12/2026` to settle it — and day-first wins when nothing
+settles it. And all-distinct values alone do not make an identifier: a fine
+measurement is all-distinct too, so an identifier must also have a constant width
+or a name that says so, and must not contain spaces — otherwise every free-text
+comment would pass for a reference.
 
 ## Palettes
 
@@ -89,7 +107,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.2.4.vsix
+code --install-extension csv-stats-0.3.0.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**
