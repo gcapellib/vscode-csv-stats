@@ -1,86 +1,83 @@
-# CSV Stats — extension VS Code
+# CSV Stats — VS Code extension
 
-Un aperçu statistique des fichiers CSV directement dans l'éditeur.
+A statistical overview of CSV files, right inside the editor.
 
-Clic droit sur un fichier `.csv` dans l'explorateur → **Open in CSV Stats**.
+Right-click a `.csv` file in the explorer → **Open in CSV Stats**.
 
-L'interface est **en anglais**, nombres compris : séparateur de milliers par
-virgule et point décimal. Le tableau, lui, montre les cellules telles qu'elles
-sont écrites dans le fichier.
+The interface is **in English**, numbers included: comma thousands separator and
+decimal point. The table itself shows the cells exactly as they are written in
+the file.
 
-## Ce que montre l'onglet
+## What the tab shows
 
-Au-dessus de chaque colonne, un bandeau donne :
+Above every column, a band reports:
 
-- le type détecté — **numeric** ou **text** ;
-- le nombre et le pourcentage de valeurs manquantes ;
-- le nombre et le pourcentage de valeurs distinctes ;
-- pour une colonne numérique, un histogramme de 20 classes, puis **min à gauche
-  et max à droite** ; survoler une barre affiche l'intervalle de la classe et son
-  effectif, et survoler le reste du bandeau donne le nom complet de la colonne et
-  son résumé ;
-- pour une colonne texte, les trois valeurs les plus fréquentes et leur part,
-  suivies d'une ligne **Other** portant le reste — les pourcentages totalisent
-  donc toujours 100 %.
+- the detected type — **numeric** or **text**;
+- the count and share of missing values;
+- the count and share of distinct values;
+- for a numeric column, a 20-bin histogram, then **Min on the left and Max on
+  the right**; hovering a bar shows that bin's range and count, and hovering the
+  rest of the band gives the column's full name and its summary;
+- for a text column, the three most frequent values and their share, followed by
+  an **Other** row carrying the remainder — so the percentages always add up to
+  100%.
 
-En dessous, le tableau des données : tri par clic sur l'en-tête, et seules les
-lignes visibles sont rendues, ce qui garde l'affichage fluide à cent mille
-lignes.
+Below that, the data table: click a header to sort, and only the visible rows are
+rendered, which keeps the display smooth at a hundred thousand rows.
 
-## Menu de colonne
+## Column menu
 
-Trois points en haut à droite de chaque bandeau : tri croissant ou décroissant,
-filtre « contient », renommage, retrait de la colonne, bascule du type détecté,
-et masquage du bandeau.
+Three dots at the top right of each band: sort ascending or descending, a
+contains-filter, rename, drop the column, flip the detected type, and hide the
+band.
 
-Ce sont toutes des **actions de vue** : le fichier n'est jamais réécrit. Rouvrir
-l'onglet rend l'état d'origine. Forcer le type en « numeric » retient les seules
-valeurs qui se lisent comme des nombres, sans exiger qu'elles le soient toutes —
-c'est bien le propos d'un forçage manuel.
+These are all **view actions**: the file is never rewritten. Reopening the tab
+restores the original state. Forcing the type to `numeric` keeps only the values
+that read as numbers, without requiring that all of them do — that is the whole
+point of a manual override.
 
 ## Palettes
 
-Un sélecteur propose **quarante palettes**, en trois familles : fond coloré et
-texte uni (vingt), fond uni et texte coloré par colonne à la manière d'une
-coloration syntaxique (dix), et les deux à la fois (dix). Le choix est retenu
-d'une session à l'autre.
+A picker offers **forty palettes** in three families: coloured background with
+uniform text (twenty), uniform background with text coloured per column, the way
+syntax highlighting does (ten), and both at once (ten). Your choice is remembered
+from one session to the next.
 
-## Règles de lecture
+## How files are read
 
+- The delimiter is detected between comma and semicolon by counting occurrences
+  outside quotes over the first lines: what decides is the **consistency** of the
+  count, not its size.
+- In a semicolon file, the comma is treated as a decimal separator; in a comma
+  file, it is not.
+- A column is numeric only if **every** one of its present values reads as a
+  number. Spaces, including non-breaking ones, are tolerated as thousands
+  separators.
+- A cell that is empty or made only of spaces counts as missing.
+- A wholly blank line is not a data row: it is skipped, as is the trailing
+  newline.
+- A UTF-8 BOM is stripped. UTF-8 is the expected encoding.
+- Beyond 500,000 rows the table is truncated, and the tab says so.
 
-- Le délimiteur est détecté entre la virgule et le point-virgule, en comptant les
-  occurrences hors guillemets sur les premières lignes : c'est la **régularité**
-  du compte qui décide, pas son volume.
-- Dans un fichier à point-virgule, la virgule est traitée comme séparateur
-  décimal ; dans un fichier à virgule, elle ne l'est pas.
-- Une colonne est numérique seulement si **toutes** ses valeurs renseignées se
-  lisent comme des nombres. Les espaces, y compris insécables, sont tolérés comme
-  séparateurs de milliers.
-- Une cellule vide ou uniquement composée d'espaces compte comme manquante.
-- Une ligne entièrement blanche n'est pas une ligne de données : elle est ignorée,
-  tout comme le saut de ligne final.
-- Le BOM UTF-8 est retiré. L'encodage attendu est UTF-8.
-- Au-delà de 500 000 lignes, la table est tronquée et l'onglet l'annonce.
+The file is read and analysed in the extension host rather than in the view, and
+rows reach the view in batches: the interface stays responsive throughout
+loading.
 
-Le fichier est lu et analysé dans l'hôte d'extension, pas dans la vue, et les
-lignes lui parviennent par paquets : l'interface reste réactive pendant tout le
-chargement.
+## Build
 
-## Construire
-
-dans ./vscode-csv-stats-main/
+From `./vscode-csv-stats-main/`:
 
 ```bash
 npm install
-npm test       # parsing, statistiques et palettes
-npm run build  # bundles dist/extension.js et dist/webview.js
-npm run package  # produit csv-stats-<version>.vsix
+npm test       # parsing, statistics and palettes
+npm run build  # bundles dist/extension.js and dist/webview.js
+npm run package  # produces csv-stats-<version>.vsix
 ```
 
-## Installer
+## Install
 
 ```bash
-code --install-extension csv-stats-0.2.0.vsix
+code --install-extension csv-stats-0.2.1.vsix
 ```
 
-Ou, dans VS Code : vue **Extensions** → `…` → **Install from VSIX…**
+Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**
