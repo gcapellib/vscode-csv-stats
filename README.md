@@ -45,23 +45,8 @@ texte uni (vingt), fond uni et texte coloré par colonne à la manière d'une
 coloration syntaxique (dix), et les deux à la fois (dix). Le choix est retenu
 d'une session à l'autre.
 
-Chaque entrée porte un aperçu de sa palette : cinq pastilles montrant le fond de
-colonne **et** la couleur d'encre. Les deux sont nécessaires — une palette à fond
-uni ne se distingue que par son encre, et un aperçu qui n'en montrerait que le
-fond les rendrait toutes identiques.
-
-Une palette n'énumère pas ses couleurs : elle fixe une liste de teintes et un
-style qui en dérive les intensités, pour le thème clair comme pour le sombre.
-S'y ajoute une rampe de luminosité, car la teinte seule ne sépare pas deux
-colonnes voisines dans une palette de famille : deux bleus proches et peu saturés
-se ressemblent. Un test refuse toute palette dont deux colonnes voisines
-s'écartent de moins de 10 unités — par le fond **ou** par le texte — ou dont le
-texte ne tranche pas assez sur son fond, et il le vérifie dans les deux thèmes.
-
 ## Règles de lecture
 
-Identiques à celles de l'extension PyCharm, pour qu'un même fichier donne les
-mêmes chiffres des deux côtés :
 
 - Le délimiteur est détecté entre la virgule et le point-virgule, en comptant les
   occurrences hors guillemets sur les premières lignes : c'est la **régularité**
