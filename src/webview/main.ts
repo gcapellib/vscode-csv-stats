@@ -47,6 +47,7 @@ const elements = {
   body: byId('body'),
   tooltip: byId('tooltip'),
   menu: byId('menu'),
+  picker: byId('picker'),
 };
 
 function byId(id: string): HTMLElement {
@@ -63,7 +64,7 @@ function byId(id: string): HTMLElement {
  */
 type Filter =
   | { kind: 'contains'; column: number; text: string; label: string }
-  | { kind: 'value'; column: number; value: string; label: string }
+  | { kind: 'values'; column: number; values: string[]; label: string }
   | { kind: 'range'; column: number; low: number; high: number; last: boolean; label: string };
 
 interface State {
@@ -237,8 +238,8 @@ function matches(cells: string[], filter: Filter): boolean {
   switch (filter.kind) {
     case 'contains':
       return raw.toLowerCase().includes(filter.text);
-    case 'value':
-      return raw === filter.value;
+    case 'values':
+      return filter.values.includes(raw);
     case 'range': {
       const value = parseNumber(raw, state.delimiter === ';');
       if (value === null) return false;
@@ -372,17 +373,18 @@ function bandCell(modelIndex: number): HTMLElement {
     for (const share of column.top) {
       body.appendChild(
         valueLine(share.value, share.share, colours.text, colours.accent, false, () =>
-          toggleFilter({
-            kind: 'value',
-            column: modelIndex,
-            value: share.value,
-            label: `${column.name} = ${share.value}`,
-          }),
+          toggleFilter(valuesFilter(modelIndex, [share.value])),
         ),
       );
     }
     if (column.top.length === 0) body.appendChild(line('type', 'no values'));
-    if (column.otherCount > 0) body.appendChild(valueLine('Other', column.otherShare, colours.text, colours.text, true));
+    if (column.otherCount > 0) {
+      const other = valueLine('Other', column.otherShare, colours.text, colours.text, true, () =>
+        openValuePicker(modelIndex, other),
+      );
+      other.title = 'Show all values';
+      body.appendChild(other);
+    }
   }
   cell.appendChild(body);
 
@@ -618,7 +620,11 @@ function openMenu(modelIndex: number, anchor: HTMLElement): void {
   const entries: Entry[] = [
     ['Sort ascending', () => applySort(modelIndex, true)],
     ['Sort descending', () => applySort(modelIndex, false)],
-    ['Filter…', () => void applyFilter(modelIndex)],
+    [
+      column.type === 'numeric' ? 'Filter by range…' : 'Filter by value…',
+      () => (column.type === 'numeric' ? openRangePicker(modelIndex, anchor) : openValuePicker(modelIndex, anchor)),
+    ],
+    ['Filter by text…', () => void applyFilter(modelIndex)],
     'separator',
     ['Rename column', () => void applyRename(modelIndex)],
     ['Drop column', () => applyDrop(modelIndex)],
@@ -707,6 +713,256 @@ async function applyFilter(modelIndex: number): Promise<void> {
     });
   }
   refilter();
+}
+
+/**
+ * Construit la condition « la colonne vaut l'une de ces valeurs ».
+ *
+ * Une seule pastille quel que soit le nombre de valeurs : c'est une seule
+ * condition, et la relire doit rester aussi simple que la poser.
+ */
+function valuesFilter(columnIndex: number, values: string[]): Filter {
+  const name = state.stats[columnIndex]?.name ?? `column ${columnIndex + 1}`;
+  const shown = values.slice(0, 3).join(', ');
+  const rest = values.length > 3 ? ` +${values.length - 3}` : '';
+  return {
+    kind: 'values',
+    column: columnIndex,
+    values,
+    label: values.length === 1 ? `${name} = ${values[0]}` : `${name} ∈ {${shown}${rest}}`,
+  };
+}
+
+/** Remplace la condition posée sur cette colonne, ou la retire si vide. */
+function setColumnFilter(columnIndex: number, filter: Filter | null): void {
+  state.filters = state.filters.filter((existing) => existing.column !== columnIndex);
+  if (filter) state.filters.push(filter);
+  refilter();
+}
+
+/**
+ * Effectifs des valeurs d'une colonne, comptés en tenant compte des **autres**
+ * filtres mais pas du sien.
+ *
+ * C'est le comportement d'Excel, et le seul qui ne piège pas : si sa propre
+ * condition comptait, décocher une valeur la ferait disparaître de la liste où
+ * on venait de la décocher.
+ */
+function valueCounts(columnIndex: number): Array<[string, number]> {
+  const others = state.filters.filter((filter) => filter.column !== columnIndex);
+  const counts = new Map<string, number>();
+  for (const cells of state.rows) {
+    if (!cells) continue;
+    if (!others.every((filter) => matches(cells, filter))) continue;
+    const raw = cells[columnIndex] ?? '';
+    counts.set(raw, (counts.get(raw) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((left, right) => right[1] - left[1] || (left[0] < right[0] ? -1 : 1));
+}
+
+/** Au-delà, la liste devient illisible : la recherche prend le relais. */
+const PICKER_MAX_ROWS = 400;
+
+/**
+ * Sélecteur de valeurs, à la manière d'Excel.
+ *
+ * Le palmarès du bandeau ne montre que trois valeurs ; toutes les autres sont
+ * noyées dans « Other » et resteraient hors d'atteinte. Ce panneau les rend
+ * toutes sélectionnables, et la recherche lui permet de tenir même sur une
+ * colonne à plusieurs milliers de valeurs distinctes.
+ */
+function openValuePicker(columnIndex: number, anchor: HTMLElement): void {
+  const column = state.stats[columnIndex];
+  const counts = valueCounts(columnIndex);
+  const current = state.filters.find(
+    (filter): filter is Extract<Filter, { kind: 'values' }> =>
+      filter.kind === 'values' && filter.column === columnIndex,
+  );
+  const chosen = new Set<string>(current?.values ?? []);
+
+  elements.picker.textContent = '';
+  const title = document.createElement('div');
+  title.className = 'picker-title';
+  title.textContent = column?.name ?? '';
+  elements.picker.appendChild(title);
+
+  const search = document.createElement('input');
+  search.className = 'picker-search';
+  search.type = 'search';
+  search.placeholder = 'Search values…';
+  elements.picker.appendChild(search);
+
+  const selectAll = document.createElement('label');
+  selectAll.className = 'picker-row picker-all';
+  const allBox = document.createElement('input');
+  allBox.type = 'checkbox';
+  selectAll.append(allBox, textSpan('(Select all)'));
+  elements.picker.appendChild(selectAll);
+
+  const list = document.createElement('div');
+  list.className = 'picker-list';
+  elements.picker.appendChild(list);
+
+  const note = document.createElement('div');
+  note.className = 'picker-note';
+  elements.picker.appendChild(note);
+
+  let visible: string[] = [];
+
+  const render = () => {
+    const needle = search.value.trim().toLowerCase();
+    const matching = needle === '' ? counts : counts.filter(([value]) => value.toLowerCase().includes(needle));
+    visible = matching.slice(0, PICKER_MAX_ROWS).map(([value]) => value);
+    list.textContent = '';
+    for (const [value, occurrences] of matching.slice(0, PICKER_MAX_ROWS)) {
+      const row = document.createElement('label');
+      row.className = 'picker-row';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = chosen.has(value);
+      box.addEventListener('change', () => {
+        if (box.checked) chosen.add(value);
+        else chosen.delete(value);
+        syncAll();
+      });
+      const name = textSpan(value === '' ? '(blank)' : value);
+      name.className = 'picker-value';
+      const tally = textSpan(count(occurrences));
+      tally.className = 'picker-count';
+      row.append(box, name, tally);
+      list.appendChild(row);
+    }
+    note.textContent =
+      matching.length > PICKER_MAX_ROWS
+        ? `Showing ${count(PICKER_MAX_ROWS)} of ${count(matching.length)} values — refine your search`
+        : `${count(matching.length)} values`;
+    syncAll();
+  };
+
+  const syncAll = () => {
+    const picked = visible.filter((value) => chosen.has(value)).length;
+    allBox.checked = picked > 0 && picked === visible.length;
+    allBox.indeterminate = picked > 0 && picked < visible.length;
+  };
+
+  allBox.addEventListener('change', () => {
+    // « Tout sélectionner » porte sur ce que la recherche laisse voir, comme
+    // dans Excel : sur une liste filtrée, il serait trompeur de tout cocher.
+    for (const value of visible) {
+      if (allBox.checked) chosen.add(value);
+      else chosen.delete(value);
+    }
+    render();
+  });
+
+  search.addEventListener('input', render);
+  render();
+
+  const footer = document.createElement('div');
+  footer.className = 'picker-footer';
+  const cancel = document.createElement('button');
+  cancel.className = 'picker-button';
+  cancel.textContent = 'Cancel';
+  cancel.addEventListener('click', closePicker);
+  const apply = document.createElement('button');
+  apply.className = 'picker-button primary';
+  apply.textContent = 'Apply';
+  apply.addEventListener('click', () => {
+    closePicker();
+    // Tout cocher ne filtre rien : autant retirer la condition.
+    const values = [...chosen];
+    const everything = values.length === counts.length;
+    setColumnFilter(columnIndex, values.length === 0 || everything ? null : valuesFilter(columnIndex, values));
+  });
+  footer.append(cancel, apply);
+  elements.picker.appendChild(footer);
+
+  placeFloating(elements.picker, anchor);
+  search.focus();
+}
+
+/**
+ * Pendant numérique du sélecteur : deux bornes saisies à la main.
+ *
+ * Une liste de valeurs n'a pas de sens sur une mesure continue, et les tranches
+ * de l'histogramme ne permettent pas de demander « entre 0 et 10 ».
+ */
+function openRangePicker(columnIndex: number, anchor: HTMLElement): void {
+  const column = state.stats[columnIndex];
+  const current = state.filters.find(
+    (filter): filter is Extract<Filter, { kind: 'range' }> =>
+      filter.kind === 'range' && filter.column === columnIndex,
+  );
+
+  elements.picker.textContent = '';
+  const title = document.createElement('div');
+  title.className = 'picker-title';
+  title.textContent = column?.name ?? '';
+  elements.picker.appendChild(title);
+
+  const make = (label: string, value: number) => {
+    const row = document.createElement('label');
+    row.className = 'picker-row';
+    row.append(textSpan(label));
+    const input = document.createElement('input');
+    input.className = 'picker-number';
+    input.type = 'number';
+    input.step = 'any';
+    input.value = String(value);
+    row.appendChild(input);
+    elements.picker.appendChild(row);
+    return input;
+  };
+  const low = make('From', current?.low ?? column?.min ?? 0);
+  const high = make('To', current?.high ?? column?.max ?? 0);
+
+  const footer = document.createElement('div');
+  footer.className = 'picker-footer';
+  const clear = document.createElement('button');
+  clear.className = 'picker-button';
+  clear.textContent = 'Clear';
+  clear.addEventListener('click', () => {
+    closePicker();
+    setColumnFilter(columnIndex, null);
+  });
+  const apply = document.createElement('button');
+  apply.className = 'picker-button primary';
+  apply.textContent = 'Apply';
+  apply.addEventListener('click', () => {
+    const from = Number(low.value);
+    const to = Number(high.value);
+    if (!Number.isFinite(from) || !Number.isFinite(to)) return;
+    closePicker();
+    setColumnFilter(columnIndex, {
+      kind: 'range',
+      column: columnIndex,
+      low: Math.min(from, to),
+      high: Math.max(from, to),
+      // Bornes saisies à la main : les deux sont incluses, comme on les lit.
+      last: true,
+      label: `${column?.name} ${num(Math.min(from, to))} – ${num(Math.max(from, to))}`,
+    });
+  });
+  footer.append(clear, apply);
+  elements.picker.appendChild(footer);
+
+  placeFloating(elements.picker, anchor);
+  low.focus();
+}
+
+function closePicker(): void {
+  elements.picker.hidden = true;
+}
+
+/** Positionne un panneau sous son ancre, sans déborder de la fenêtre. */
+function placeFloating(panel: HTMLElement, anchor: HTMLElement): void {
+  panel.style.visibility = 'hidden';
+  panel.hidden = false;
+  const box = anchor.getBoundingClientRect();
+  const size = panel.getBoundingClientRect();
+  panel.style.left = `${Math.max(4, Math.min(box.left, window.innerWidth - size.width - 8))}px`;
+  panel.style.top = `${Math.max(4, Math.min(box.bottom + 2, window.innerHeight - size.height - 8))}px`;
+  panel.style.visibility = 'visible';
 }
 
 /** Applique une condition, ou la retire si elle est déjà posée. */
@@ -918,7 +1174,14 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
     closeThemePopup();
     closeMenu();
+    closePicker();
   }
+});
+
+document.addEventListener('mousedown', (event) => {
+  const target = event.target as HTMLElement;
+  if (elements.picker.hidden || elements.picker.contains(target)) return;
+  closePicker();
 });
 
 vscode.postMessage({ type: 'ready' });

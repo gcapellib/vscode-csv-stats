@@ -56,6 +56,17 @@ subset**. Columns stop being read side by side and start being read conditioned
 on one another — *among trips departing from Caen, what does the cancellation
 rate look like?* is one click away.
 
+The ranking only shows three values, and the rest hides behind **Other** —
+clicking it opens a value picker listing *every* distinct value with its count,
+a search box, and checkboxes, the way Excel does. Several values become a single
+condition, `departure ∈ {Paris, Lille}`, because it is one condition and reading
+it back should be as simple as setting it. Counts in that list honour the other
+active filters but not the column's own, otherwise unticking a value would make
+it vanish from the list you were unticking it in.
+
+Numeric columns get the same entry as a pair of bounds instead of a list: the
+histogram bins cannot express *between 0 and 10*.
+
 Conditions combine with AND, and each of them shows as a chip in a bar under the
 toolbar, with the count of rows kept. Clicking a chip removes that one
 condition; **Clear all** removes them all. That bar is half the feature, not its
@@ -120,7 +131,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.6.0.vsix
+code --install-extension csv-stats-0.7.0.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**

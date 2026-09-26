@@ -199,6 +199,7 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
 </div></div>
 <div id="tooltip" hidden></div>
 <div id="menu" hidden></div>
+<div id="picker" hidden></div>
 <script nonce="${nonce}" src="${script}"></script>
 </body>
 </html>`;
