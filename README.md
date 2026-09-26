@@ -8,6 +8,9 @@ The interface is **in English**, numbers included: comma thousands separator and
 decimal point. The table itself shows the cells exactly as they are written in
 the file.
 
+<img width="2557" height="1436" alt="image" src="https://github.com/user-attachments/assets/ba124c28-ae8c-48fa-a299-287c5c41e628" />
+
+
 ## What the tab shows
 
 Above every column, a band reports:
