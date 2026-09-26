@@ -10,6 +10,9 @@ the file.
 
 <img width="2557" height="1436" alt="image" src="https://github.com/user-attachments/assets/ba124c28-ae8c-48fa-a299-287c5c41e628" />
 
+<img width="2557" height="1436" alt="image" src="https://github.com/user-attachments/assets/543b3b9b-2bef-4349-befb-2887e564ca0c" />
+
+<img width="724" height="846" alt="image" src="https://github.com/user-attachments/assets/a4f5485a-0849-4c54-92ab-6b827dfed40e" />
 
 ## What the tab shows
 
