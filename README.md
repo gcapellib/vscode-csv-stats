@@ -48,6 +48,20 @@ it, so the palette stays readable under the selection. The selection is held by 
 survives sorting, filtering and scrolling. Only the visible rows are rendered,
 which keeps the display smooth at a hundred thousand rows.
 
+## Cross-filtering
+
+Click a histogram bar or one of the ranked values, and two things happen: the
+table keeps only the matching rows, and **every other band is recomputed on that
+subset**. Columns stop being read side by side and start being read conditioned
+on one another — *among trips departing from Caen, what does the cancellation
+rate look like?* is one click away.
+
+Conditions combine with AND, and each of them shows as a chip in a bar under the
+toolbar, with the count of rows kept. Clicking a chip removes that one
+condition; **Clear all** removes them all. That bar is half the feature, not its
+decoration: without it you filter three times, forget what is active, and read
+partial figures believing them complete.
+
 ## Column menu
 
 Three dots at the top right of each band: sort ascending or descending, a
@@ -106,7 +120,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.5.1.vsix
+code --install-extension csv-stats-0.6.0.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**

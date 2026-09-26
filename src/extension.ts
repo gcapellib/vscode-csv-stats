@@ -189,6 +189,7 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
   <span id="selection"></span>
   <span id="notice"></span>
 </div>
+<div id="filters" hidden></div>
 <div id="scroller"><div id="sheet">
   <div id="frozen">
     <div id="band"></div>

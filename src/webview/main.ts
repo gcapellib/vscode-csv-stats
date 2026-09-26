@@ -6,7 +6,7 @@
  * horizontalement avec les colonnes, si bien que l'alignement est structurel.
  */
 import { count, num, percent } from '../core/format';
-import { type ColumnStats } from '../core/stats';
+import { compute, type ColumnStats } from '../core/stats';
 import { parseNumber, type ColumnType } from '../core/types';
 import { paletteFor, THEMES, themeById, type CsvTheme, type Palette } from '../core/themes';
 
@@ -38,6 +38,7 @@ const elements = {
   themePopup: byId('theme-popup'),
   shape: byId('shape'),
   selection: byId('selection'),
+  filterBar: byId('filters'),
   notice: byId('notice'),
   scroller: byId('scroller'),
   sheet: byId('sheet'),
@@ -54,6 +55,17 @@ function byId(id: string): HTMLElement {
   return element;
 }
 
+/**
+ * Une condition de filtrage. Elles se combinent par ET.
+ *
+ * Chacune porte son propre libellé : la barre de filtres doit pouvoir dire ce
+ * qu'elle retient sans avoir à reconstituer la phrase depuis les données.
+ */
+type Filter =
+  | { kind: 'contains'; column: number; text: string; label: string }
+  | { kind: 'value'; column: number; value: string; label: string }
+  | { kind: 'range'; column: number; low: number; high: number; last: boolean; label: string };
+
 interface State {
   headers: string[];
   rows: string[][];
@@ -64,7 +76,9 @@ interface State {
   order: number[];
   widths: number[];
   sort: { index: number; ascending: boolean } | null;
-  filters: Map<number, string>;
+  filters: Filter[];
+  /** Types imposés depuis le menu, à réappliquer après chaque recalcul. */
+  forcedTypes: Map<number, ColumnType>;
   /** Lignes retenues après filtre et tri, par index de modèle. */
   view: number[];
   bandVisible: boolean;
@@ -88,7 +102,8 @@ const state: State = {
   order: [],
   widths: [],
   sort: null,
-  filters: new Map(),
+  filters: [],
+  forcedTypes: new Map(),
   view: [],
   bandVisible: true,
   selected: new Set<number>(),
@@ -216,19 +231,61 @@ function totalWidth(): number {
 
 // ------------------------------------------------------------- filtre et tri
 
-function rebuildView(): void {
-  const rows = state.rows;
-  let view: number[] = [];
-  if (state.filters.size === 0) {
-    view = rows.map((_, index) => index);
-  } else {
-    const clauses = [...state.filters.entries()].map(([index, text]) => ({ index, text: text.toLowerCase() }));
-    for (let row = 0; row < rows.length; row++) {
-      const cells = rows[row];
-      if (!cells) continue;
-      if (clauses.every((clause) => (cells[clause.index] ?? '').toLowerCase().includes(clause.text))) view.push(row);
+/** Une ligne satisfait-elle la condition ? */
+function matches(cells: string[], filter: Filter): boolean {
+  const raw = cells[filter.column] ?? '';
+  switch (filter.kind) {
+    case 'contains':
+      return raw.toLowerCase().includes(filter.text);
+    case 'value':
+      return raw === filter.value;
+    case 'range': {
+      const value = parseNumber(raw, state.delimiter === ';');
+      if (value === null) return false;
+      // La dernière classe inclut sa borne haute, sinon le maximum lui-même
+      // serait exclu de l'intervalle qui le contient.
+      return value >= filter.low && (filter.last ? value <= filter.high : value < filter.high);
     }
   }
+}
+
+/** Indices des lignes retenues par les filtres actifs. */
+function filteredRows(): number[] {
+  const rows = state.rows;
+  if (state.filters.length === 0) return rows.map((_, index) => index);
+  const kept: number[] = [];
+  for (let row = 0; row < rows.length; row++) {
+    const cells = rows[row];
+    if (cells && state.filters.every((filter) => matches(cells, filter))) kept.push(row);
+  }
+  return kept;
+}
+
+/**
+ * Recalcule les bandeaux sur les seules lignes retenues.
+ *
+ * C'est tout l'intérêt du filtrage croisé : les colonnes ne se lisent plus côte
+ * à côte mais conditionnées les unes par les autres — « parmi les trajets
+ * annulés, à quoi ressemble la distribution des retards ».
+ */
+function recomputeStats(kept: number[]): void {
+  const subset = {
+    headers: state.headers,
+    rows: kept.map((index) => state.rows[index]).filter(Boolean),
+    delimiter: state.delimiter,
+    truncated: false,
+  };
+  const names = state.stats.map((column) => column.name);
+  state.stats = state.headers.map((_, index) => {
+    const recomputed = compute(subset, index, state.forcedTypes.get(index));
+    // Les renommages sont un état d'affichage : ils survivent au recalcul.
+    recomputed.name = names[index] ?? recomputed.name;
+    return recomputed;
+  });
+}
+
+function rebuildView(): void {
+  const view: number[] = filteredRows();
 
   const sort = state.sort;
   if (sort) {
@@ -313,7 +370,16 @@ function bandCell(modelIndex: number): HTMLElement {
     body.appendChild(bounds);
   } else {
     for (const share of column.top) {
-      body.appendChild(valueLine(share.value, share.share, colours.text, colours.accent));
+      body.appendChild(
+        valueLine(share.value, share.share, colours.text, colours.accent, false, () =>
+          toggleFilter({
+            kind: 'value',
+            column: modelIndex,
+            value: share.value,
+            label: `${column.name} = ${share.value}`,
+          }),
+        ),
+      );
     }
     if (column.top.length === 0) body.appendChild(line('type', 'no values'));
     if (column.otherCount > 0) body.appendChild(valueLine('Other', column.otherShare, colours.text, colours.text, true));
@@ -335,9 +401,20 @@ function line(className: string, text: string): HTMLElement {
   return element;
 }
 
-function valueLine(label: string, share: number, colour: string, shareColour: string, dim = false): HTMLElement {
+function valueLine(
+  label: string,
+  share: number,
+  colour: string,
+  shareColour: string,
+  dim = false,
+  onPick?: () => void,
+): HTMLElement {
   const row = document.createElement('div');
   row.className = dim ? 'value dim' : 'value';
+  if (onPick) {
+    row.classList.add('pickable');
+    row.addEventListener('click', onPick);
+  }
   const name = document.createElement('span');
   name.className = 'value-name';
   name.textContent = label;
@@ -395,6 +472,19 @@ function histogram(column: ColumnStats, colours: Palette, width: number): SVGSVG
       event.stopPropagation();
       showTooltip(event as MouseEvent, `<b>${escape(range)}</b><br>Count: <b>${count(value)}</b> (${percent(share)})`);
     });
+    target.addEventListener('click', (event) => {
+      event.stopPropagation();
+      hideTooltip();
+      toggleFilter({
+        kind: 'range',
+        column: column.index,
+        low,
+        high,
+        last: index === bins - 1,
+        label: `${column.name} ${range}`,
+      });
+    });
+    target.classList.add('pickable');
     svg.append(rect, target);
   }
   return svg;
@@ -601,11 +691,90 @@ function applySort(modelIndex: number, ascending: boolean): void {
 
 async function applyFilter(modelIndex: number): Promise<void> {
   const column = state.stats[modelIndex];
-  const entered = await ask('Filter Column', `Keep rows where « ${column.name} » contains:`, state.filters.get(modelIndex) ?? '');
+  const existing = state.filters.find(
+    (filter): filter is Extract<Filter, { kind: 'contains' }> =>
+      filter.kind === 'contains' && filter.column === modelIndex,
+  );
+  const entered = await ask('Filter Column', `Keep rows where « ${column.name} » contains:`, existing?.text ?? '');
   if (entered === null) return;
-  if (entered === '') state.filters.delete(modelIndex);
-  else state.filters.set(modelIndex, entered);
+  state.filters = state.filters.filter((filter) => filter !== existing);
+  if (entered !== '') {
+    state.filters.push({
+      kind: 'contains',
+      column: modelIndex,
+      text: entered.toLowerCase(),
+      label: `${column.name} contains « ${entered} »`,
+    });
+  }
+  refilter();
+}
+
+/** Applique une condition, ou la retire si elle est déjà posée. */
+function toggleFilter(filter: Filter): void {
+  const same = state.filters.findIndex(
+    (existing) => existing.column === filter.column && existing.label === filter.label,
+  );
+  if (same >= 0) state.filters.splice(same, 1);
+  else state.filters.push(filter);
+  refilter();
+}
+
+function clearFilters(): void {
+  state.filters = [];
+  refilter();
+}
+
+/**
+ * Affiche les conditions actives.
+ *
+ * Sans cette barre, on filtre trois fois, on oublie ce qui est retenu, et on lit
+ * des chiffres partiels en les croyant complets. C'est la moitié de la
+ * fonctionnalité, pas sa décoration.
+ */
+function paintFilterBar(): void {
+  elements.filterBar.textContent = '';
+  elements.filterBar.hidden = state.filters.length === 0;
+  if (state.filters.length === 0) return;
+
+  const kept = state.view.length;
+  const summary = document.createElement('span');
+  summary.className = 'filter-summary';
+  summary.textContent = `${count(kept)} of ${count(state.rows.length)} rows`;
+  elements.filterBar.appendChild(summary);
+
+  for (const filter of state.filters) {
+    const chip = document.createElement('button');
+    chip.className = 'chip-filter';
+    chip.title = 'Remove this filter';
+    chip.append(document.createTextNode(filter.label), cross());
+    chip.addEventListener('click', () => {
+      state.filters = state.filters.filter((other) => other !== filter);
+      refilter();
+    });
+    elements.filterBar.appendChild(chip);
+  }
+
+  const clear = document.createElement('button');
+  clear.className = 'chip-clear';
+  clear.textContent = 'Clear all';
+  clear.addEventListener('click', clearFilters);
+  elements.filterBar.appendChild(clear);
+}
+
+function cross(): HTMLElement {
+  const mark = document.createElement('span');
+  mark.className = 'chip-cross';
+  mark.textContent = '\u00D7';
+  return mark;
+}
+
+function refilter(): void {
   rebuildView();
+  // Le recalcul n'a lieu qu'ici : le mettre dans rebuildView le déclencherait à
+  // chaque paquet de lignes reçu, soit cinq fois pour rien sur un gros fichier.
+  recomputeStats(state.view);
+  measureWidths();
+  paintFilterBar();
   paint();
 }
 

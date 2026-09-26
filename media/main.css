@@ -12,6 +12,9 @@
 }
 
 body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
   margin: 0;
   padding: 0;
   font-family: var(--vscode-font-family);
@@ -22,6 +25,7 @@ body {
 }
 
 #toolbar {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -156,9 +160,56 @@ body {
   margin-left: 8px;
 }
 
+#filters {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+}
+
+.filter-summary {
+  color: var(--vscode-descriptionForeground);
+}
+
+.chip-filter,
+.chip-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--vscode-focusBorder, var(--vscode-panel-border));
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.chip-clear {
+  border-style: dashed;
+  color: var(--vscode-descriptionForeground);
+}
+
+.chip-filter:hover,
+.chip-clear:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.chip-cross {
+  opacity: 0.7;
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+/* Colonne souple plutôt qu'un décalage fixe : la barre de filtres apparaît et
+   disparaît, et le tableau se réajuste sans qu'aucune constante ne mente. */
 #scroller {
-  position: absolute;
-  inset: 40px 0 0 0;
+  flex: 1;
+  min-height: 0;
   overflow: auto;
 }
 
@@ -277,6 +328,15 @@ body {
 
 .bar {
   cursor: default;
+}
+
+/* Ce qui filtre au clic doit s'annoncer comme tel. */
+.pickable {
+  cursor: pointer;
+}
+
+.value.pickable:hover {
+  text-decoration: underline;
 }
 
 .head-cell {
