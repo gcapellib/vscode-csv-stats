@@ -21,7 +21,7 @@ const MAX_WIDTH = 460;
  * plus à être avare de sa place : un graphique lisible vaut mieux qu'un
  * graphique qui tient.
  */
-const HIST_HEIGHT = 96;
+const HIST_HEIGHT = 84;
 const WIDTH_SAMPLE_ROWS = 60;
 const OVERSCAN = 8;
 

@@ -101,7 +101,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.4.1.vsix
+code --install-extension csv-stats-0.4.2.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**
