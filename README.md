@@ -1,7 +1,6 @@
 # CSV Stats — extension VS Code
 
-Un aperçu statistique des fichiers CSV directement dans l'éditeur : version
-simplifiée de *Data Wrangler*, et portage de l'extension PyCharm du même nom.
+Un aperçu statistique des fichiers CSV directement dans l'éditeur.
 
 Clic droit sur un fichier `.csv` dans l'explorateur → **Open in CSV Stats**.
 
