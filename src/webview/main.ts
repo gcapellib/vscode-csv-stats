@@ -7,6 +7,12 @@
  */
 import { count, num, percent } from '../core/format';
 import { compute, type ColumnStats } from '../core/stats';
+import {
+  computeDataset,
+  computeDetails,
+  readCsvSnippet,
+  type ColumnDetails,
+} from '../core/details';
 import { parseNumber, type ColumnType } from '../core/types';
 import { paletteFor, THEMES, themeById, type CsvTheme, type Palette } from '../core/themes';
 
@@ -32,6 +38,7 @@ const TYPE_LABELS: Record<ColumnType, string> = { numeric: 'Numeric', text: 'Tex
 const elements = {
   toolbar: byId('toolbar'),
   insightsToggle: byId('insights-toggle'),
+  datasetButton: byId('dataset-button'),
   themeButton: byId('theme-button'),
   themeSwatch: byId('theme-swatch'),
   themeLabel: byId('theme-label'),
@@ -83,6 +90,7 @@ interface State {
   /** Lignes retenues après filtre et tri, par index de modèle. */
   view: number[];
   bandVisible: boolean;
+  fileName: string;
   /**
    * Lignes sélectionnées, par index du modèle et non de l'affichage : la
    * sélection survit ainsi au tri comme au filtrage.
@@ -107,6 +115,7 @@ const state: State = {
   forcedTypes: new Map(),
   view: [],
   bandVisible: true,
+  fileName: '',
   selected: new Set<number>(),
   active: null,
   themeId: THEMES[0].id,
@@ -140,6 +149,7 @@ window.addEventListener('message', (event: MessageEvent) => {
       state.stats = message.stats as ColumnStats[];
       state.delimiter = message.delimiter as string;
       state.rowCount = message.rowCount as number;
+      state.fileName = (message.fileName as string) ?? '';
       state.order = state.headers.map((_, index) => index);
       state.themeId = themeById(message.theme as string | undefined).id;
       if (message.insights === false) toggleInsights(false);
@@ -782,6 +792,19 @@ function valueCounts(columnIndex: number): Array<[string, number]> {
 /** Au-delà, la liste devient illisible : la recherche prend le relais. */
 const PICKER_MAX_ROWS = 400;
 
+/** Au-delà, un classement de valeurs ne montre plus qu'une forêt de barres égales. */
+const MAX_BARS = 20;
+
+/** La table telle qu'elle est après filtrage : c'est sur elle qu'on analyse. */
+function currentTable() {
+  return {
+    headers: state.headers,
+    rows: state.view.map((index) => state.rows[index]).filter(Boolean),
+    delimiter: state.delimiter,
+    truncated: false,
+  };
+}
+
 /**
  * Sélecteur de valeurs, à la manière d'Excel.
  *
@@ -973,118 +996,312 @@ function openRangePicker(columnIndex: number, anchor: HTMLElement): void {
  * Panneau de détail d'une colonne.
  *
  * Le bandeau doit rester compact ; tout ce qu'il ne peut pas porter sans devenir
- * illisible vient ici, à un clic. C'est aussi l'endroit où logeront plus tard
- * les signaux de qualité, sans rouvrir la question de la place.
+ * illisible vient ici, à un clic.
  */
 function openDetails(columnIndex: number, anchor: HTMLElement): void {
   const column = state.stats[columnIndex];
   if (!column) return;
+  const table = currentTable();
+  const details = computeDetails(table, columnIndex, column.type);
+
   elements.picker.textContent = '';
   elements.picker.classList.add('wide');
+  elements.picker.appendChild(panelTitle(column.name, `${column.type} · pandas ${details.pandasType}`));
 
-  const title = document.createElement('div');
-  title.className = 'picker-title';
-  title.textContent = column.name;
-  elements.picker.appendChild(title);
-
-  const filtered = state.filters.length > 0;
   const scope = document.createElement('div');
   scope.className = 'picker-note';
-  scope.textContent = filtered
-    ? `computed on the ${count(column.total)} rows kept by the active filters`
-    : `computed on all ${count(column.total)} rows`;
+  scope.textContent =
+    state.filters.length > 0
+      ? `computed on the ${count(column.total)} rows kept by the active filters`
+      : `computed on all ${count(column.total)} rows`;
   elements.picker.appendChild(scope);
 
-  const table = document.createElement('div');
-  table.className = 'detail-grid';
-  const add = (label: string, value: string) => {
-    table.append(textSpan(label), Object.assign(textSpan(value), { className: 'detail-value' }));
-  };
-  add('Type', column.type);
-  add('Rows', count(column.total));
-  add('Missing', `${count(column.missing)} (${percent(column.missingShare)})`);
-  add('Distinct', `${count(column.distinct)} (${percent(column.distinctShare)})`);
-  if (column.mean !== null) {
-    add('Min', num(column.min ?? 0));
-    add('Max', num(column.max ?? 0));
-    add('Mean', num(column.mean));
-    add('Median', num(column.median ?? 0));
-    add('Q1', num(column.q1 ?? 0));
-    add('Q3', num(column.q3 ?? 0));
-    add('Std deviation', num(column.deviation ?? 0));
-    add('Outliers', `${count(column.outliers)} (${percent(column.total === 0 ? 0 : column.outliers / column.total)})`);
+  for (const blocker of details.blockers) {
+    const flag = document.createElement('div');
+    flag.className = 'flag';
+    flag.textContent = blocker;
+    elements.picker.appendChild(flag);
   }
-  elements.picker.appendChild(table);
 
-  if (column.mean !== null) elements.picker.appendChild(boxPlot(column, palette(columnIndex)));
+  elements.picker.appendChild(sectionTitle('Completeness'));
+  const completeness = grid();
+  addRow(completeness, 'Empty', count(details.empty));
+  addRow(completeness, 'Whitespace only', count(details.whitespaceOnly));
+  for (const token of details.nullTokens) {
+    addRow(completeness, `Written as ${token.value}`, `${count(token.count)}${token.known ? ' · pandas NA' : ''}`);
+  }
+  addRow(
+    completeness,
+    'Effectively missing',
+    `${count(details.effectiveMissing)} (${percent(column.total === 0 ? 0 : details.effectiveMissing / column.total)})`,
+  );
+  addRow(completeness, 'Distinct', `${count(column.distinct)} (${percent(column.distinctShare)})`);
+  addRow(completeness, 'Duplicated rows', count(details.duplicated));
+  elements.picker.appendChild(completeness);
 
-  const footer = document.createElement('div');
-  footer.className = 'picker-footer';
-  const close = document.createElement('button');
-  close.className = 'picker-button primary';
-  close.textContent = 'Close';
-  close.addEventListener('click', closePicker);
-  footer.appendChild(close);
-  elements.picker.appendChild(footer);
+  elements.picker.appendChild(sectionTitle('Distribution'));
+  elements.picker.appendChild(distributionChart(column, details, palette(columnIndex)));
 
+  if (column.mean !== null) {
+    elements.picker.appendChild(sectionTitle('Statistics'));
+    const numbers = grid();
+    addRow(numbers, 'Min', num(column.min ?? 0));
+    addRow(numbers, 'Max', num(column.max ?? 0));
+    addRow(numbers, 'Mean', num(column.mean));
+    addRow(numbers, 'Median', num(column.median ?? 0));
+    addRow(numbers, 'Q1', num(column.q1 ?? 0));
+    addRow(numbers, 'Q3', num(column.q3 ?? 0));
+    addRow(numbers, 'Std deviation', num(column.deviation ?? 0));
+    addRow(numbers, 'Outliers', count(column.outliers));
+    elements.picker.appendChild(numbers);
+  } else {
+    elements.picker.appendChild(sectionTitle('Text'));
+    const text = grid();
+    addRow(text, 'Length min / max', `${count(details.minLength)} / ${count(details.maxLength)}`);
+    addRow(text, 'Length mean', num(Math.round(details.meanLength * 10) / 10));
+    addRow(text, 'Case variants', count(details.caseVariants));
+    addRow(text, 'Padded with spaces', count(details.spacePadded));
+    elements.picker.appendChild(text);
+  }
+
+  elements.picker.appendChild(footer([['Close', closePicker, true]]));
   placeFloating(elements.picker, anchor);
 }
 
 /**
- * Boîte à moustaches : la boîte va de Q1 à Q3, le trait marque la médiane, les
- * moustaches s'arrêtent à 1,5 écart interquartile.
+ * Le graphique qui dit quelque chose, plutôt que toujours le même.
+ *
+ * Une mesure mérite son histogramme ; une nomenclature, un classement de ses
+ * valeurs ; du texte libre, ni l'un ni l'autre — toutes ses valeurs y valant
+ * une occurrence — mais la répartition de ses longueurs, qui révèle les champs
+ * tronqués et les bourrages d'espaces.
  */
-function boxPlot(column: ColumnStats, colours: Palette): SVGSVGElement {
-  const width = 300;
-  const height = 56;
+function distributionChart(column: ColumnStats, details: ColumnDetails, colours: Palette): HTMLElement {
+  if (column.histogram.length > 0) return markedHistogram(column, colours);
+  const mostlyUnique = column.present > 0 && column.distinct / column.present > 0.6;
+  if (mostlyUnique && details.lengths.length > 1) {
+    return barChart(
+      details.lengths.map((entry) => ({ label: `${entry.length} chars`, count: entry.count })),
+      column.present,
+      colours,
+      'Value length',
+    );
+  }
+  const ranked = rankedValues(column.index);
+  return barChart(ranked, column.present, colours, 'Most frequent values');
+}
+
+/** Valeurs les plus fréquentes, le reste regroupé pour ne pas noyer le graphique. */
+function rankedValues(columnIndex: number): Array<{ label: string; count: number }> {
+  const counts = valueCounts(columnIndex);
+  const top = counts.slice(0, MAX_BARS).map(([value, occurrences]) => ({
+    label: value === '' ? '(blank)' : value,
+    count: occurrences,
+  }));
+  const rest = counts.slice(MAX_BARS).reduce((sum, [, occurrences]) => sum + occurrences, 0);
+  if (rest > 0) top.push({ label: `Other (${count(counts.length - MAX_BARS)} values)`, count: rest });
+  return top;
+}
+
+function barChart(
+  entries: Array<{ label: string; count: number }>,
+  total: number,
+  colours: Palette,
+  caption: string,
+): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'chart list';
+  wrapper.appendChild(Object.assign(textSpan(caption), { className: 'chart-caption' }));
+  const peak = Math.max(...entries.map((entry) => entry.count), 1);
+  for (const entry of entries) {
+    const row = document.createElement('div');
+    row.className = 'bar-row';
+    const label = textSpan(entry.label);
+    label.className = 'bar-label';
+    label.title = entry.label;
+    const track = document.createElement('div');
+    track.className = 'bar-track';
+    const fill = document.createElement('div');
+    fill.className = 'bar-fill';
+    fill.style.width = `${(entry.count / peak) * 100}%`;
+    fill.style.background = colours.accent;
+    track.appendChild(fill);
+    const tally = textSpan(`${count(entry.count)} · ${percent(total === 0 ? 0 : entry.count / total)}`);
+    tally.className = 'bar-count';
+    row.append(label, track, tally);
+    wrapper.appendChild(row);
+  }
+  return wrapper;
+}
+
+/**
+ * Histogramme en grand, avec médiane et quartiles posés dessus.
+ *
+ * Une boîte à moustaches redessinait des chiffres déjà écrits, et demandait
+ * qu'on sache la lire. Ici la forme se lit sans formation, et les quartiles s'y
+ * ajoutent au lieu de s'y substituer.
+ */
+function markedHistogram(column: ColumnStats, colours: Palette): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'chart';
+  const width = 316;
+  const height = 150;
+  const bottom = height - 26;
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('class', 'boxplot');
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.setAttribute('class', 'big-hist');
+
+  const bins = column.histogram;
+  const peak = Math.max(...bins, 1);
+  for (let index = 0; index < bins.length; index++) {
+    const left = 6 + ((width - 12) * index) / bins.length;
+    const right = 6 + ((width - 12) * (index + 1)) / bins.length;
+    const barHeight = bins[index] === 0 ? 0 : Math.max(1, (bottom - 8) * (bins[index] / peak));
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', String(left));
+    rect.setAttribute('y', String(bottom - barHeight));
+    rect.setAttribute('width', String(Math.max(1, right - left - 1)));
+    rect.setAttribute('height', String(barHeight));
+    rect.setAttribute('fill', colours.accent);
+    svg.appendChild(rect);
+  }
 
   const min = column.min ?? 0;
-  const max = column.max ?? 0;
-  const span = max - min || 1;
-  const x = (value: number) => 6 + ((value - min) / span) * (width - 12);
-  const spread = (column.q3 ?? 0) - (column.q1 ?? 0);
-  const lowWhisker = Math.max(min, (column.q1 ?? 0) - 1.5 * spread);
-  const highWhisker = Math.min(max, (column.q3 ?? 0) + 1.5 * spread);
-
-  const line = (x1: number, y1: number, x2: number, y2: number) => {
-    const element = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    element.setAttribute('x1', String(x1));
-    element.setAttribute('y1', String(y1));
-    element.setAttribute('x2', String(x2));
-    element.setAttribute('y2', String(y2));
-    element.setAttribute('stroke', colours.accent);
-    element.setAttribute('stroke-width', '2');
-    svg.appendChild(element);
+  const span = (column.max ?? 0) - min || 1;
+  const mark = (value: number, label: string) => {
+    const x = 6 + ((value - min) / span) * (width - 12);
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', String(x));
+    line.setAttribute('x2', String(x));
+    line.setAttribute('y1', '4');
+    line.setAttribute('y2', String(bottom));
+    line.setAttribute('stroke', 'currentColor');
+    line.setAttribute('stroke-width', label === 'Median' ? '2' : '1');
+    line.setAttribute('stroke-dasharray', label === 'Median' ? '' : '3 3');
+    line.setAttribute('opacity', '0.75');
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', String(Math.min(width - 28, Math.max(2, x + 3))));
+    text.setAttribute('y', String(bottom + 12));
+    text.setAttribute('font-size', '10');
+    text.setAttribute('fill', 'currentColor');
+    text.setAttribute('opacity', '0.75');
+    text.textContent = label;
+    svg.append(line, text);
   };
+  mark(column.q1 ?? 0, 'Q1');
+  mark(column.median ?? 0, 'Median');
+  mark(column.q3 ?? 0, 'Q3');
 
-  const middle = 22;
-  line(x(lowWhisker), middle, x(highWhisker), middle);
-  line(x(lowWhisker), middle - 8, x(lowWhisker), middle + 8);
-  line(x(highWhisker), middle - 8, x(highWhisker), middle + 8);
+  const scale = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  scale.setAttribute('x', '6');
+  scale.setAttribute('y', String(height - 4));
+  scale.setAttribute('font-size', '10');
+  scale.setAttribute('fill', 'currentColor');
+  scale.setAttribute('opacity', '0.6');
+  scale.textContent = `${num(min)} … ${num(column.max ?? 0)}`;
+  svg.appendChild(scale);
 
-  const box = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  box.setAttribute('x', String(x(column.q1 ?? 0)));
-  box.setAttribute('y', String(middle - 12));
-  box.setAttribute('width', String(Math.max(1, x(column.q3 ?? 0) - x(column.q1 ?? 0))));
-  box.setAttribute('height', '24');
-  box.setAttribute('fill', colours.accent);
-  box.setAttribute('fill-opacity', '0.35');
-  box.setAttribute('stroke', colours.accent);
-  svg.appendChild(box);
-  line(x(column.median ?? 0), middle - 12, x(column.median ?? 0), middle + 12);
+  wrapper.appendChild(svg);
+  return wrapper;
+}
 
-  const caption = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  caption.setAttribute('x', '6');
-  caption.setAttribute('y', String(height - 6));
-  caption.setAttribute('font-size', '11');
-  caption.setAttribute('fill', 'currentColor');
-  caption.setAttribute('opacity', '0.7');
-  caption.textContent = `${num(min)} … ${num(max)}`;
-  svg.appendChild(caption);
-  return svg;
+/**
+ * Panneau du fichier entier.
+ *
+ * Ce que chaque colonne ignore d'elle-même : les lignes strictement dupliquées,
+ * et surtout l'appel `pd.read_csv` qui reprend ce que le plugin a détecté —
+ * séparateur, virgule décimale, écritures de l'absence, colonnes à zéros de
+ * tête. C'est ce qu'on tape en premier, et ce qu'on se trompe le plus souvent.
+ */
+function openDataset(anchor: HTMLElement): void {
+  const table = currentTable();
+  const details = state.headers.map((_, index) =>
+    computeDetails(table, index, state.stats[index]?.type ?? 'text'),
+  );
+  const dataset = computeDataset(table, details);
+
+  elements.picker.textContent = '';
+  elements.picker.classList.add('wide');
+  elements.picker.appendChild(
+    panelTitle(state.fileName || 'Dataset', `${count(dataset.rows)} rows × ${count(dataset.columns)} columns`),
+  );
+
+  const summary = grid();
+  addRow(summary, 'Duplicate rows', count(dataset.duplicateRows));
+  addRow(summary, 'Columns with notes', count(new Set(dataset.notes.map((note) => note.split(':')[0])).size));
+  elements.picker.appendChild(summary);
+
+  if (dataset.notes.length > 0) {
+    elements.picker.appendChild(sectionTitle('Findings'));
+    const list = document.createElement('div');
+    list.className = 'findings';
+    for (const note of dataset.notes) {
+      const item = document.createElement('div');
+      item.className = 'flag';
+      item.textContent = note;
+      list.appendChild(item);
+    }
+    elements.picker.appendChild(list);
+  }
+
+  elements.picker.appendChild(sectionTitle('Read it with pandas'));
+  const snippet = readCsvSnippet(state.fileName || 'data.csv', table, dataset);
+  const code = document.createElement('pre');
+  code.className = 'snippet';
+  code.textContent = snippet;
+  elements.picker.appendChild(code);
+
+  elements.picker.appendChild(
+    footer([
+      ['Copy', () => void navigator.clipboard.writeText(snippet), false],
+      ['Close', closePicker, true],
+    ]),
+  );
+  placeFloating(elements.picker, anchor);
+}
+
+// ------------------------------------------------- fabriques de panneaux
+
+function panelTitle(title: string, subtitle: string): HTMLElement {
+  const wrapper = document.createElement('div');
+  const main = document.createElement('div');
+  main.className = 'picker-title';
+  main.textContent = title;
+  const sub = document.createElement('div');
+  sub.className = 'picker-note';
+  sub.textContent = subtitle;
+  wrapper.append(main, sub);
+  return wrapper;
+}
+
+function sectionTitle(text: string): HTMLElement {
+  const element = document.createElement('div');
+  element.className = 'section-title';
+  element.textContent = text;
+  return element;
+}
+
+function grid(): HTMLElement {
+  const element = document.createElement('div');
+  element.className = 'detail-grid';
+  return element;
+}
+
+function addRow(target: HTMLElement, label: string, value: string): void {
+  target.append(textSpan(label), Object.assign(textSpan(value), { className: 'detail-value' }));
+}
+
+function footer(buttons: Array<[string, () => void, boolean]>): HTMLElement {
+  const element = document.createElement('div');
+  element.className = 'picker-footer';
+  for (const [label, action, primary] of buttons) {
+    const button = document.createElement('button');
+    button.className = primary ? 'picker-button primary' : 'picker-button';
+    button.textContent = label;
+    button.addEventListener('click', action);
+    element.appendChild(button);
+  }
+  return element;
 }
 
 function closePicker(): void {
@@ -1201,6 +1418,7 @@ function toggleInsights(visible = !state.bandVisible): void {
 }
 
 elements.insightsToggle.addEventListener('click', () => toggleInsights());
+elements.datasetButton.addEventListener('click', () => openDataset(elements.datasetButton));
 
 // ----------------------------------------------------------------- palettes
 

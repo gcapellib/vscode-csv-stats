@@ -134,6 +134,7 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
             delimiter: table.delimiter,
             truncated: table.truncated,
             rowCount: table.rows.length,
+            fileName: basename(document.uri),
             stats,
             theme: this.context.globalState.get<string>(THEME_KEY),
             insights: this.context.globalState.get<boolean>(INSIGHTS_KEY) ?? true,
@@ -177,6 +178,7 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
   <button id="insights-toggle" type="button" aria-expanded="true" title="Show or hide the statistics bands">
     <span class="chevron">▾</span> Insights
   </button>
+  <button id="dataset-button" type="button" title="Duplicates, findings and the matching pandas call">Dataset…</button>
   <span class="toolbar-sep"></span>
   <span class="toolbar-label">Theme</span>
   <button id="theme-button" type="button" aria-haspopup="listbox" aria-expanded="false">

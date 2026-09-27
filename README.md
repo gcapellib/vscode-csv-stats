@@ -31,8 +31,7 @@ Above every column, a band reports:
   spread, which warns you that the ranking just below ranks nothing;
 - for a numeric column, a 20-bin histogram, then **Min / Max** and
   **Mean / Median** — the two figures you want at a glance, the rest one click
-  away in **Column details**, which adds quartiles, standard deviation, an
-  outlier count and a box plot; hovering a bar shows that bin's range and count, and hovering the
+  away in **Column details**; hovering a bar shows that bin's range and count, and hovering the
   rest of the band gives the column's full name and its summary;
 - for a text column, the three most frequent values and their share, followed by
   an **Other** row carrying the remainder, so the percentages always add up to
@@ -76,6 +75,35 @@ toolbar, with the count of rows kept. Clicking a chip removes that one
 condition; **Clear all** removes them all. That bar is half the feature, not its
 decoration: without it you filter three times, forget what is active, and read
 partial figures believing them complete.
+
+## Column details, and the dataset
+
+`⋯` → **Column details** opens what the band cannot carry without becoming
+unreadable.
+
+**Completeness, told apart.** An empty cell, a cell of spaces and a cell reading
+`NULL` are three different mistakes, and the panel counts them separately. It
+also names the tokens found — `NULL x68`, `- x62` — and says which ones pandas
+already discards on its own. That distinction matters: only the others belong in
+`na_values`.
+
+**The chart that says something**, rather than always the same one. A measure
+gets its histogram, enlarged, with the median and quartiles drawn on it — a box
+plot would have redrawn three figures already written above it, and asked you to
+know how to read it. A nomenclature gets its twenty most frequent values as
+bars, the rest gathered under *Other*, because past twenty bars nothing is
+legible. Free text gets neither — every value occurring once ranks nothing — but
+the distribution of its **lengths**, which is what reveals fields truncated at
+fifty characters and padding spaces.
+
+**What pandas would make of the column**, and what stands in the way: `int64`,
+`float64` or `object`, with notes such as *leading zeros are lost unless dtype is
+"string"* or *would be numeric if NULL, - counted as missing*.
+
+**Dataset…** in the toolbar covers what no single column knows about itself:
+rows strictly duplicated, findings across all columns, and the `pd.read_csv`
+call matching what was detected — separator, decimal comma, the missing-value
+tokens pandas does not know, and the columns to read as strings.
 
 ## Column menu
 
@@ -135,7 +163,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.8.0.vsix
+code --install-extension csv-stats-0.9.0.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**
