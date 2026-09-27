@@ -11,17 +11,25 @@ The interface is **in English**, numbers included: comma thousands separator and
 decimal point. The table itself shows the cells exactly as they are written in
 the file.
 
-![The stats band over a 7,200-row file, Rainbow palette, with a histogram tooltip](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-rainbow.png)
+![The stats band over a 7,200-row file, Rainbow palette, with a row selected](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-rainbow.png)
 
-*Hovering a histogram bar gives that bin's range and count.*
+*Per-column stats, a rainbow palette, and a row marked in the table below.*
 
-![The same file with the Console palette, where each column carries its own ink colour](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-console.png)
+![The Column details panel: completeness, a histogram with median and quartiles marked, and full statistics](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-column-details.png)
 
-*The Console palette leaves the background alone and colours the text instead.*
+*`⋯` → Column details: what pandas would make of the column, and the chart that fits it — here a histogram with Q1, median and Q3 marked on it.*
 
 ![The palette picker, with a preview of each palette](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-themes.png)
 
 *Forty palettes, each previewed by five chips showing background and ink.*
+
+![The same file with the Console palette, where each column carries its own ink colour on a plain background](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-console.png)
+
+*Console: a plain background, each column keeping its own ink colour — the way syntax highlighting does.*
+
+![The same file with the Prism duo palette, where both the background and the text are coloured per column](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-prismduo.png)
+
+*Prism duo: background and text both coloured, the text much denser than its background.*
 
 ## What the tab shows
 
@@ -173,7 +181,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.10.1.vsix
+code --install-extension csv-stats-0.10.2.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**
