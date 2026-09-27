@@ -50,10 +50,14 @@ describe('analyse approfondie', () => {
     assert.equal(padded.spacePadded, 1);
   });
 
-  it('compte les lignes qui partagent une valeur', () => {
-    const { details } = detailsOf('ville\nLyon\nLyon\nLyon\nNantes\n');
-    // Quatre lignes renseignées, deux valeurs distinctes : deux doublons.
-    assert.equal(details.duplicated, 2);
+  it('compte les valeurs vues une seule fois', () => {
+    // Lyon revient trois fois, Nantes une : une seule valeur est unique.
+    assert.equal(detailsOf('ville\nLyon\nLyon\nLyon\nNantes\n').details.singletons, 1);
+    // Une nomenclature régulière n'en a aucune, et c'est l'information utile :
+    // « présentes moins distinctes » aurait annoncé 7 190 doublons sur une
+    // colonne parfaitement saine.
+    const regular = 'g\n' + Array.from({ length: 60 }, (_, i) => `${['A', 'B', 'C'][i % 3]}\n`).join('');
+    assert.equal(detailsOf(regular).details.singletons, 0);
   });
 
   it('mesure les longueurs de texte', () => {

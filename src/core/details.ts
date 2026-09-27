@@ -36,8 +36,14 @@ export interface ColumnDetails {
   nullTokens: NullToken[];
   /** Manquants réels si les jetons ci-dessus étaient traités comme absents. */
   effectiveMissing: number;
-  /** Lignes partageant leur valeur avec une autre ligne. */
-  duplicated: number;
+  /**
+   * Valeurs n'apparaissant qu'une seule fois.
+   *
+   * Contrairement à « présentes moins distinctes », ce compte ne se déduit pas
+   * des deux totaux déjà affichés : il distingue une poignée de valeurs lourdes
+   * suivies d'une longue traîne de cas uniques d'une répartition régulière.
+   */
+  singletons: number;
   minLength: number;
   maxLength: number;
   meanLength: number;
@@ -146,7 +152,7 @@ export function computeDetails(table: CsvTable, columnIndex: number, type: Colum
     whitespaceOnly,
     nullTokens,
     effectiveMissing: empty + whitespaceOnly + nullTotal,
-    duplicated: present - counts.size,
+    singletons: [...counts.values()].filter((occurrences) => occurrences === 1).length,
     minLength: minLength === Number.POSITIVE_INFINITY ? 0 : minLength,
     maxLength,
     meanLength: present === 0 ? 0 : lengthSum / present,

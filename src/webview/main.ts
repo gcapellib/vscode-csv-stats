@@ -1036,7 +1036,11 @@ function openDetails(columnIndex: number, anchor: HTMLElement): void {
     `${count(details.effectiveMissing)} (${percent(column.total === 0 ? 0 : details.effectiveMissing / column.total)})`,
   );
   addRow(completeness, 'Distinct', `${count(column.distinct)} (${percent(column.distinctShare)})`);
-  addRow(completeness, 'Duplicated rows', count(details.duplicated));
+  addRow(
+    completeness,
+    'Values seen once',
+    `${count(details.singletons)}${column.distinct === 0 ? '' : ` of ${count(column.distinct)}`}`,
+  );
   elements.picker.appendChild(completeness);
 
   elements.picker.appendChild(sectionTitle('Distribution'));
