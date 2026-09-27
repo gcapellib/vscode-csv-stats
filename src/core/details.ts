@@ -49,8 +49,11 @@ export interface ColumnDetails {
   meanLength: number;
   /** Valeurs qui ne se distinguent d'une autre que par la casse. */
   caseVariants: number;
+  /** Les valeurs en cause, pour pouvoir aller les voir dans le tableau. */
+  caseVariantValues: string[];
   /** Valeurs portant un espace en tête ou en fin. */
   spacePadded: number;
+  spacePaddedValues: string[];
   /** Chiffres uniquement, dont certains commencent par un zéro. */
   leadingZeros: boolean;
   /** Type que pandas donnerait à la colonne, et ce qui l'en empêche. */
@@ -120,7 +123,14 @@ export function computeDetails(table: CsvTable, columnIndex: number, type: Colum
   }
 
   let caseVariants = 0;
-  for (const variants of folded.values()) if (variants.size > 1) caseVariants += variants.size;
+  const caseVariantValues: string[] = [];
+  for (const variants of folded.values()) {
+    if (variants.size > 1) {
+      caseVariants += variants.size;
+      caseVariantValues.push(...variants);
+    }
+  }
+  const spacePaddedValues = [...counts.keys()].filter((raw) => raw !== raw.trim());
 
   const nullTokens = [...nullCounts.entries()]
     .map(([value, count]) => ({ value, count, known: PANDAS_DEFAULT_NA.has(value.toLowerCase()) }))
@@ -132,7 +142,6 @@ export function computeDetails(table: CsvTable, columnIndex: number, type: Colum
   if (type === 'numeric') {
     const anyDecimal = [...counts.keys()].some((raw) => !Number.isInteger(parseNumber(raw, decimalComma) ?? 0.5));
     pandasType = anyDecimal ? 'float64' : 'int64';
-    if (decimalComma) blockers.push('needs decimal="," or it reads as object');
   } else if (nullTotal > 0 && present > nullTotal) {
     const restIsNumeric = [...counts.keys()]
       .filter((raw) => !isNullToken(raw))
@@ -157,7 +166,9 @@ export function computeDetails(table: CsvTable, columnIndex: number, type: Colum
     maxLength,
     meanLength: present === 0 ? 0 : lengthSum / present,
     caseVariants,
+    caseVariantValues,
     spacePadded,
+    spacePaddedValues,
     leadingZeros: digitsOnly && sawLeadingZero,
     pandasType,
     blockers,
@@ -167,49 +178,81 @@ export function computeDetails(table: CsvTable, columnIndex: number, type: Colum
   };
 }
 
+/**
+ * Un constat, accompagné de ce qu'il faut pour aller le vérifier.
+ *
+ * Un diagnostic qu'on ne peut pas aller voir dans les données ne sert qu'à
+ * inquiéter : chaque constat porte donc les valeurs fautives, de quoi filtrer le
+ * tableau sur elles d'un clic.
+ */
+export interface Finding {
+  column: number;
+  text: string;
+  values: string[];
+}
+
 export interface DatasetDetails {
   rows: number;
   columns: number;
   /** Lignes strictement identiques à une autre, la première exceptée. */
   duplicateRows: number;
+  /** Leurs index, pour pouvoir les afficher. */
+  duplicateRowIndices: number[];
   /** Jetons d'absence à passer à pandas, ceux qu'il ne connaît pas déjà. */
   extraNaValues: string[];
   /** Colonnes à lire en texte pour préserver leurs zéros de tête. */
   stringColumns: string[];
-  notes: string[];
+  findings: Finding[];
 }
 
 export function computeDataset(table: CsvTable, details: ColumnDetails[]): DatasetDetails {
   const seen = new Set<string>();
-  let duplicateRows = 0;
-  for (const row of table.rows) {
+  const duplicateRowIndices: number[] = [];
+  table.rows.forEach((row, index) => {
     const key = row.join(ROW_JOIN);
-    if (seen.has(key)) duplicateRows++;
+    if (seen.has(key)) duplicateRowIndices.push(index);
     else seen.add(key);
-  }
+  });
 
   const extra = new Set<string>();
   const stringColumns: string[] = [];
-  const notes: string[] = [];
+  const findings: Finding[] = [];
   details.forEach((column, index) => {
     const name = table.headers[index] ?? `column ${index + 1}`;
     for (const token of column.nullTokens) if (!token.known) extra.add(token.value);
     if (column.leadingZeros) stringColumns.push(name);
-    if (column.caseVariants > 0) notes.push(`${name}: ${column.caseVariants} values differ only by case`);
-    if (column.spacePadded > 0) notes.push(`${name}: ${column.spacePadded} values padded with spaces`);
+    if (column.caseVariants > 0) {
+      findings.push({
+        column: index,
+        text: `${name}: ${column.caseVariants} values differ only by case`,
+        values: column.caseVariantValues,
+      });
+    }
+    if (column.spacePadded > 0) {
+      findings.push({
+        column: index,
+        text: `${name}: ${column.spacePadded} values padded with spaces`,
+        values: column.spacePaddedValues,
+      });
+    }
     if (column.nullTokens.length > 0) {
       const list = column.nullTokens.map((token) => `${token.value} x${token.count}`).join(', ');
-      notes.push(`${name}: missing written as ${list}`);
+      findings.push({
+        column: index,
+        text: `${name}: missing written as ${list}`,
+        values: column.nullTokens.map((token) => token.value),
+      });
     }
   });
 
   return {
     rows: table.rows.length,
     columns: table.headers.length,
-    duplicateRows,
+    duplicateRows: duplicateRowIndices.length,
+    duplicateRowIndices,
     extraNaValues: [...extra].sort(),
     stringColumns,
-    notes,
+    findings,
   };
 }
 

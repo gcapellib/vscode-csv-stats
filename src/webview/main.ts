@@ -72,7 +72,9 @@ function byId(id: string): HTMLElement {
 type Filter =
   | { kind: 'contains'; column: number; text: string; label: string }
   | { kind: 'values'; column: number; values: string[]; label: string }
-  | { kind: 'range'; column: number; low: number; high: number; last: boolean; label: string };
+  | { kind: 'range'; column: number; low: number; high: number; last: boolean; label: string }
+  /** Un ensemble de lignes désigné explicitement, comme les doublons. */
+  | { kind: 'rows'; column: number; rows: Set<number>; label: string };
 
 interface State {
   headers: string[];
@@ -247,7 +249,8 @@ function totalWidth(): number {
 // ------------------------------------------------------------- filtre et tri
 
 /** Une ligne satisfait-elle la condition ? */
-function matches(cells: string[], filter: Filter): boolean {
+function matches(cells: string[], filter: Filter, rowIndex: number): boolean {
+  if (filter.kind === 'rows') return filter.rows.has(rowIndex);
   const raw = cells[filter.column] ?? '';
   switch (filter.kind) {
     case 'contains':
@@ -271,7 +274,7 @@ function filteredRows(): number[] {
   const kept: number[] = [];
   for (let row = 0; row < rows.length; row++) {
     const cells = rows[row];
-    if (cells && state.filters.every((filter) => matches(cells, filter))) kept.push(row);
+    if (cells && state.filters.every((filter) => matches(cells, filter, row))) kept.push(row);
   }
   return kept;
 }
@@ -752,13 +755,17 @@ async function applyFilter(modelIndex: number): Promise<void> {
  */
 function valuesFilter(columnIndex: number, values: string[]): Filter {
   const name = state.stats[columnIndex]?.name ?? `column ${columnIndex + 1}`;
-  const shown = values.slice(0, 3).join(', ');
+  // Une valeur bordée d'espaces se met entre guillemets : sans eux, « Nantes »
+  // et « Nantes  » se lisent pareil, et le compte affiché paraît faux.
+  const show = (value: string) =>
+    value === '' ? '(blank)' : value !== value.trim() ? JSON.stringify(value) : value;
+  const shown = values.slice(0, 3).map(show).join(', ');
   const rest = values.length > 3 ? ` +${values.length - 3}` : '';
   return {
     kind: 'values',
     column: columnIndex,
     values,
-    label: values.length === 1 ? `${name} = ${values[0]}` : `${name} ∈ {${shown}${rest}}`,
+    label: values.length === 1 ? `${name} = ${show(values[0])}` : `${name} ∈ {${shown}${rest}}`,
   };
 }
 
@@ -780,9 +787,10 @@ function setColumnFilter(columnIndex: number, filter: Filter | null): void {
 function valueCounts(columnIndex: number): Array<[string, number]> {
   const others = state.filters.filter((filter) => filter.column !== columnIndex);
   const counts = new Map<string, number>();
-  for (const cells of state.rows) {
+  for (let index = 0; index < state.rows.length; index++) {
+    const cells = state.rows[index];
     if (!cells) continue;
-    if (!others.every((filter) => matches(cells, filter))) continue;
+    if (!others.every((filter) => matches(cells, filter, index))) continue;
     const raw = cells[columnIndex] ?? '';
     counts.set(raw, (counts.get(raw) ?? 0) + 1);
   }
@@ -1030,16 +1038,19 @@ function openDetails(columnIndex: number, anchor: HTMLElement): void {
   for (const token of details.nullTokens) {
     addRow(completeness, `Written as ${token.value}`, `${count(token.count)}${token.known ? ' · pandas NA' : ''}`);
   }
-  addRow(
-    completeness,
-    'Effectively missing',
-    `${count(details.effectiveMissing)} (${percent(column.total === 0 ? 0 : details.effectiveMissing / column.total)})`,
-  );
-  addRow(completeness, 'Distinct', `${count(column.distinct)} (${percent(column.distinctShare)})`);
+  // Sans jeton d'absence, ce total répète exactement ce que le bandeau affiche
+  // sous « Missing ». Il ne s'affiche donc que lorsqu'il en diffère.
+  if (details.nullTokens.length > 0) {
+    addRow(
+      completeness,
+      'Effectively missing',
+      `${count(details.effectiveMissing)} (${percent(column.total === 0 ? 0 : details.effectiveMissing / column.total)})`,
+    );
+  }
   addRow(
     completeness,
     'Values seen once',
-    `${count(details.singletons)}${column.distinct === 0 ? '' : ` of ${count(column.distinct)}`}`,
+    `${count(details.singletons)}${column.distinct === 0 ? '' : ` of ${count(column.distinct)} distinct`}`,
   );
   elements.picker.appendChild(completeness);
 
@@ -1212,10 +1223,9 @@ function markedHistogram(column: ColumnStats, colours: Palette): HTMLElement {
 /**
  * Panneau du fichier entier.
  *
- * Ce que chaque colonne ignore d'elle-même : les lignes strictement dupliquées,
- * et surtout l'appel `pd.read_csv` qui reprend ce que le plugin a détecté —
- * séparateur, virgule décimale, écritures de l'absence, colonnes à zéros de
- * tête. C'est ce qu'on tape en premier, et ce qu'on se trompe le plus souvent.
+ * Il ne paraphrase pas ce que les colonnes disent déjà : il répond à « que vaut
+ * ce fichier, et comment je le charge ». D'où l'appel `pd.read_csv` en tête,
+ * puis la vue d'ensemble des colonnes qu'il faudrait sinon ouvrir une à une.
  */
 function openDataset(anchor: HTMLElement): void {
   const table = currentTable();
@@ -1226,27 +1236,7 @@ function openDataset(anchor: HTMLElement): void {
 
   elements.picker.textContent = '';
   elements.picker.classList.add('wide');
-  elements.picker.appendChild(
-    panelTitle(state.fileName || 'Dataset', `${count(dataset.rows)} rows × ${count(dataset.columns)} columns`),
-  );
-
-  const summary = grid();
-  addRow(summary, 'Duplicate rows', count(dataset.duplicateRows));
-  addRow(summary, 'Columns with notes', count(new Set(dataset.notes.map((note) => note.split(':')[0])).size));
-  elements.picker.appendChild(summary);
-
-  if (dataset.notes.length > 0) {
-    elements.picker.appendChild(sectionTitle('Findings'));
-    const list = document.createElement('div');
-    list.className = 'findings';
-    for (const note of dataset.notes) {
-      const item = document.createElement('div');
-      item.className = 'flag';
-      item.textContent = note;
-      list.appendChild(item);
-    }
-    elements.picker.appendChild(list);
-  }
+  elements.picker.appendChild(panelTitle(state.fileName || 'Dataset', 'what this file is, and how to load it'));
 
   elements.picker.appendChild(sectionTitle('Read it with pandas'));
   const snippet = readCsvSnippet(state.fileName || 'data.csv', table, dataset);
@@ -1254,14 +1244,87 @@ function openDataset(anchor: HTMLElement): void {
   code.className = 'snippet';
   code.textContent = snippet;
   elements.picker.appendChild(code);
+  const copy = document.createElement('button');
+  copy.className = 'picker-button';
+  copy.textContent = 'Copy';
+  copy.addEventListener('click', () => {
+    void navigator.clipboard.writeText(snippet);
+    copy.textContent = 'Copied';
+    window.setTimeout(() => (copy.textContent = 'Copy'), 1200);
+  });
+  elements.picker.appendChild(copy);
 
-  elements.picker.appendChild(
-    footer([
-      ['Copy', () => void navigator.clipboard.writeText(snippet), false],
-      ['Close', closePicker, true],
-    ]),
-  );
+  elements.picker.appendChild(sectionTitle('Columns'));
+  const info = document.createElement('div');
+  info.className = 'info-table';
+  info.append(head('Column'), head('Non-null'), head('Dtype'));
+  state.headers.forEach((name, index) => {
+    const stats = state.stats[index];
+    const column = details[index];
+    // Non-nuls tels que pandas les compterait après l'appel ci-dessus, jetons
+    // d'absence compris : sans quoi les deux moitiés du panneau se
+    // contrediraient.
+    const nonNull = (stats?.total ?? 0) - column.effectiveMissing;
+    const row = document.createElement('button');
+    row.className = 'info-name';
+    row.textContent = stats?.name ?? name;
+    row.title = 'Open this column';
+    row.addEventListener('click', () => {
+      closePicker();
+      openDetails(index, anchor);
+    });
+    info.append(
+      row,
+      Object.assign(textSpan(count(nonNull)), { className: 'info-cell' }),
+      Object.assign(textSpan(column.pandasType), { className: 'info-cell dim' }),
+    );
+  });
+  elements.picker.appendChild(info);
+
+  elements.picker.appendChild(sectionTitle('Findings'));
+  const list = document.createElement('div');
+  list.className = 'findings';
+
+  if (dataset.duplicateRows > 0) {
+    list.appendChild(
+      finding(`${count(dataset.duplicateRows)} rows are exact duplicates of another`, () => {
+        closePicker();
+        setColumnFilter(-1, {
+          kind: 'rows',
+          column: -1,
+          rows: new Set(dataset.duplicateRowIndices.map((index) => state.view[index] ?? index)),
+          label: `${count(dataset.duplicateRows)} duplicate rows`,
+        });
+      }),
+    );
+  }
+  for (const entry of dataset.findings) {
+    list.appendChild(
+      finding(entry.text, () => {
+        closePicker();
+        setColumnFilter(entry.column, valuesFilter(entry.column, entry.values));
+      }),
+    );
+  }
+  if (list.childElementCount === 0) list.appendChild(Object.assign(textSpan('Nothing to report.'), { className: 'picker-note' }));
+  elements.picker.appendChild(list);
+
+  elements.picker.appendChild(footer([['Close', closePicker, true]]));
   placeFloating(elements.picker, anchor);
+}
+
+function head(text: string): HTMLElement {
+  return Object.assign(textSpan(text), { className: 'info-head' });
+}
+
+/** Un constat qu'on peut aller vérifier : le clic filtre le tableau dessus. */
+function finding(text: string, onPick: () => void): HTMLElement {
+  const item = document.createElement('button');
+  item.className = 'flag pickable';
+  item.title = 'Show these rows in the table';
+  item.textContent = text;
+  item.addEventListener('click', onPick);
+  return item;
 }
 
 // ------------------------------------------------- fabriques de panneaux

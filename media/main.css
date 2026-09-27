@@ -469,6 +469,61 @@ body {
   background: rgb(128 128 128 / 12%);
 }
 
+.info-table {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 2px 12px;
+  align-items: center;
+}
+
+.info-head {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.info-name {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.info-name:hover {
+  text-decoration: underline;
+}
+
+.info-cell {
+  text-align: right;
+  font-weight: 600;
+}
+
+.info-cell.dim {
+  color: var(--vscode-descriptionForeground);
+  font-weight: normal;
+}
+
+.flag.pickable {
+  width: 100%;
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.flag.pickable:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
 .findings {
   display: flex;
   flex-direction: column;

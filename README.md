@@ -100,10 +100,17 @@ fifty characters and padding spaces.
 `float64` or `object`, with notes such as *leading zeros are lost unless dtype is
 "string"* or *would be numeric if NULL, - counted as missing*.
 
-**Dataset…** in the toolbar covers what no single column knows about itself:
-rows strictly duplicated, findings across all columns, and the `pd.read_csv`
-call matching what was detected — separator, decimal comma, the missing-value
-tokens pandas does not know, and the columns to read as strings.
+**Dataset…** in the toolbar answers *what is this file, and how do I load it* —
+it does not paraphrase what the columns already say. It leads with the
+`pd.read_csv` call matching what was detected: separator, decimal comma, the
+missing-value tokens pandas does not already know, and the columns to read as
+strings. Then a `df.info()`-style table — every column with the count of
+non-nulls **as pandas would report it after that very call** and its dtype,
+which otherwise means opening every column panel one after another. Then the
+findings, each of them clickable: duplicated rows, values differing only by
+case, values padded with spaces. Clicking one filters the table down to the
+offending rows, because a diagnosis you cannot go and look at only causes
+worry.
 
 ## Column menu
 
@@ -163,7 +170,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.9.1.vsix
+code --install-extension csv-stats-0.10.0.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**
