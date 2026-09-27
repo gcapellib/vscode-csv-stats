@@ -1,6 +1,9 @@
 # CSV Stats — VS Code extension
 
-A statistical overview of CSV files, right inside the editor.
+A data-exploration tool for CSV files, built for people who will load the file
+into pandas: per-column stats, cross-filtering, and a `pd.read_csv` call that
+matches what was actually detected in the file — separator, decimal comma,
+missing-value tokens, columns that need `dtype="string"`.
 
 Right-click a `.csv` file in the explorer → **Open in CSV Stats**.
 
@@ -170,7 +173,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.10.0.vsix
+code --install-extension csv-stats-0.10.1.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**

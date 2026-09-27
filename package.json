@@ -1,8 +1,8 @@
 {
   "name": "csv-stats",
   "displayName": "CSV Stats",
-  "description": "A statistical overview of CSV files inside the editor, a simplified take on Data Wrangler.",
-  "version": "0.10.0",
+  "description": "Explore CSV files inside VS Code: per-column stats, cross-filtering, and the pandas read_csv call that matches what was detected.",
+  "version": "0.10.1",
   "publisher": "GabrielCapelli",
   "icon": "media/icon.png",
   "galleryBanner": {
@@ -23,9 +23,11 @@
   ],
   "keywords": [
     "csv",
+    "pandas",
+    "data engineering",
+    "data exploration",
     "statistics",
-    "data",
-    "rainbow"
+    "filter"
   ],
   "main": "./dist/extension.js",
   "contributes": {
