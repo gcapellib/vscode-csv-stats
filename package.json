@@ -2,7 +2,7 @@
   "name": "csv-stats",
   "displayName": "CSV Stats",
   "description": "Explore CSV files inside VS Code: per-column stats, cross-filtering, and the pandas read_csv call that matches what was detected.",
-  "version": "0.10.2",
+  "version": "0.10.3",
   "publisher": "GabrielCapelli",
   "icon": "media/icon.png",
   "galleryBanner": {
