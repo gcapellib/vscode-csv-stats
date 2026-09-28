@@ -4,6 +4,14 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.16.x
+
+- **Folding the bands narrows the columns.** Column widths account for the
+  `Min … Max …` the band must hold, which is far more than the values need;
+  with the band gone that requirement goes too. Measured on six columns: 1302
+  to 666 pixels, four columns on screen becoming six. Both movements share one
+  90 ms duration so neither waits for the other.
+
 ## 0.15.x
 
 - Clicking a column title no longer sorts. Only its arrow button does —

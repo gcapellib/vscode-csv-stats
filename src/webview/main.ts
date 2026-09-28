@@ -21,7 +21,15 @@ declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
 
 const ROW_HEIGHT = 22;
+/**
+ * Largeur plancher, bandeau déployé : il doit rester lisible — « Distinct 196
+ * (65.3%) », un palmarès avec ses pourcentages, un histogramme qui veuille dire
+ * quelque chose. Replié, plus rien n'exige cette place et une colonne n'a plus
+ * qu'à loger son titre et ses valeurs, d'où un plancher bien plus bas : voir le
+ * plus de colonnes possible est précisément la raison de replier.
+ */
 const MIN_WIDTH = 210;
+const MIN_WIDTH_FOLDED = 90;
 const MAX_WIDTH = 460;
 /**
  * Hauteur de l'histogramme. Le bandeau peut se replier d'un clic, donc il n'a
@@ -235,7 +243,16 @@ function resolvePrompt(token: string, value: string | null): void {
 
 // ------------------------------------------------------------------- géométrie
 
-function measureWidths(): void {
+/**
+ * Largeur de chaque colonne.
+ *
+ * `withBand` dit si les bornes du bandeau entrent dans le calcul : elles
+ * imposent souvent bien plus de place que les cellules elles-mêmes — « Min
+ * 10,001   Max 10,300 » contre « 10001 ». Bandeau replié, cette contrainte
+ * n'existe plus et les colonnes se resserrent, ce qui est tout l'intérêt de le
+ * replier : en voir davantage à l'écran.
+ */
+function measureWidths(withBand = state.bandVisible): void {
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
   const font = getComputedStyle(document.body).font || '13px sans-serif';
@@ -250,7 +267,7 @@ function measureWidths(): void {
       if (value) widest = Math.max(widest, widthOf(value));
     }
     const column = state.stats[index];
-    if (column && column.min !== null) {
+    if (withBand && column && column.min !== null) {
       // La colonne doit loger ce que son bandeau annonce : des bornes tronquées
       // en « Min 98,… » ne renseignent plus sur rien.
       // La colonne doit loger les deux lignes de bornes : tronquées, elles ne
@@ -269,7 +286,8 @@ function measureWidths(): void {
         column.mean === null ? 0 : pair(`Mean ${central}`, `Median ${central}`),
       );
     }
-    return Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, widest + 28)));
+    const floor = withBand ? MIN_WIDTH : MIN_WIDTH_FOLDED;
+    return Math.round(Math.min(MAX_WIDTH, Math.max(floor, widest + 28)));
   });
 }
 
@@ -586,6 +604,9 @@ function paintHead(): void {
     const name = document.createElement('span');
     name.className = 'head-name';
     name.textContent = state.stats[modelIndex].name;
+    // Bandeau replié, les colonnes se resserrent au point de tronquer le titre :
+    // le survol reste alors le seul moyen de le lire en entier.
+    name.title = state.stats[modelIndex].name;
 
     // Deux boutons permanents plutôt que des gestes à deviner : le tri ne se
     // devinait qu'en cliquant le titre, et le filtre dormait dans le menu « ⋯ ».
@@ -1840,7 +1861,17 @@ function applyDrop(modelIndex: number): void {
  * L'interrupteur vit dans la barre d'outils, et non dans le bandeau : quand il y
  * etait, le replier supprimait le seul bouton capable de le rappeler.
  */
-const FOLD_MS = 140;
+/**
+ * Durée du pliage du bandeau **et** du glissement des colonnes.
+ *
+ * Une seule constante pour les deux : ils décrivent un même geste, et deux
+ * valeurs même voisines se verraient — l'une des deux moitiés de l'écran
+ * finirait avant l'autre. Les désynchroniser demanderait donc de le vouloir.
+ */
+const FOLD_MS = 90;
+/** Une bascule en annule une autre : sans ce jeton, deux animations de largeur
+ * se disputeraient state.widths à chaque frame. */
+let widthRun = 0;
 
 function toggleInsights(visible = !state.bandVisible, animate = true): void {
   const changed = visible !== state.bandVisible;
@@ -1854,9 +1885,41 @@ function toggleInsights(visible = !state.bandVisible, animate = true): void {
   // Le bandeau est peint avant l'animation : il faut sa hauteur naturelle pour
   // savoir vers quoi — ou depuis quoi — animer.
   const before = elements.band.getBoundingClientRect().height;
+  // Les largeurs se rediscutent ici, et seulement ici : c'est un geste
+  // délibéré dont le déplacement est justement l'effet recherché, à la
+  // différence d'un filtre où il n'était qu'une nuisance.
+  const from = state.widths.slice();
+  if (state.ready) measureWidths();
+  const to = state.widths.slice();
+
+  if (!changed || !animate || reducedMotion()) {
+    paint();
+    return;
+  }
+  // Repeint d'abord dans les largeurs de départ, sinon la première frame
+  // montrerait déjà l'état final et l'animation n'aurait plus rien à jouer.
+  state.widths = from;
   paint();
-  if (!changed || !animate || reducedMotion()) return;
   foldBand(visible ? 0 : before, visible ? elements.band.getBoundingClientRect().height : 0);
+  animateWidths(from, to);
+}
+
+/** Fait glisser les colonnes d'une largeur à l'autre. */
+function animateWidths(from: number[], to: number[]): void {
+  const run = ++widthRun;
+  const start = performance.now();
+  const step = () => {
+    if (run !== widthRun) return;
+    const ratio = Math.min(1, (performance.now() - start) / FOLD_MS);
+    const eased = 1 - (1 - ratio) * (1 - ratio);
+    state.widths = to.map((target, index) => {
+      const origin = from[index] ?? target;
+      return Math.round(origin + (target - origin) * eased);
+    });
+    paint();
+    if (ratio < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 function reducedMotion(): boolean {
