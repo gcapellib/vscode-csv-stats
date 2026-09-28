@@ -188,3 +188,49 @@ class RecordReader {
     return fields;
   }
 }
+
+/**
+ * Découpe une ligne brute en champs et en séparateurs.
+ *
+ * Les guillemets sont respectés — un champ qui contient le délimiteur reste un
+ * seul champ, sans quoi la coloration décalerait toutes les colonnes suivantes
+ * sur la seule ligne où cela compte le plus. Les séparateurs sont rendus tels
+ * quels sous la colonne -1 : recollés bout à bout, les morceaux redonnent la
+ * ligne au caractère près, ce qu'une vue « brute » doit à son nom.
+ */
+export function rawSegments(line: string, delimiter: string): Array<{ text: string; column: number }> {
+  const segments: Array<{ text: string; column: number }> = [];
+  let field = '';
+  let column = 0;
+  let quoted = false;
+  for (let index = 0; index < line.length; index++) {
+    const char = line[index];
+    if (quoted) {
+      field += char;
+      if (char === '"') {
+        if (line[index + 1] === '"') {
+          field += '"';
+          index++;
+        } else {
+          quoted = false;
+        }
+      }
+      continue;
+    }
+    if (char === '"') {
+      quoted = true;
+      field += char;
+      continue;
+    }
+    if (char === delimiter) {
+      if (field !== '') segments.push({ text: field, column });
+      segments.push({ text: char, column: -1 });
+      field = '';
+      column++;
+      continue;
+    }
+    field += char;
+  }
+  if (field !== '') segments.push({ text: field, column });
+  return segments;
+}

@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { decode, detectDelimiter, parse } from '../core/csv';
+import { decode, detectDelimiter, parse, rawSegments } from '../core/csv';
 
 describe('CsvLoader', () => {
   it('lit un CSV simple à virgule', () => {
@@ -81,5 +81,61 @@ describe('CsvLoader', () => {
     const table = parse('');
     assert.equal(table.headers.length, 0);
     assert.equal(table.rows.length, 0);
+  });
+});
+
+describe('rawSegments', () => {
+  /** Recollés bout à bout, les morceaux doivent redonner la ligne d'origine. */
+  function recolle(line: string, delimiter = ','): string {
+    return rawSegments(line, delimiter)
+      .map((segment) => segment.text)
+      .join('');
+  }
+
+  it('attribue une colonne à chaque champ et marque les séparateurs', () => {
+    const segments = rawSegments('10001,Paris,No', ',');
+    assert.deepEqual(segments, [
+      { text: '10001', column: 0 },
+      { text: ',', column: -1 },
+      { text: 'Paris', column: 1 },
+      { text: ',', column: -1 },
+      { text: 'No', column: 2 },
+    ]);
+  });
+
+  it('ne coupe pas sur une virgule entre guillemets', () => {
+    const champs = rawSegments('1,"Lyon, Rhône",2', ',').filter((segment) => segment.column >= 0);
+    assert.equal(champs.length, 3);
+    assert.equal(champs[1].text, '"Lyon, Rhône"');
+    // Le décalage est le vrai risque : sans la règle, « 2 » passerait colonne 3
+    // et toute la fin de la ligne se colorerait d'un cran à côté.
+    assert.equal(champs[2].column, 2);
+  });
+
+  it('traite un guillemet doublé comme un guillemet du champ', () => {
+    const ligne = '1,"il dit ""oui""",3';
+    const champs = rawSegments(ligne, ',').filter((segment) => segment.column >= 0);
+    assert.equal(champs[1].text, '"il dit ""oui"""');
+    assert.equal(champs[2].column, 2);
+  });
+
+  it('garde une colonne vide sans lui inventer de texte', () => {
+    const segments = rawSegments('1,,3', ',');
+    assert.deepEqual(
+      segments.filter((segment) => segment.column >= 0).map((segment) => segment.column),
+      [0, 2],
+    );
+  });
+
+  it('suit le point-virgule quand il est le délimiteur', () => {
+    const champs = rawSegments('1;Lyon;2', ';').filter((segment) => segment.column >= 0);
+    assert.equal(champs.length, 3);
+    assert.equal(champs[1].text, 'Lyon');
+  });
+
+  it('restitue la ligne au caractère près', () => {
+    for (const line of ['a,b,c', '1,"Lyon, Rhône",2', '1,,3', '', '"",x', 'sans separateur']) {
+      assert.equal(recolle(line), line);
+    }
   });
 });

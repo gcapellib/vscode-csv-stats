@@ -31,6 +31,10 @@ body {
   gap: 8px;
   padding: 6px 10px;
   border-bottom: 1px solid var(--vscode-panel-border);
+  /* Même traitement que la barre de filtres juste en dessous : une base opaque,
+     teintée par le dégradé que JavaScript pose selon la palette choisie. */
+  background-color: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  background-image: none;
 }
 
 #toolbar label {
@@ -302,6 +306,12 @@ body {
   flex: 0 0 auto;
   padding-right: 24px;
   color: var(--vscode-editor-foreground);
+}
+
+/* Les délimiteurs s'effacent : ce sont des repères, pas du contenu, et les
+   laisser à pleine intensité hacherait la ligne en autant de barrières. */
+.raw-sep {
+  opacity: 0.45;
 }
 
 .raw-loading {

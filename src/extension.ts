@@ -193,11 +193,6 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
 <div id="toolbar">
   <span id="shape"></span>
   <span class="toolbar-sep"></span>
-  <button id="insights-toggle" type="button" aria-expanded="true" title="Show or hide the statistics bands">
-    <span class="chevron">▾</span> Insights
-  </button>
-  <button id="dataset-button" type="button" title="Duplicates, findings and the matching pandas call">Dataset…</button>
-  <span class="toolbar-sep"></span>
   <span class="toolbar-label">Theme</span>
   <button id="theme-button" type="button" aria-haspopup="listbox" aria-expanded="false">
     <span id="theme-swatch" class="swatch"></span>
@@ -206,6 +201,10 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
   </button>
   <div id="theme-popup" role="listbox" hidden></div>
   <span class="toolbar-sep"></span>
+  <button id="insights-toggle" type="button" aria-expanded="true" title="Show or hide the statistics bands">
+    <span class="chevron">▾</span> Insights
+  </button>
+  <button id="dataset-button" type="button" title="Duplicates, findings and the matching pandas call">Dataset…</button>
   <button id="raw-toggle" type="button" title="Show the file exactly as written, unparsed">Raw</button>
   <span id="selection"></span>
   <span id="notice"></span>

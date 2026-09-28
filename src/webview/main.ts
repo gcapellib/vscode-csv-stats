@@ -13,6 +13,7 @@ import {
   readCsvSnippet,
   type ColumnDetails,
 } from '../core/details';
+import { rawSegments } from '../core/csv';
 import { parseNumber, type ColumnType } from '../core/types';
 import { paletteFor, THEMES, themeById, type CsvTheme, type Palette } from '../core/themes';
 
@@ -171,6 +172,7 @@ window.addEventListener('message', (event: MessageEvent) => {
         elements.notice.textContent = `Truncated: only the first ${count(state.rowCount)} rows are analysed.`;
       }
       buildThemePicker();
+      paintChrome();
       break;
     case 'rows': {
       const start = message.start as number;
@@ -668,6 +670,8 @@ function paintRaw(): void {
   const first = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
   const last = Math.min(total, first + Math.ceil(viewport / ROW_HEIGHT) + OVERSCAN * 2);
 
+  const theme = themeById(state.themeId);
+  const dark = isDark();
   const gutterWidth = String(total).length;
   const fragment = document.createDocumentFragment();
   for (let index = first; index < last; index++) {
@@ -679,7 +683,18 @@ function paintRaw(): void {
     gutter.textContent = String(index + 1).padStart(gutterWidth, ' ');
     const text = document.createElement('span');
     text.className = 'raw-text';
-    text.textContent = lines[index];
+    for (const segment of rawSegments(lines[index], state.delimiter)) {
+      const piece = document.createElement('span');
+      if (segment.column < 0) {
+        piece.className = 'raw-sep';
+      } else {
+        // La même couleur que la colonne porte dans le tableau : le fichier
+        // brut se lit alors avec les mêmes repères que la vue analysée.
+        piece.style.color = paletteFor(theme, segment.column, dark).accent;
+      }
+      piece.textContent = segment.text;
+      text.appendChild(piece);
+    }
     row.append(gutter, text);
     fragment.appendChild(row);
   }
@@ -1608,12 +1623,12 @@ function withAlpha(hex: string, alpha: number): string {
 /**
  * Dégradé horizontal tissé dans les teintes du thème actif.
  *
- * Sans lui, la barre de filtres empruntait un gris neutre sans rapport avec la
- * palette choisie juste au-dessus. L'opacité reste faible : les pastilles et le
- * texte doivent rester lisibles par-dessus, le dégradé ne fait que teinter le
- * fond derrière eux.
+ * Sans lui, les deux barres du haut empruntaient un gris neutre sans rapport
+ * avec la palette choisie juste en dessous. L'opacité reste faible : boutons,
+ * pastilles et texte doivent rester lisibles par-dessus, le dégradé ne fait que
+ * teinter le fond derrière eux.
  */
-function filterBarGradient(): string {
+function themeGradient(): string {
   const theme = themeById(state.themeId);
   const dark = isDark();
   const stops = theme.hues.map((_, index) => withAlpha(paletteFor(theme, index, dark).accent, 0.3));
@@ -1623,10 +1638,17 @@ function filterBarGradient(): string {
   return `linear-gradient(90deg, ${steps.join(', ')})`;
 }
 
+/** Teinte les deux barres du haut : celle des boutons et celle des filtres. */
+function paintChrome(): void {
+  const gradient = themeGradient();
+  elements.toolbar.style.backgroundImage = gradient;
+  elements.filterBar.style.backgroundImage = gradient;
+}
+
 function paintFilterBar(): void {
   elements.filterBar.textContent = '';
   elements.filterBar.hidden = state.filters.length === 0;
-  elements.filterBar.style.backgroundImage = filterBarGradient();
+  paintChrome();
   if (state.filters.length === 0) return;
 
   const kept = state.view.length;
@@ -1755,7 +1777,9 @@ function buildThemePicker(): void {
         vscode.postMessage({ type: 'selectTheme', id: theme.id });
         closeThemePopup();
         buildThemePicker();
+        paintChrome();
         paint();
+        if (state.showRaw) paintRaw();
       });
       elements.themePopup.appendChild(item);
     }

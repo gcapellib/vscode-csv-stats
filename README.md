@@ -7,12 +7,15 @@ missing-value tokens, columns that need `dtype="string"`.
 
 Right-click a `.csv` file in the explorer → **Open in CSV Stats**. A **Raw**
 button in the toolbar switches to the file exactly as written on disk —
-unparsed, in the editor's own font and colours — for the odd file where a
-detected delimiter or a quoting quirk is worth checking against the bytes
-themselves. The text is only requested the first time you click it, then
-cached, and only the visible lines are ever built into the page: a hundred
-thousand lines sit in the same few dozen DOM nodes as the table below, with no
-size cap standing in the way.
+unparsed, for the odd file where a detected delimiter or a quoting quirk is
+worth checking against the bytes themselves. Each field carries the colour its
+column wears in the table, and the delimiters fade back: the raw file is read
+with the same landmarks as the analysed view, rather than as one undifferentiated
+wall of text. Quoted fields are honoured, so a value containing the delimiter
+stays one field instead of shifting every colour after it by one. The text is
+only requested the first time you click it, then cached, and only the visible
+lines are ever built into the page: a hundred thousand lines sit in the same few
+dozen DOM nodes as the table below, with no size cap standing in the way.
 
 The interface is **in English**, numbers included: comma thousands separator and
 decimal point. The table itself shows the cells exactly as they are written in
@@ -196,7 +199,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.11.0.vsix
+code --install-extension csv-stats-0.11.1.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**

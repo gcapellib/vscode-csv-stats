@@ -4,6 +4,21 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.11.x
+
+- **Raw view**: a toolbar button shows the file exactly as written on disk,
+  each field carrying the colour its column wears in the table and the
+  delimiters faded back. Quoted fields are honoured, so a value containing the
+  delimiter does not shift every colour after it. The text is fetched only on
+  the first click and rendered by windowing — a hundred thousand lines in a few
+  dozen DOM nodes, no line cap.
+- The **Dataset** snippet now replays everything done through the table —
+  renames, dropped columns, filters, sort — in the order it was applied.
+  Previously it only ever reproduced reading the file, contradicting the very
+  figures shown beside it.
+- Toolbar and filter bar carry a gradient woven from the active palette, and
+  the row count leads the toolbar with the palette picker beside it.
+
 ## 0.10.x
 
 - **Column details panel redesigned** (`⋯` → Column details), oriented toward
