@@ -1792,14 +1792,17 @@ function buildThemePicker(): void {
       item.setAttribute('role', 'option');
       item.dataset.id = theme.id;
       item.append(swatch(theme), textSpan(theme.label));
+      // Survoler suffit à voir : une pastille de cinq carrés ne dit pas ce que
+      // quarante-cinq palettes donnent sur ses propres données, et choisir à
+      // l'aveugle obligeait à ouvrir le panneau autant de fois qu'il y a de
+      // palettes. Le clic, lui, reste le seul geste qui engage.
+      item.addEventListener('mouseenter', () => previewTheme(theme.id));
+      item.addEventListener('focus', () => previewTheme(theme.id));
       item.addEventListener('click', () => {
-        state.themeId = theme.id;
+        chosenThemeId = theme.id;
         vscode.postMessage({ type: 'selectTheme', id: theme.id });
         closeThemePopup();
         buildThemePicker();
-        paintChrome();
-        paint();
-        if (state.showRaw) paintRaw();
       });
       elements.themePopup.appendChild(item);
     }
@@ -1813,17 +1816,46 @@ function textSpan(text: string): HTMLElement {
   return span;
 }
 
+/**
+ * La palette réellement choisie, par opposition à celle qu'on est en train de
+ * survoler. Le panneau la restitue à sa fermeture, quelle que soit la façon dont
+ * on en sort — clic ailleurs, Échap, ou le bouton lui-même.
+ */
+let chosenThemeId: string | null = null;
+let previewFrame = 0;
+
+/**
+ * Applique une palette à l'écran sans engager le choix.
+ *
+ * Le bouton de la barre d'outils et la coche « courante » ne bougent pas : ils
+ * disent ce qui est choisi, et rien ne l'est encore. Les repeints sont groupés
+ * par frame — balayer la liste de haut en bas déclenche sinon quarante-cinq
+ * reconstructions du tableau pour un seul mouvement de souris.
+ */
+function previewTheme(id: string): void {
+  if (state.themeId === id) return;
+  state.themeId = id;
+  if (previewFrame !== 0) return;
+  previewFrame = requestAnimationFrame(() => {
+    previewFrame = 0;
+    paintChrome();
+    paint();
+    if (state.showRaw) paintRaw();
+  });
+}
+
 function showCurrentTheme(): void {
   const theme = themeById(state.themeId);
   elements.themeLabel.textContent = theme.label;
   elements.themeSwatch.replaceWith(Object.assign(swatch(theme), { id: 'theme-swatch' }));
   elements.themeSwatch = byId('theme-swatch');
   elements.themePopup.querySelectorAll<HTMLElement>('.theme-item').forEach((item) => {
-    item.classList.toggle('current', item.dataset.id === state.themeId);
+    item.classList.toggle('current', item.dataset.id === (chosenThemeId ?? state.themeId));
   });
 }
 
 function openThemePopup(): void {
+  chosenThemeId = state.themeId;
   elements.themePopup.style.visibility = 'hidden';
   elements.themePopup.hidden = false;
   const box = elements.themeButton.getBoundingClientRect();
@@ -1838,6 +1870,16 @@ function openThemePopup(): void {
 function closeThemePopup(): void {
   elements.themePopup.hidden = true;
   elements.themeButton.setAttribute('aria-expanded', 'false');
+  // Toute sortie du panneau passe par ici : l'aperçu ne peut donc pas rester
+  // collé après un clic ailleurs, un Échap ou un second clic sur le bouton. Le
+  // clic sur une palette, lui, a déjà inscrit son choix juste avant.
+  if (chosenThemeId !== null && chosenThemeId !== state.themeId) {
+    state.themeId = chosenThemeId;
+    paintChrome();
+    paint();
+    if (state.showRaw) paintRaw();
+  }
+  showCurrentTheme();
 }
 
 elements.themeButton.addEventListener('click', () => {

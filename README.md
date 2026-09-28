@@ -160,6 +160,13 @@ values, which makes the guess a hundred times cheaper.
 
 ## Palettes
 
+**Hovering a palette applies it to the sheet straight away**; only a click
+chooses it. Five chips cannot say what forty-five palettes do to your own
+columns, and judging them one commit at a time meant reopening the picker
+forty-five times. Until you click, nothing is decided: the toolbar button and
+the tick still name your current palette, and leaving the picker any way at all
+— a click elsewhere, Escape, the button again — puts it back.
+
 A picker offers **forty-five palettes** in three families: coloured background
 with uniform text (twenty), uniform background with text coloured per column,
 the way syntax highlighting does (fifteen), and both at once (ten). Your choice
@@ -205,7 +212,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.12.0.vsix
+code --install-extension csv-stats-0.13.0.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**

@@ -4,6 +4,12 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.13.x
+
+- **Live palette preview**: hovering a palette in the picker recolours the sheet
+  at once — table, bands, filter bar and raw view — while only a click commits
+  it. Leaving the picker any way at all restores the chosen palette.
+
 ## 0.12.x
 
 - **Five palettes** after the editor colour schemes most people already read
