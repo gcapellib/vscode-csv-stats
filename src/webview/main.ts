@@ -580,10 +580,12 @@ function paintHead(): void {
     cell.className = 'head-cell';
     cell.style.width = `${state.widths[modelIndex]}px`;
 
+    // Le titre ne trie plus : seule la flèche le fait. Un titre cliquable qui
+    // réordonnait tout sans rien annoncer surprenait plus qu'il ne servait,
+    // maintenant qu'un bouton dit ce qu'il fait.
     const name = document.createElement('span');
     name.className = 'head-name';
     name.textContent = state.stats[modelIndex].name;
-    name.addEventListener('click', () => cycleSort(modelIndex));
 
     // Deux boutons permanents plutôt que des gestes à deviner : le tri ne se
     // devinait qu'en cliquant le titre, et le filtre dormait dans le menu « ⋯ ».

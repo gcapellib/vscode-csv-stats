@@ -6,6 +6,10 @@ file exists so that jump has an explanation.
 
 ## 0.15.x
 
+- Clicking a column title no longer sorts. Only its arrow button does —
+  reordering a table is too large a consequence for a click that announces
+  nothing.
+
 - Every dropdown closes on a second click of the button that opened it. The
   panel did not: the outside-click handler closed it *before* the click reached
   the button, which reopened it at once.

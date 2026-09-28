@@ -75,10 +75,11 @@ Both actions existed before, but one was a click on the title that nothing
 announced and the other slept inside the `⋯` menu — a feature you cannot see is
 a feature you do not have.
 
-Below that, the data table: click a header, or its sort button, to sort —
-ascending, then descending, then back to the file's own order, because without
-that third state the original order is lost on the first click with no way back
-— click a cell to mark it —
+Below that, the data table: the header's sort button cycles ascending, then
+descending, then back to the file's own order, because without that third state
+the original order is lost on the first click with no way back. The title
+itself does nothing — reordering a table is too large a consequence for a click
+that announces nothing. Click a cell to mark it —
 the whole row takes a translucent veil and the cell itself darkens and gets a
 frame. Ctrl-click (Cmd on macOS) marks several rows, and clicking a lone marked
 row unmarks it. The veil is laid over the column colour rather than replacing
@@ -226,7 +227,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.15.1.vsix
+code --install-extension csv-stats-0.15.2.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**
