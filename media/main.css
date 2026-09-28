@@ -60,6 +60,25 @@ body {
   background: var(--vscode-list-hoverBackground);
 }
 
+#raw-toggle {
+  padding: 3px 10px;
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border));
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+#raw-toggle:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+#raw-toggle.active {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border-color: transparent;
+}
+
 #insights-toggle {
   display: inline-flex;
   align-items: center;
@@ -237,6 +256,57 @@ body {
   flex: 1;
   min-height: 0;
   overflow: auto;
+}
+
+/* La vue brute a sa propre police et ses propres couleurs — celles de
+   l'éditeur de texte de VS Code, pas la palette de colonnes : ce n'est plus
+   un tableau, c'est un fichier tel qu'il est écrit sur le disque. */
+#raw-scroller {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--vscode-editor-background);
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: var(--vscode-editor-font-size, 13px);
+}
+
+#raw-body {
+  position: relative;
+  width: max-content;
+  min-width: 100%;
+}
+
+.raw-line {
+  position: absolute;
+  left: 0;
+  display: flex;
+  width: max-content;
+  min-width: 100%;
+  height: var(--row-height);
+  align-items: center;
+  white-space: pre;
+}
+
+.raw-gutter {
+  flex: 0 0 auto;
+  position: sticky;
+  left: 0;
+  padding: 0 12px;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-editorLineNumber-foreground, var(--vscode-descriptionForeground));
+  text-align: right;
+  user-select: none;
+}
+
+.raw-text {
+  flex: 0 0 auto;
+  padding-right: 24px;
+  color: var(--vscode-editor-foreground);
+}
+
+.raw-loading {
+  padding: 12px;
+  color: var(--vscode-descriptionForeground);
 }
 
 #sheet {

@@ -62,15 +62,27 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
     panel.webview.html = this.html(panel.webview);
 
     let table: CsvTable | null = null;
+    // Le texte décodé, jamais renvoyé tant qu'on ne le demande pas : la
+    // vue brute est un bouton, pas une charge que tout le monde paie.
+    let rawText: string | null = null;
+    // Une demande de texte brut peut arriver pendant que le fichier est encore
+    // en cours d'analyse : sans ce drapeau, elle trouverait rawText a null et
+    // serait perdue en silence, laissant la vue bloquee sur « Loading… ».
+    let rawRequested = false;
     const stats: ColumnStats[] = [];
 
     panel.webview.onDidReceiveMessage(async (message: { type: string; [key: string]: unknown }) => {
       switch (message.type) {
         case 'ready':
-          await this.load(document, panel, (loaded, computed) => {
+          await this.load(document, panel, (loaded, computed, text) => {
             table = loaded;
+            rawText = text;
             stats.length = 0;
             stats.push(...computed);
+            if (rawRequested) {
+              rawRequested = false;
+              void panel.webview.postMessage({ type: 'raw', text });
+            }
           });
           break;
         case 'selectTheme':
@@ -88,6 +100,10 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
           void panel.webview.postMessage({ type: 'promptResult', token: message.token, value: answer ?? null });
           break;
         }
+        case 'requestRaw':
+          if (rawText !== null) void panel.webview.postMessage({ type: 'raw', text: rawText });
+          else rawRequested = true;
+          break;
         case 'changeType': {
           if (!table) return;
           const index = message.index as number;
@@ -104,7 +120,7 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
   private async load(
     document: CsvDocument,
     panel: vscode.WebviewPanel,
-    keep: (table: CsvTable, stats: ColumnStats[]) => void,
+    keep: (table: CsvTable, stats: ColumnStats[], text: string) => void,
   ): Promise<void> {
     try {
       const raw = await vscode.workspace.fs.readFile(document.uri);
@@ -126,7 +142,7 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
             return;
           }
           const stats = computeAll(table);
-          keep(table, stats);
+          keep(table, stats, text);
 
           void panel.webview.postMessage({
             type: 'head',
@@ -189,6 +205,8 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
     <span class="caret">⌄</span>
   </button>
   <div id="theme-popup" role="listbox" hidden></div>
+  <span class="toolbar-sep"></span>
+  <button id="raw-toggle" type="button" title="Show the file exactly as written, unparsed">Raw</button>
   <span id="selection"></span>
   <span id="notice"></span>
 </div>
@@ -200,6 +218,7 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
   </div>
   <div id="body"></div>
 </div></div>
+<div id="raw-scroller" hidden><div id="raw-body"></div></div>
 <div id="tooltip" hidden></div>
 <div id="menu" hidden></div>
 <div id="picker" hidden></div>

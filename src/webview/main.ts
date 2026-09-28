@@ -47,6 +47,9 @@ const elements = {
   selection: byId('selection'),
   filterBar: byId('filters'),
   notice: byId('notice'),
+  rawToggle: byId('raw-toggle'),
+  rawScroller: byId('raw-scroller'),
+  rawBody: byId('raw-body'),
   scroller: byId('scroller'),
   sheet: byId('sheet'),
   band: byId('band'),
@@ -103,6 +106,10 @@ interface State {
   active: { row: number; column: number } | null;
   themeId: string;
   ready: boolean;
+  /** Texte brut du fichier, demandé une seule fois au premier clic sur « Raw ». */
+  rawLines: string[] | null;
+  rawLoading: boolean;
+  showRaw: boolean;
 }
 
 const state: State = {
@@ -123,6 +130,9 @@ const state: State = {
   active: null,
   themeId: THEMES[0].id,
   ready: false,
+  rawLines: null,
+  rawLoading: false,
+  showRaw: false,
 };
 
 // ------------------------------------------------------------------- couleurs
@@ -188,6 +198,15 @@ window.addEventListener('message', (event: MessageEvent) => {
     case 'promptResult':
       resolvePrompt(message.token as string, message.value as string | null);
       break;
+    case 'raw': {
+      // Un « \r » final par ligne, quand le fichier vient de Windows : retiré
+      // pour l'affichage, la ligne elle-même reste intacte au caractère près.
+      const text = message.text as string;
+      state.rawLines = text.split('\n').map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line));
+      state.rawLoading = false;
+      if (state.showRaw) paintRaw();
+      break;
+    }
   }
 });
 
@@ -594,6 +613,83 @@ function paintRows(): void {
   elements.body.textContent = '';
   elements.body.appendChild(fragment);
 }
+
+// ------------------------------------------------------------- vue brute
+
+/**
+ * Bascule vers le texte brut, non analysé.
+ *
+ * Le texte n'est demandé qu'au premier clic — jamais à l'ouverture du fichier —
+ * et mis en cache ensuite : les allers-retours suivants ne coûtent plus rien.
+ */
+function toggleRaw(): void {
+  state.showRaw = !state.showRaw;
+  elements.rawToggle.classList.toggle('active', state.showRaw);
+  elements.scroller.hidden = state.showRaw;
+  elements.filterBar.hidden = state.showRaw || state.filters.length === 0;
+  if (state.showRaw) {
+    if (state.rawLines === null && !state.rawLoading) {
+      state.rawLoading = true;
+      vscode.postMessage({ type: 'requestRaw' });
+    }
+    elements.rawScroller.hidden = false;
+    paintRaw();
+  } else {
+    elements.rawScroller.hidden = true;
+    paint();
+  }
+}
+
+elements.rawToggle.addEventListener('click', toggleRaw);
+
+/**
+ * Rend la vue brute par fenêtrage, exactement comme paintRows() rend le
+ * tableau : seules les lignes visibles à l'écran entrent dans le DOM, ce qui
+ * tient la promesse de fluidité à cent mille lignes même pour du texte non
+ * analysé, sans imposer de plafond arbitraire.
+ */
+function paintRaw(): void {
+  if (state.rawLoading) {
+    elements.rawBody.textContent = '';
+    elements.rawBody.style.height = '';
+    const loading = document.createElement('div');
+    loading.className = 'raw-loading';
+    loading.textContent = 'Loading…';
+    elements.rawBody.appendChild(loading);
+    return;
+  }
+  const lines = state.rawLines;
+  if (lines === null) return;
+
+  const total = lines.length;
+  elements.rawBody.style.height = `${total * ROW_HEIGHT}px`;
+  const scrollTop = elements.rawScroller.scrollTop;
+  const viewport = elements.rawScroller.clientHeight;
+  const first = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
+  const last = Math.min(total, first + Math.ceil(viewport / ROW_HEIGHT) + OVERSCAN * 2);
+
+  const gutterWidth = String(total).length;
+  const fragment = document.createDocumentFragment();
+  for (let index = first; index < last; index++) {
+    const row = document.createElement('div');
+    row.className = 'raw-line';
+    row.style.top = `${index * ROW_HEIGHT}px`;
+    const gutter = document.createElement('span');
+    gutter.className = 'raw-gutter';
+    gutter.textContent = String(index + 1).padStart(gutterWidth, ' ');
+    const text = document.createElement('span');
+    text.className = 'raw-text';
+    text.textContent = lines[index];
+    row.append(gutter, text);
+    fragment.appendChild(row);
+  }
+  elements.rawBody.textContent = '';
+  elements.rawBody.appendChild(fragment);
+}
+
+elements.rawScroller.addEventListener('scroll', () => {
+  if (state.showRaw) paintRaw();
+});
 
 function select(rowIndex: number, columnIndex: number, add: boolean): void {
   state.active = { row: rowIndex, column: columnIndex };

@@ -5,7 +5,14 @@ into pandas: per-column stats, cross-filtering, and a `pd.read_csv` call that
 matches what was actually detected in the file — separator, decimal comma,
 missing-value tokens, columns that need `dtype="string"`.
 
-Right-click a `.csv` file in the explorer → **Open in CSV Stats**.
+Right-click a `.csv` file in the explorer → **Open in CSV Stats**. A **Raw**
+button in the toolbar switches to the file exactly as written on disk —
+unparsed, in the editor's own font and colours — for the odd file where a
+detected delimiter or a quoting quirk is worth checking against the bytes
+themselves. The text is only requested the first time you click it, then
+cached, and only the visible lines are ever built into the page: a hundred
+thousand lines sit in the same few dozen DOM nodes as the table below, with no
+size cap standing in the way.
 
 The interface is **in English**, numbers included: comma thousands separator and
 decimal point. The table itself shows the cells exactly as they are written in
@@ -189,7 +196,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.10.6.vsix
+code --install-extension csv-stats-0.11.0.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**
