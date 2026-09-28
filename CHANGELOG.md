@@ -6,6 +6,12 @@ file exists so that jump has an explanation.
 
 ## 0.15.x
 
+- Every dropdown closes on a second click of the button that opened it. The
+  panel did not: the outside-click handler closed it *before* the click reached
+  the button, which reopened it at once.
+- **Other** is a plain line again. The header's filter button opens the full
+  value list, so a clickable **Other** only doubled that gesture.
+
 - **Group by removed.** Counting rows per value is what the value picker
   already does, and what the band already shows: the panel moved information
   around without producing any. A real group by aggregates the *other* columns

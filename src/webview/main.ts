@@ -448,11 +448,11 @@ function bandCell(modelIndex: number): HTMLElement {
     }
     if (column.top.length === 0) body.appendChild(line('type', 'no values'));
     if (otherCount > 0) {
-      const other = valueLine('Other', otherShare, colours.text, colours.text, true, () =>
-        openValuePicker(modelIndex, other),
-      );
-      other.title = 'Show all values';
-      body.appendChild(other);
+      // Inerte : la liste complète s'ouvre par le bouton de filtre de l'en-tête,
+      // toujours visible. Un « Other » cliquable doublait ce geste tout en
+      // laissant croire qu'on peut filtrer sur « le reste », ce qui ne veut
+      // rien dire.
+      body.appendChild(valueLine('Other', otherShare, colours.text, colours.text, true));
     }
   }
   cell.appendChild(body);
@@ -632,9 +632,16 @@ function cycleSort(modelIndex: number): void {
 
 /** Le panneau du bouton de gauche : la liste des valeurs, ou les bornes. */
 function openColumnFilter(modelIndex: number, anchor: HTMLElement): void {
+  // Le bouton qui ouvre referme : sans quoi le second clic rouvrait le même
+  // panneau, et le seul moyen d'en sortir était de cliquer ailleurs.
+  if (openPanel === `filter:${modelIndex}`) {
+    closePicker();
+    return;
+  }
   const column = state.stats[modelIndex];
   if (column?.type === 'numeric') openRangePicker(modelIndex, anchor);
   else openValuePicker(modelIndex, anchor);
+  pickerToggle = anchor;
 }
 
 function paintRows(): void {
@@ -828,7 +835,15 @@ function escape(text: string): string {
  * Renommer, retirer ou retyper une colonne change ce qui est affiché, et rouvrir
  * l'onglet rend l'état d'origine.
  */
+/** Colonne dont le menu « ⋯ » est ouvert, pour que son bouton le referme. */
+let menuColumn: number | null = null;
+
 function openMenu(modelIndex: number, anchor: HTMLElement): void {
+  if (menuColumn === modelIndex && !elements.menu.hidden) {
+    closeMenu();
+    return;
+  }
+  menuColumn = modelIndex;
   const column = state.stats[modelIndex];
   type Entry = [string, () => void] | 'separator' | { heading: string };
   const entries: Entry[] = [
@@ -893,6 +908,7 @@ function openMenu(modelIndex: number, anchor: HTMLElement): void {
 
 function closeMenu(): void {
   elements.menu.hidden = true;
+  menuColumn = null;
 }
 
 // Fermeture au clic en dehors. On écarte explicitement le bouton d'ouverture au
@@ -1112,6 +1128,7 @@ function openValuePicker(columnIndex: number, anchor: HTMLElement): void {
   elements.picker.appendChild(footer);
 
   placeFloating(elements.picker, anchor);
+  openPanel = `filter:${columnIndex}`;
   search.focus();
 }
 
@@ -1181,6 +1198,7 @@ function openRangePicker(columnIndex: number, anchor: HTMLElement): void {
   elements.picker.appendChild(footer);
 
   placeFloating(elements.picker, anchor);
+  openPanel = `filter:${columnIndex}`;
   low.focus();
 }
 
@@ -1265,6 +1283,7 @@ function openDetails(columnIndex: number, anchor: HTMLElement): void {
 
   elements.picker.appendChild(footer([['Close', closePicker, true]]));
   placeFloating(elements.picker, anchor);
+  openPanel = `details:${columnIndex}`;
 }
 
 /**
@@ -1653,19 +1672,35 @@ function footer(buttons: Array<[string, () => void, boolean]>): HTMLElement {
  * valeurs : sans cette distinction, un second clic sur « Dataset » ne saurait
  * pas s'il doit refermer son propre panneau ou basculer depuis un autre.
  */
-let openPanel: 'dataset' | 'other' | null = null;
+let openPanel: string | null = null;
+
+/**
+ * Le bouton qui referme le panneau, quand il en existe un.
+ *
+ * Sans cette exception, le clic extérieur fermait le panneau **avant** que le
+ * clic n'atteigne le bouton, lequel le rouvrait dans la foulée : le panneau
+ * semblait ne jamais se refermer. Seuls les boutons qui font réellement
+ * bascule y figurent — « ⋯ » ouvre le menu, pas le panneau, et doit donc
+ * continuer à le fermer.
+ */
+let pickerToggle: HTMLElement | null = null;
 
 function closePicker(): void {
   elements.picker.classList.remove('wide');
   elements.picker.hidden = true;
   openPanel = null;
+  pickerToggle = null;
   elements.datasetButton.classList.remove('active');
 }
 
 /** Positionne un panneau sous son ancre, sans déborder de la fenêtre. */
 function placeFloating(panel: HTMLElement, anchor: HTMLElement): void {
   if (panel === elements.picker) {
-    openPanel = 'other';
+    // Chaque ouvreur pose ensuite sa propre clé ; celui qui oublierait de le
+    // faire laisse simplement un panneau qu'aucun bouton ne referme, jamais un
+    // panneau qui se referme au mauvais moment.
+    openPanel = null;
+    pickerToggle = null;
     elements.datasetButton.classList.remove('active');
   }
   panel.style.visibility = 'hidden';
@@ -1855,8 +1890,12 @@ elements.datasetButton.addEventListener('click', () => {
   // Une bascule, comme « Raw » et « Insights » : un second clic referme. Mais
   // seulement s'il s'agit bien du panneau Dataset — venant de « Column
   // details », le clic doit basculer vers Dataset, pas tout fermer.
-  if (openPanel === 'dataset') closePicker();
-  else openDataset(elements.datasetButton);
+  if (openPanel === 'dataset') {
+    closePicker();
+    return;
+  }
+  openDataset(elements.datasetButton);
+  pickerToggle = elements.datasetButton;
 });
 
 // ----------------------------------------------------------------- palettes
@@ -2030,6 +2069,7 @@ document.addEventListener('keydown', (event) => {
 document.addEventListener('mousedown', (event) => {
   const target = event.target as HTMLElement;
   if (elements.picker.hidden || elements.picker.contains(target)) return;
+  if (pickerToggle?.contains(target)) return;
   closePicker();
 });
 
