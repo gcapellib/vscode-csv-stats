@@ -73,8 +73,9 @@ type Filter =
   | { kind: 'contains'; column: number; text: string; label: string }
   | { kind: 'values'; column: number; values: string[]; label: string }
   | { kind: 'range'; column: number; low: number; high: number; last: boolean; label: string }
-  /** Un ensemble de lignes désigné explicitement, comme les doublons. */
-  | { kind: 'rows'; column: number; rows: Set<number>; label: string };
+  /** Lignes dupliquées, désignées par leur index — seul cas où un ensemble de
+   * lignes explicite est nécessaire plutôt qu'une condition sur une colonne. */
+  | { kind: 'duplicates'; column: number; rows: Set<number>; label: string };
 
 interface State {
   headers: string[];
@@ -250,7 +251,7 @@ function totalWidth(): number {
 
 /** Une ligne satisfait-elle la condition ? */
 function matches(cells: string[], filter: Filter, rowIndex: number): boolean {
-  if (filter.kind === 'rows') return filter.rows.has(rowIndex);
+  if (filter.kind === 'duplicates') return filter.rows.has(rowIndex);
   const raw = cells[filter.column] ?? '';
   switch (filter.kind) {
     case 'contains':
@@ -1227,6 +1228,33 @@ function markedHistogram(column: ColumnStats, colours: Palette): HTMLElement {
  * ce fichier, et comment je le charge ». D'où l'appel `pd.read_csv` en tête,
  * puis la vue d'ensemble des colonnes qu'il faudrait sinon ouvrir une à une.
  */
+/**
+ * Traduit une condition de filtrage en une ligne pandas.
+ *
+ * Le panneau affiche des chiffres calculés sur le sous-ensemble filtré ; sans
+ * cette traduction, le code copié depuis « Dataset… » relirait les 7 200 lignes
+ * du fichier au lieu des 12 que le panneau vient d'analyser — une incohérence
+ * entre ce que l'outil montre et ce qu'il exporte.
+ */
+function filterToPandas(filter: Filter): string {
+  if (filter.kind === 'duplicates') return 'df = df[df.duplicated(keep=False)]';
+  const name = JSON.stringify(state.stats[filter.column]?.name ?? `column ${filter.column + 1}`);
+  switch (filter.kind) {
+    case 'contains':
+      return `df = df[df[${name}].astype(str).str.contains(${JSON.stringify(filter.text)}, case=False, na=False)]`;
+    case 'values':
+      return filter.values.length === 1
+        ? `df = df[df[${name}] == ${JSON.stringify(filter.values[0])}]`
+        : `df = df[df[${name}].isin(${JSON.stringify(filter.values)})]`;
+    case 'range':
+      // Une classe d'histogramme exclut sa borne haute ; une plage saisie à la
+      // main (Filter by range…) inclut les deux, d'où les deux formes.
+      return filter.last
+        ? `df = df[df[${name}].between(${filter.low}, ${filter.high})]`
+        : `df = df[(df[${name}] >= ${filter.low}) & (df[${name}] < ${filter.high})]`;
+  }
+}
+
 function openDataset(anchor: HTMLElement): void {
   const table = currentTable();
   const details = state.headers.map((_, index) =>
@@ -1236,10 +1264,26 @@ function openDataset(anchor: HTMLElement): void {
 
   elements.picker.textContent = '';
   elements.picker.classList.add('wide');
-  elements.picker.appendChild(panelTitle(state.fileName || 'Dataset', 'what this file is, and how to load it'));
+  const filtered = state.filters.length > 0;
+  elements.picker.appendChild(
+    panelTitle(
+      state.fileName || 'Dataset',
+      filtered
+        ? `reflects the ${count(table.rows.length)} rows kept by the active filters`
+        : 'what this file is, and how to load it',
+    ),
+  );
 
   elements.picker.appendChild(sectionTitle('Read it with pandas'));
-  const snippet = readCsvSnippet(state.fileName || 'data.csv', table, dataset);
+  // Le code reproduit aussi les filtres actifs : sans ces lignes, il relirait
+  // le fichier entier alors que la table des colonnes ci-dessous — comme les
+  // non-nuls qu'elle affiche — porte sur le seul sous-ensemble filtré.
+  const lines = [readCsvSnippet(state.fileName || 'data.csv', table, dataset)];
+  if (filtered) {
+    lines.push('', '# Matching the filters applied in this session');
+    for (const filter of state.filters) lines.push(`# ${filter.label}`, filterToPandas(filter));
+  }
+  const snippet = lines.join('\n');
   const code = document.createElement('pre');
   code.className = 'snippet';
   code.textContent = snippet;
@@ -1290,7 +1334,7 @@ function openDataset(anchor: HTMLElement): void {
       finding(`${count(dataset.duplicateRows)} rows are exact duplicates of another`, () => {
         closePicker();
         setColumnFilter(-1, {
-          kind: 'rows',
+          kind: 'duplicates',
           column: -1,
           rows: new Set(dataset.duplicateRowIndices.map((index) => state.view[index] ?? index)),
           label: `${count(dataset.duplicateRows)} duplicate rows`,

@@ -115,10 +115,13 @@ fifty characters and padding spaces.
 it does not paraphrase what the columns already say. It leads with the
 `pd.read_csv` call matching what was detected: separator, decimal comma, the
 missing-value tokens pandas does not already know, and the columns to read as
-strings. Then a `df.info()`-style table — every column with the count of
-non-nulls **as pandas would report it after that very call** and its dtype,
-which otherwise means opening every column panel one after another. Then the
-findings, each of them clickable: duplicated rows, values differing only by
+strings. If any cross-filters are active, matching `df = df[...]` lines follow,
+each labelled with the condition it reproduces — without them, code copied out
+of a filtered view would silently read all the rows back in, contradicting the
+very panel it came from. Then a `df.info()`-style table — every column with the
+count of non-nulls **as pandas would report it after that very call** and its
+dtype, which otherwise means opening every column panel one after another. Then
+the findings, each of them clickable: duplicated rows, values differing only by
 case, values padded with spaces. Clicking one filters the table down to the
 offending rows, because a diagnosis you cannot go and look at only causes
 worry.
@@ -181,7 +184,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.10.3.vsix
+code --install-extension csv-stats-0.10.4.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**
