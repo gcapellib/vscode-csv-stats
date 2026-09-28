@@ -1741,6 +1741,12 @@ function toggleFilter(filter: Filter): void {
 
 function clearFilters(): void {
   state.filters = [];
+  // La pastille du regroupement vit dans cette même barre : un bouton qui
+  // promet de tout effacer ne peut pas laisser le tableau sur un agrégat.
+  if (state.group !== null) {
+    ungroup();
+    return;
+  }
   refilter();
 }
 
