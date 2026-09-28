@@ -337,6 +337,7 @@ function paint(): void {
   paintBand();
   paintHead();
   paintRows();
+  paintFilterBar();
 }
 
 function paintBand(): void {
@@ -1499,9 +1500,37 @@ function clearFilters(): void {
  * des chiffres partiels en les croyant complets. C'est la moitié de la
  * fonctionnalité, pas sa décoration.
  */
+/** Convertit un « #rrggbb » en rgba, pour pouvoir l'atténuer sans y perdre le texte. */
+function withAlpha(hex: string, alpha: number): string {
+  const value = hex.replace('#', '');
+  const red = parseInt(value.slice(0, 2), 16);
+  const green = parseInt(value.slice(2, 4), 16);
+  const blue = parseInt(value.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+/**
+ * Dégradé horizontal tissé dans les teintes du thème actif.
+ *
+ * Sans lui, la barre de filtres empruntait un gris neutre sans rapport avec la
+ * palette choisie juste au-dessus. L'opacité reste faible : les pastilles et le
+ * texte doivent rester lisibles par-dessus, le dégradé ne fait que teinter le
+ * fond derrière eux.
+ */
+function filterBarGradient(): string {
+  const theme = themeById(state.themeId);
+  const dark = isDark();
+  const stops = theme.hues.map((_, index) => withAlpha(paletteFor(theme, index, dark).accent, 0.3));
+  if (stops.length === 0) return 'none';
+  if (stops.length === 1) return `linear-gradient(90deg, ${stops[0]}, ${stops[0]})`;
+  const steps = stops.map((colour, index) => `${colour} ${Math.round((index / (stops.length - 1)) * 100)}%`);
+  return `linear-gradient(90deg, ${steps.join(', ')})`;
+}
+
 function paintFilterBar(): void {
   elements.filterBar.textContent = '';
   elements.filterBar.hidden = state.filters.length === 0;
+  elements.filterBar.style.backgroundImage = filterBarGradient();
   if (state.filters.length === 0) return;
 
   const kept = state.view.length;

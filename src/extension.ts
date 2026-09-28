@@ -175,6 +175,8 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
 </head>
 <body>
 <div id="toolbar">
+  <span id="shape"></span>
+  <span class="toolbar-sep"></span>
   <button id="insights-toggle" type="button" aria-expanded="true" title="Show or hide the statistics bands">
     <span class="chevron">▾</span> Insights
   </button>
@@ -187,7 +189,6 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
     <span class="caret">⌄</span>
   </button>
   <div id="theme-popup" role="listbox" hidden></div>
-  <span id="shape"></span>
   <span id="selection"></span>
   <span id="notice"></span>
 </div>

@@ -181,7 +181,11 @@ body {
   gap: 8px;
   padding: 6px 10px;
   border-bottom: 1px solid var(--vscode-panel-border);
-  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  /* La couleur unie reste la base ; le dégradé posé par JavaScript
+     (background-image) la teinte des couleurs du thème actif sans jamais la
+     remplacer — une base opaque garde le texte lisible quel que soit le thème. */
+  background-color: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  background-image: none;
 }
 
 .filter-summary {

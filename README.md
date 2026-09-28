@@ -85,7 +85,9 @@ Conditions combine with AND, and each of them shows as a chip in a bar under the
 toolbar, with the count of rows kept. Clicking a chip removes that one
 condition; **Clear all** removes them all. That bar is half the feature, not its
 decoration: without it you filter three times, forget what is active, and read
-partial figures believing them complete.
+partial figures believing them complete. The bar itself carries a faint
+gradient woven from the active palette's own hues, so it reads as part of the
+same sheet as the band above rather than a plain grey strip bolted onto it.
 
 ## Column details, and the dataset
 
@@ -187,7 +189,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.10.5.vsix
+code --install-extension csv-stats-0.10.6.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**
