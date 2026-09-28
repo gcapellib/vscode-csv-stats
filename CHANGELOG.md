@@ -8,8 +8,9 @@ file exists so that jump has an explanation.
 
 - **Folding the bands narrows the columns.** Column widths account for the
   `Min … Max …` the band must hold, which is far more than the values need;
-  with the band gone that requirement goes too. Measured on six columns: 1302
-  to 666 pixels, four columns on screen becoming six. Both movements share one
+  with the band gone that requirement goes too. No column narrows past its own title, buttons
+  included. Measured on six columns: 1302 to 826 pixels, four columns on screen
+  becoming six. Both movements share one
   90 ms duration so neither waits for the other.
 
 ## 0.15.x

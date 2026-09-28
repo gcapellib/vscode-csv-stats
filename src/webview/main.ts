@@ -30,6 +30,14 @@ const ROW_HEIGHT = 22;
  */
 const MIN_WIDTH = 210;
 const MIN_WIDTH_FOLDED = 90;
+/**
+ * Place que les deux boutons de l'en-tête prennent au titre.
+ *
+ * Sans elle, la largeur ne couvrait que le texte et les boutons le
+ * rognaient — invisible tant que le plancher de 210 px absorbait l'écart,
+ * flagrant dès que replier les bandeaux le fait tomber.
+ */
+const HEAD_BUTTONS = 46;
 const MAX_WIDTH = 460;
 /**
  * Hauteur de l'histogramme. Le bandeau peut se replier d'un clic, donc il n'a
@@ -261,7 +269,10 @@ function measureWidths(withBand = state.bandVisible): void {
 
   const sampled = Math.min(state.rows.length, WIDTH_SAMPLE_ROWS);
   state.widths = state.headers.map((header, index) => {
-    let widest = widthOf(header);
+    // Le titre doit tenir en entier : il nomme la colonne, et une colonne dont
+    // on lit « dep… » n'est plus identifiée. Les valeurs, elles, n'ont pas les
+    // boutons au-dessus d'elles.
+    let widest = widthOf(header) + HEAD_BUTTONS;
     for (let row = 0; row < sampled; row++) {
       const value = state.rows[row]?.[index];
       if (value) widest = Math.max(widest, widthOf(value));

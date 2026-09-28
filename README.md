@@ -68,9 +68,10 @@ bottom.
 The **Insights** button in the toolbar folds the bands away when you only want
 the table, and unfolds them again. Folding also **narrows every column**: a
 column is wide enough to hold `Min 10,001   Max 10,300`, which is far more than
-its own values need — with the band gone, that requirement goes with it. On a
-six-column sample the sheet drops from 1302 to 666 pixels and every column fits
-on screen instead of four. Both movements — the band and the columns — run over
+its own values need — with the band gone, that requirement goes with it. A column never narrows past its own
+title, buttons included — a column read as `dep…` is no longer identified. On a
+six-column sample the sheet still drops from 1302 to 826 pixels and every
+column fits on screen instead of four. Both movements — the band and the columns — run over
 the same 90 ms, so neither is seen waiting for the other.
 
 Because they can be folded, the bands are not stingy with space: a readable
@@ -233,7 +234,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.16.0.vsix
+code --install-extension csv-stats-0.16.1.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**
