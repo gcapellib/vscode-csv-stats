@@ -4,6 +4,18 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.12.x
+
+- **Five palettes** after the editor colour schemes most people already read
+  code in — Mocha, Midnight, Frost, Solar, Ember — bringing the picker to
+  forty-five. Their hues are ordered so neighbouring columns fall as far apart
+  as possible.
+- The picker now derives each palette's family from the palette itself rather
+  than from its position in the list, where a hardcoded cut would have filed a
+  new palette under the wrong heading in silence.
+- The raw view no longer renders a short page when it is painted before the
+  layout settles.
+
 ## 0.11.x
 
 - **Raw view**: a toolbar button shows the file exactly as written on disk,

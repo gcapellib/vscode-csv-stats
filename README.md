@@ -31,7 +31,7 @@ the file.
 
 ![The palette picker, with a preview of each palette](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-themes.png)
 
-*Forty palettes, each previewed by five chips showing background and ink.*
+*Forty-five palettes, each previewed by five chips showing background and ink.*
 
 ![The same file with the Console palette, where each column carries its own ink colour on a plain background](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-console.png)
 
@@ -160,10 +160,16 @@ values, which makes the guess a hundred times cheaper.
 
 ## Palettes
 
-A picker offers **forty palettes** in three families: coloured background with
-uniform text (twenty), uniform background with text coloured per column, the way
-syntax highlighting does (ten), and both at once (ten). Your choice is remembered
-from one session to the next.
+A picker offers **forty-five palettes** in three families: coloured background
+with uniform text (twenty), uniform background with text coloured per column,
+the way syntax highlighting does (fifteen), and both at once (ten). Your choice
+is remembered from one session to the next.
+
+Five of the coloured-text palettes — **Mocha**, **Midnight**, **Frost**,
+**Solar**, **Ember** — take after the editor colour schemes most people already
+read code in: an almost-neutral dark ground and frank but unshouted ink. Their
+hues are ordered so that two neighbouring columns fall as far apart as possible,
+since the original swatches sometimes put two oranges side by side.
 
 ## How files are read
 
@@ -199,7 +205,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.11.1.vsix
+code --install-extension csv-stats-0.12.0.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**

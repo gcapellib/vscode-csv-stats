@@ -20,10 +20,23 @@ function difference(first: string, second: string): number {
 }
 
 describe('palettes', () => {
-  it('en compte quarante, aux identifiants et libellés uniques', () => {
-    assert.equal(THEMES.length, 40);
-    assert.equal(new Set(THEMES.map((theme) => theme.id)).size, 40);
-    assert.equal(new Set(THEMES.map((theme) => theme.label)).size, 40);
+  it('en compte quarante-cinq, aux identifiants et libellés uniques', () => {
+    assert.equal(THEMES.length, 45);
+    assert.equal(new Set(THEMES.map((theme) => theme.id)).size, 45);
+    assert.equal(new Set(THEMES.map((theme) => theme.label)).size, 45);
+  });
+
+  it('range chaque palette dans une famille et une seule', () => {
+    // Le sélecteur groupe par ces deux champs : une palette qui porterait les
+    // deux, ou aucun des deux par erreur, apparaîtrait deux fois ou pas du tout.
+    const familles = { fond: 0, encre: 0, duo: 0 };
+    for (const theme of THEMES) {
+      if (theme.uniformInk && theme.neutral) assert.fail(`« ${theme.label} » porte les deux familles`);
+      if (theme.uniformInk) familles.fond++;
+      else if (theme.neutral) familles.encre++;
+      else familles.duo++;
+    }
+    assert.deepEqual(familles, { fond: 20, encre: 15, duo: 10 });
   });
 
   it('retombe sur la palette par défaut pour un identifiant inconnu', () => {

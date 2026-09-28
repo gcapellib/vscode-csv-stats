@@ -91,6 +91,15 @@ const INKED: CsvTheme[] = [
   inked('steel', 'Steel', [210, 198, 226, 188, 240, 178], '#F6F8FA', '#1A1F26'),
   inked('prism', 'Prism', [0, 45, 90, 135, 180, 225, 270, 315], '#FFFFFF', '#121316'),
   inked('dawn', 'Dawn', [20, 340, 45, 300, 5, 260], '#FFFAF5', '#241C22'),
+  // Cinq palettes qui reprennent l'esprit des thèmes d'éditeur les plus répandus
+  // — fond sombre presque neutre, encre franche mais jamais criarde. Les teintes
+  // sont rangées pour que deux colonnes voisines s'écartent le plus possible :
+  // l'ordre du nuancier d'origine mettait parfois deux oranges côte à côte.
+  inked('mocha', 'Mocha', [343, 41, 189, 23, 267, 115, 316, 217], '#EFF1F5', '#1E1E2E'),
+  inked('midnight', 'Midnight', [326, 191, 135, 31, 265, 0, 65], '#FBF7FF', '#282A36'),
+  inked('frost', 'Frost', [193, 354, 92, 213, 40, 311, 14], '#ECEFF4', '#2E3440'),
+  inked('solar', 'Solar', [45, 331, 175, 18, 237, 68, 1, 205], '#FDF6E3', '#002B36'),
+  inked('ember', 'Ember', [4, 162, 42, 343, 101, 27, 61], '#FBF1C7', '#282828'),
 ];
 
 /** Fond teinté et texte coloré, tous deux par colonne. */

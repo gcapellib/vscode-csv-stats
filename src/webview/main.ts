@@ -650,7 +650,7 @@ elements.rawToggle.addEventListener('click', toggleRaw);
  * tient la promesse de fluidité à cent mille lignes même pour du texte non
  * analysé, sans imposer de plafond arbitraire.
  */
-function paintRaw(): void {
+function paintRaw(retry = true): void {
   if (state.rawLoading) {
     elements.rawBody.textContent = '';
     elements.rawBody.style.height = '';
@@ -667,6 +667,16 @@ function paintRaw(): void {
   elements.rawBody.style.height = `${total * ROW_HEIGHT}px`;
   const scrollTop = elements.rawScroller.scrollTop;
   const viewport = elements.rawScroller.clientHeight;
+  // Une hauteur nulle veut dire que la mise en page n'a pas encore eu lieu.
+  // Rendre malgré tout ne remplirait que l'overscan — une poignée de lignes,
+  // puis du vide jusqu'au premier défilement, sans que rien ne signale l'erreur.
+  // Une seule nouvelle tentative, sinon un panneau réellement replié bouclerait.
+  if (viewport === 0 && retry) {
+    requestAnimationFrame(() => {
+      if (state.showRaw) paintRaw(false);
+    });
+    return;
+  }
   const first = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
   const last = Math.min(total, first + Math.ceil(viewport / ROW_HEIGHT) + OVERSCAN * 2);
 
@@ -1726,10 +1736,20 @@ elements.datasetButton.addEventListener('click', () => openDataset(elements.data
 
 // ----------------------------------------------------------------- palettes
 
+/**
+ * Les trois familles, déduites de la palette elle-même plutôt que de sa position
+ * dans la liste.
+ *
+ * Un découpage par indices figés était un piège : ajouter une palette au milieu
+ * de la liste l'aurait rangée en silence dans la mauvaise famille, sans qu'aucun
+ * test ne s'en aperçoive. Chaque palette sait déjà ce qu'elle est — une encre
+ * unique pour un fond coloré, un fond uni pour une encre colorée, ni l'un ni
+ * l'autre quand les deux portent la couleur.
+ */
 const THEME_GROUPS: Array<[string, typeof THEMES]> = [
-  ['Coloured background', THEMES.slice(0, 20)],
-  ['Coloured text', THEMES.slice(20, 30)],
-  ['Both', THEMES.slice(30)],
+  ['Coloured background', THEMES.filter((theme) => theme.uniformInk !== undefined)],
+  ['Coloured text', THEMES.filter((theme) => theme.neutral !== undefined)],
+  ['Both', THEMES.filter((theme) => theme.uniformInk === undefined && theme.neutral === undefined)],
 ];
 
 /**
