@@ -4,11 +4,15 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.15.x
+
+- **Group by removed.** Counting rows per value is what the value picker
+  already does, and what the band already shows: the panel moved information
+  around without producing any. A real group by aggregates the *other* columns
+  — mean delay per company — and that is a different feature.
+
 ## 0.14.x
 
-- **Group by** from the column's filter button: one row per distinct value with
-  its count, computed on the rows the filters kept, with a chip to come back.
-  It reaches the generated pandas alongside the filters and the sort.
 - **Two permanent buttons in every column header**, sort and filter — both
   actions existed, but one was an unannounced click on the title and the other
   slept in the `⋯` menu.

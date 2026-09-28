@@ -83,18 +83,6 @@ type Filter =
    * lignes explicite est nécessaire plutôt qu'une condition sur une colonne. */
   | { kind: 'duplicates'; column: number; rows: Set<number>; label: string };
 
-/**
- * Un regroupement installe un tableau d'agrégats à la place des lignes du
- * fichier — deux colonnes, une par valeur distincte et son compte. Les noms des
- * colonnes d'origine sont conservés : les filtres actifs les désignent encore,
- * et le code pandas généré doit pouvoir les nommer.
- */
-interface Group {
-  column: number;
-  name: string;
-  names: string[];
-}
-
 interface State {
   headers: string[];
   rows: string[][];
@@ -121,8 +109,6 @@ interface State {
   active: { row: number; column: number } | null;
   themeId: string;
   ready: boolean;
-  /** Regroupement en cours, ou null quand le tableau montre les lignes du fichier. */
-  group: Group | null;
   /** Texte brut du fichier, demandé une seule fois au premier clic sur « Raw ». */
   rawLines: string[] | null;
   rawLoading: boolean;
@@ -147,7 +133,6 @@ const state: State = {
   active: null,
   themeId: THEMES[0].id,
   ready: false,
-  group: null,
   rawLines: null,
   rawLoading: false,
   showRaw: false,
@@ -314,8 +299,8 @@ function matches(cells: string[], filter: Filter, rowIndex: number): boolean {
 }
 
 /** Indices des lignes retenues par les filtres actifs. */
-/** Les lignes retenues parmi celles qu'on lui donne. */
-function keptRows(rows: string[][]): number[] {
+function filteredRows(): number[] {
+  const rows = state.rows;
   if (state.filters.length === 0) return rows.map((_, index) => index);
   const kept: number[] = [];
   for (let row = 0; row < rows.length; row++) {
@@ -323,14 +308,6 @@ function keptRows(rows: string[][]): number[] {
     if (cells && state.filters.every((filter) => matches(cells, filter, row))) kept.push(row);
   }
   return kept;
-}
-
-function filteredRows(): number[] {
-  // Regroupé, les filtres ont déjà servi à bâtir l'agrégat : les réappliquer à
-  // ses deux colonnes ne retiendrait plus rien, une condition sur « departure »
-  // ne trouvant plus de colonne de ce nom.
-  if (state.group !== null) return state.rows.map((_, index) => index);
-  return keptRows(state.rows);
 }
 
 /**
@@ -610,7 +587,7 @@ function paintHead(): void {
 
     // Deux boutons permanents plutôt que des gestes à deviner : le tri ne se
     // devinait qu'en cliquant le titre, et le filtre dormait dans le menu « ⋯ ».
-    const filter = headButton('\u25BE', 'Filter or group this column', (event) => {
+    const filter = headButton('\u25BE', 'Filter this column', (event) => {
       event.stopPropagation();
       openColumnFilter(modelIndex, filter);
     });
@@ -653,28 +630,10 @@ function cycleSort(modelIndex: number): void {
   paint();
 }
 
-/**
- * « Group by », depuis le même panneau que le filtre.
- *
- * Le bouton de gauche ouvre le filtre en un clic parce que c'est son usage
- * courant ; le regroupement y tient sa place plutôt qu'un bouton de plus dans
- * un en-tête déjà chargé.
- */
-function groupButton(columnIndex: number): HTMLButtonElement {
-  const button = document.createElement('button');
-  button.className = 'picker-button';
-  button.textContent = state.group?.column === columnIndex ? 'Ungroup' : 'Group by';
-  button.addEventListener('click', () => {
-    closePicker();
-    groupByColumn(columnIndex);
-  });
-  return button;
-}
-
-/** Le panneau du bouton de gauche : filtrer, et regrouper. */
+/** Le panneau du bouton de gauche : la liste des valeurs, ou les bornes. */
 function openColumnFilter(modelIndex: number, anchor: HTMLElement): void {
   const column = state.stats[modelIndex];
-  if (column?.type === 'numeric' && state.group === null) openRangePicker(modelIndex, anchor);
+  if (column?.type === 'numeric') openRangePicker(modelIndex, anchor);
   else openValuePicker(modelIndex, anchor);
 }
 
@@ -1149,7 +1108,7 @@ function openValuePicker(columnIndex: number, anchor: HTMLElement): void {
     const everything = values.length === counts.length;
     setColumnFilter(columnIndex, values.length === 0 || everything ? null : valuesFilter(columnIndex, values));
   });
-  footer.append(groupButton(columnIndex), cancel, apply);
+  footer.append(cancel, apply);
   elements.picker.appendChild(footer);
 
   placeFloating(elements.picker, anchor);
@@ -1218,7 +1177,7 @@ function openRangePicker(columnIndex: number, anchor: HTMLElement): void {
       label: `${column?.name} ${num(Math.min(from, to))} – ${num(Math.max(from, to))}`,
     });
   });
-  footer.append(groupButton(columnIndex), clear, apply);
+  footer.append(clear, apply);
   elements.picker.appendChild(footer);
 
   placeFloating(elements.picker, anchor);
@@ -1491,14 +1450,6 @@ function datasetTransformLines(): string[] {
     for (const filter of state.filters) lines.push(`# ${filter.label}`, filterToPandas(filter));
   }
 
-  if (state.group !== null) {
-    lines.push(
-      '',
-      `# Grouped by ${state.group.name}`,
-      `df = df.groupby(${JSON.stringify(state.group.name)}).size().reset_index(name="count")`,
-    );
-  }
-
   if (state.sort) {
     const name = state.stats[state.sort.index]?.name ?? `column ${state.sort.index + 1}`;
     const direction = state.sort.ascending ? 'ascending' : 'descending';
@@ -1514,10 +1465,7 @@ function datasetTransformLines(): string[] {
 
 function filterToPandas(filter: Filter): string {
   if (filter.kind === 'duplicates') return 'df = df[df.duplicated(keep=False)]';
-  // Les noms d'origine, pas ceux de l'agrégat : un filtre posé avant un
-  // regroupement désigne une colonne que state.stats ne connaît plus.
-  const names = state.group ? state.group.names : state.stats.map((column) => column.name);
-  const name = JSON.stringify(names[filter.column] ?? `column ${filter.column + 1}`);
+  const name = JSON.stringify(state.stats[filter.column]?.name ?? `column ${filter.column + 1}`);
   switch (filter.kind) {
     case 'contains':
       return `df = df[df[${name}].astype(str).str.contains(${JSON.stringify(filter.text)}, case=False, na=False)]`;
@@ -1741,12 +1689,6 @@ function toggleFilter(filter: Filter): void {
 
 function clearFilters(): void {
   state.filters = [];
-  // La pastille du regroupement vit dans cette même barre : un bouton qui
-  // promet de tout effacer ne peut pas laisser le tableau sur un agrégat.
-  if (state.group !== null) {
-    ungroup();
-    return;
-  }
   refilter();
 }
 
@@ -1793,28 +1735,14 @@ function paintChrome(): void {
 
 function paintFilterBar(): void {
   elements.filterBar.textContent = '';
-  elements.filterBar.hidden = state.filters.length === 0 && state.group === null;
+  elements.filterBar.hidden = state.filters.length === 0;
   paintChrome();
   if (elements.filterBar.hidden) return;
 
   const summary = document.createElement('span');
   summary.className = 'filter-summary';
-  // Regroupé, le tableau ne montre plus des lignes du fichier mais des groupes :
-  // « 12 of 7,200 rows » y désignerait deux choses différentes dans la même
-  // phrase.
-  summary.textContent = state.group
-    ? `${count(state.rows.length)} groups`
-    : `${count(state.view.length)} of ${count(state.rows.length)} rows`;
+  summary.textContent = `${count(state.view.length)} of ${count(state.rows.length)} rows`;
   elements.filterBar.appendChild(summary);
-
-  if (state.group !== null) {
-    const chip = document.createElement('button');
-    chip.className = 'chip-filter';
-    chip.title = 'Back to the rows';
-    chip.append(document.createTextNode(`Grouped by ${state.group.name}`), cross());
-    chip.addEventListener('click', ungroup);
-    elements.filterBar.appendChild(chip);
-  }
 
   for (const filter of state.filters) {
     const chip = document.createElement('button');
@@ -1842,101 +1770,7 @@ function cross(): HTMLElement {
   return mark;
 }
 
-/**
- * Les lignes du fichier, intactes.
- *
- * Grouper installe un tableau d'agrégats à leur place — tout le rendu, bandeau
- * compris, s'applique alors sans rien savoir du regroupement. Dégrouper les
- * remet. On repart toujours d'ici : un agrégat calculé sur un agrégat n'aurait
- * aucun sens.
- */
-let source: { headers: string[]; rows: string[][] } | null = null;
-
-/** Regroupe sur une colonne, ou dégroupe si c'est déjà elle. */
-function groupByColumn(modelIndex: number): void {
-  if (state.group?.column === modelIndex) {
-    ungroup();
-    return;
-  }
-  if (state.group === null) source = { headers: state.headers, rows: state.rows };
-  const names = state.group ? state.group.names : state.stats.map((column) => column.name);
-  state.group = { column: modelIndex, name: names[modelIndex] ?? `column ${modelIndex + 1}`, names };
-  regroup(true);
-}
-
-function ungroup(): void {
-  if (source === null || state.group === null) return;
-  const names = state.group.names;
-  state.headers = source.headers;
-  state.rows = source.rows;
-  state.group = null;
-  state.order = state.headers.map((_, index) => index);
-  state.sort = null;
-  state.selected.clear();
-  state.forcedTypes.clear();
-  // Vidé d'abord : recomputeStats reprend les noms précédents pour que les
-  // renommages survivent au recalcul, ce qui collerait ici les noms de
-  // l'agrégat sur les colonnes du fichier.
-  state.stats = [];
-  rebuildView();
-  recomputeStats(state.view);
-  for (const [index, column] of state.stats.entries()) column.name = names[index] ?? column.name;
-  measureWidths();
-  paintFilterBar();
-  paint();
-}
-
-/**
- * Reconstruit le tableau d'agrégats depuis les lignes du fichier.
- *
- * Les filtres s'appliquent **avant** le regroupement, comme partout ailleurs
- * dans l'outil : on groupe ce qu'on regarde. Ils ne doivent donc jamais être
- * réappliqués à l'agrégat, dont les colonnes n'ont plus rien à voir avec les
- * leurs — d'où le retour à la source à chaque passage.
- */
-function regroup(remeasure: boolean): void {
-  const group = state.group;
-  if (group === null || source === null) return;
-  state.headers = source.headers;
-  state.rows = source.rows;
-
-  const kept = keptRows(source.rows);
-  const counts = new Map<string, number>();
-  for (const index of kept) {
-    const raw = source.rows[index]?.[group.column] ?? '';
-    // Une cellule vide n'est pas un groupe : pandas l'écarte aussi, groupby
-    // ayant dropna=True par défaut. Le code généré dirait sinon autre chose
-    // que ce que le tableau montre.
-    if (raw.trim() === '') continue;
-    counts.set(raw, (counts.get(raw) ?? 0) + 1);
-  }
-  const ordered = [...counts.entries()].sort(
-    (left, right) => right[1] - left[1] || (left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0),
-  );
-
-  state.headers = [group.name, 'count'];
-  state.rows = ordered.map(([value, total]) => [value, String(total)]);
-  state.order = [0, 1];
-  state.selected.clear();
-  state.forcedTypes.clear();
-  if (state.sort !== null && state.sort.index > 1) state.sort = null;
-  // Même raison qu'au dégroupement : sans cela, les deux colonnes d'agrégat
-  // hériteraient des noms des deux premières colonnes du fichier.
-  state.stats = [];
-  rebuildView();
-  recomputeStats(state.view);
-  if (remeasure) measureWidths();
-  paintFilterBar();
-  paint();
-}
-
 function refilter(): void {
-  // Un regroupement se recalcule entièrement : les filtres ayant changé, ce
-  // n'est plus le même sous-ensemble qu'on agrège.
-  if (state.group !== null) {
-    regroup(false);
-    return;
-  }
   rebuildView();
   // Le recalcul n'a lieu qu'ici : le mettre dans rebuildView le déclencherait à
   // chaque paquet de lignes reçu, soit cinq fois pour rien sur un gros fichier.

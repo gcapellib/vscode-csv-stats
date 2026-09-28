@@ -113,19 +113,6 @@ partial figures believing them complete. The bar itself carries a faint
 gradient woven from the active palette's own hues, so it reads as part of the
 same sheet as the band above rather than a plain grey strip bolted onto it.
 
-## Group by
-
-The filter button also groups. **Group by** replaces the table with one row per
-distinct value and its count — the shape you would reach for to answer *how many
-trips were cancelled, and how many were not* — with the bands recomputed over
-those two columns, so the result is read with the same instruments as the file
-it came from.
-
-It groups **what you are looking at**: filters apply first, so grouping under
-`departure = Lyon` counts the rows that filter kept, not the whole file. A
-`Grouped by …` chip joins the filter chips, and removing it brings the rows
-back.
-
 ## Column details, and the dataset
 
 `⋯` → **Column details** opens what the band cannot carry without becoming
@@ -156,8 +143,7 @@ it does not paraphrase what the columns already say. It leads with the
 missing-value tokens pandas does not already know, and the columns to read as
 strings. Every change made through the table follows, in the order it was
 actually applied — `df.rename(...)` for renamed columns, `df.drop(...)` for
-dropped ones, `df = df[...]` for each active filter, `df.groupby(...).size()`
-for a grouping, `df.sort_values(...)` for the current sort — because code that only replayed some of them would either
+dropped ones, `df = df[...]` for each active filter, `df.sort_values(...)` for the current sort — because code that only replayed some of them would either
 contradict the panel it came from (rows or columns it no longer shows) or fail
 outright (a filter naming a column that was never renamed in the code). Then a
 `df.info()`-style table — every column still on screen, with the count of
@@ -239,7 +225,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.14.1.vsix
+code --install-extension csv-stats-0.15.0.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**
