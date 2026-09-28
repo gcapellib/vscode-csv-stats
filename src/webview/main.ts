@@ -1236,6 +1236,50 @@ function markedHistogram(column: ColumnStats, colours: Palette): HTMLElement {
  * du fichier au lieu des 12 que le panneau vient d'analyser — une incohérence
  * entre ce que l'outil montre et ce qu'il exporte.
  */
+/**
+ * Toutes les lignes de transformation, dans l'ordre où l'application les
+ * applique réellement : renommage et retrait de colonnes en premier (state.order
+ * n'affecte que l'affichage, mais un renommage change le nom que les filtres et
+ * le tri utilisent déjà), puis les filtres, puis le tri — le même ordre que
+ * `rebuildView()` (filteredRows() avant le tri).
+ */
+function datasetTransformLines(): string[] {
+  const lines: string[] = [];
+
+  const renamed = state.headers
+    .map((original, index) => ({ original, current: state.stats[index]?.name ?? original }))
+    .filter(({ original, current }) => current !== original);
+  if (renamed.length > 0) {
+    const mapping = renamed.map(({ original, current }) => `${JSON.stringify(original)}: ${JSON.stringify(current)}`).join(', ');
+    lines.push('', '# Columns renamed in the table', `df = df.rename(columns={${mapping}})`);
+  }
+
+  const dropped = state.headers
+    .map((original, index) => ({ index, name: state.stats[index]?.name ?? original }))
+    .filter(({ index }) => !state.order.includes(index));
+  if (dropped.length > 0) {
+    const names = dropped.map(({ name }) => JSON.stringify(name)).join(', ');
+    lines.push('', '# Columns dropped from the table', `df = df.drop(columns=[${names}])`);
+  }
+
+  if (state.filters.length > 0) {
+    lines.push('', '# Matching the filters applied in this session');
+    for (const filter of state.filters) lines.push(`# ${filter.label}`, filterToPandas(filter));
+  }
+
+  if (state.sort) {
+    const name = state.stats[state.sort.index]?.name ?? `column ${state.sort.index + 1}`;
+    const direction = state.sort.ascending ? 'ascending' : 'descending';
+    lines.push(
+      '',
+      `# Sorted ${direction} by ${name} in the table`,
+      `df = df.sort_values(${JSON.stringify(name)}, ascending=${state.sort.ascending ? 'True' : 'False'})`,
+    );
+  }
+
+  return lines;
+}
+
 function filterToPandas(filter: Filter): string {
   if (filter.kind === 'duplicates') return 'df = df[df.duplicated(keep=False)]';
   const name = JSON.stringify(state.stats[filter.column]?.name ?? `column ${filter.column + 1}`);
@@ -1275,14 +1319,13 @@ function openDataset(anchor: HTMLElement): void {
   );
 
   elements.picker.appendChild(sectionTitle('Read it with pandas'));
-  // Le code reproduit aussi les filtres actifs : sans ces lignes, il relirait
-  // le fichier entier alors que la table des colonnes ci-dessous — comme les
-  // non-nuls qu'elle affiche — porte sur le seul sous-ensemble filtré.
-  const lines = [readCsvSnippet(state.fileName || 'data.csv', table, dataset)];
-  if (filtered) {
-    lines.push('', '# Matching the filters applied in this session');
-    for (const filter of state.filters) lines.push(`# ${filter.label}`, filterToPandas(filter));
-  }
+  // Le code reproduit tout ce qui change la forme du dataframe affiche a
+  // l'ecran, pas seulement les filtres : un renommage ou un retrait de
+  // colonne non reproduits, et le code genererait un DataFrame different de
+  // celui que le panneau vient d'analyser — ou pire, une KeyError si un
+  // filtre porte sur le nom renomme d'une colonne que le code n'a jamais
+  // renommee.
+  const lines = [readCsvSnippet(state.fileName || 'data.csv', table, dataset), ...datasetTransformLines()];
   const snippet = lines.join('\n');
   const code = document.createElement('pre');
   code.className = 'snippet';
@@ -1302,7 +1345,10 @@ function openDataset(anchor: HTMLElement): void {
   const info = document.createElement('div');
   info.className = 'info-table';
   info.append(head('Column'), head('Non-null'), head('Dtype'));
-  state.headers.forEach((name, index) => {
+  // Une colonne retiree du tableau (Drop column) n'a plus sa place ici : le
+  // code genere ci-dessous la supprime aussi, le panneau doit dire pareil.
+  for (const index of state.order) {
+    const name = state.headers[index];
     const stats = state.stats[index];
     const column = details[index];
     // Non-nuls tels que pandas les compterait après l'appel ci-dessus, jetons
@@ -1322,7 +1368,7 @@ function openDataset(anchor: HTMLElement): void {
       Object.assign(textSpan(count(nonNull)), { className: 'info-cell' }),
       Object.assign(textSpan(column.pandasType), { className: 'info-cell dim' }),
     );
-  });
+  }
   elements.picker.appendChild(info);
 
   elements.picker.appendChild(sectionTitle('Findings'));
