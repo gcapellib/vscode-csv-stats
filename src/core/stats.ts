@@ -54,7 +54,12 @@ export interface ColumnStats {
 }
 
 export const HISTOGRAM_BINS = 20;
-const TOP_VALUES = 3;
+/**
+ * Le bandeau réserve sept lignes au palmarès. L'hôte en envoie donc sept : la
+ * vue replie la dernière dans « Other » s'il reste quelque chose derrière, et
+ * les affiche toutes les sept sinon.
+ */
+export const TOP_VALUES = 7;
 
 export function isMissing(raw: string): boolean {
   return raw.trim() === '';

@@ -54,17 +54,31 @@ Above every column, a band reports:
   **Mean / Median** — the two figures you want at a glance, the rest one click
   away in **Column details**; hovering a bar shows that bin's range and count, and hovering the
   rest of the band gives the column's full name and its summary;
-- for a text column, the three most frequent values and their share, followed by
-  an **Other** row carrying the remainder, so the percentages always add up to
-  100%.
+- for a text column, the most frequent values and their share — **seven lines**,
+  filled to the space the band actually has — followed by an **Other** row
+  carrying the remainder, so the percentages always add up to 100%. When the
+  column holds seven distinct values or fewer they are all listed and **Other**
+  disappears, a row reading 0.0% having nothing to say.
+
+The histogram takes whatever height the band has left, rather than a fixed 84
+pixels — on a typical file that is a third taller, and the bars are read from a
+common baseline across columns since the numeric blocks all sit flush with the
+bottom.
 
 The **Insights** button in the toolbar folds the bands away when you only want
-the table, and unfolds them again. Because they can be folded, the bands are not
-stingy with space: a readable chart beats one that merely fits.
+the table, and unfolds them again, in a short slide rather than a jump. Because
+they can be folded, the bands are not stingy with space: a readable chart beats
+one that merely fits.
 
-Below that, the data table: click a header to sort — ascending, then
-descending, then back to the file's own order, because without that third state
-the original order is lost on the first click with no way back — click a cell to mark it —
+Every column header carries two permanent buttons: **sort** and **filter**.
+Both actions existed before, but one was a click on the title that nothing
+announced and the other slept inside the `⋯` menu — a feature you cannot see is
+a feature you do not have.
+
+Below that, the data table: click a header, or its sort button, to sort —
+ascending, then descending, then back to the file's own order, because without
+that third state the original order is lost on the first click with no way back
+— click a cell to mark it —
 the whole row takes a translucent veil and the cell itself darkens and gets a
 frame. Ctrl-click (Cmd on macOS) marks several rows, and clicking a lone marked
 row unmarks it. The veil is laid over the column colour rather than replacing
@@ -99,6 +113,19 @@ partial figures believing them complete. The bar itself carries a faint
 gradient woven from the active palette's own hues, so it reads as part of the
 same sheet as the band above rather than a plain grey strip bolted onto it.
 
+## Group by
+
+The filter button also groups. **Group by** replaces the table with one row per
+distinct value and its count — the shape you would reach for to answer *how many
+trips were cancelled, and how many were not* — with the bands recomputed over
+those two columns, so the result is read with the same instruments as the file
+it came from.
+
+It groups **what you are looking at**: filters apply first, so grouping under
+`departure = Lyon` counts the rows that filter kept, not the whole file. A
+`Grouped by …` chip joins the filter chips, and removing it brings the rows
+back.
+
 ## Column details, and the dataset
 
 `⋯` → **Column details** opens what the band cannot carry without becoming
@@ -123,14 +150,14 @@ fifty characters and padding spaces.
 `float64` or `object`, with notes such as *leading zeros are lost unless dtype is
 "string"* or *would be numeric if NULL, - counted as missing*.
 
-**Dataset…** in the toolbar answers *what is this file, and how do I load it* —
+**Dataset…** in the toolbar — a toggle, like **Insights** and **Raw** — answers *what is this file, and how do I load it* —
 it does not paraphrase what the columns already say. It leads with the
 `pd.read_csv` call matching what was detected: separator, decimal comma, the
 missing-value tokens pandas does not already know, and the columns to read as
 strings. Every change made through the table follows, in the order it was
 actually applied — `df.rename(...)` for renamed columns, `df.drop(...)` for
-dropped ones, `df = df[...]` for each active filter, `df.sort_values(...)` for
-the current sort — because code that only replayed some of them would either
+dropped ones, `df = df[...]` for each active filter, `df.groupby(...).size()`
+for a grouping, `df.sort_values(...)` for the current sort — because code that only replayed some of them would either
 contradict the panel it came from (rows or columns it no longer shows) or fail
 outright (a filter naming a column that was never renamed in the code). Then a
 `df.info()`-style table — every column still on screen, with the count of
@@ -212,7 +239,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.13.0.vsix
+code --install-extension csv-stats-0.14.0.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**

@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 import { parse } from '../core/csv';
-import { compute, computeAll, HISTOGRAM_BINS, parseNumber } from '../core/stats';
+import { compute, computeAll, HISTOGRAM_BINS, parseNumber, TOP_VALUES } from '../core/stats';
 
 function statsOf(text: string) {
   return computeAll(parse(text));
@@ -36,25 +36,36 @@ describe('StatsComputer', () => {
     assert.equal(forced.distinct, 3);
   });
 
-  it('donne le top 3 par fréquence', () => {
+  it('classe par fréquence décroissante', () => {
     const stats = statsOf('ville\nLyon\nLyon\nLyon\nNantes\nNantes\nBrest\nCaen\n')[0];
     assert.equal(stats.type, 'text');
     assert.deepEqual(
       stats.top.map((entry) => entry.value),
-      ['Lyon', 'Nantes', 'Brest'],
+      ['Lyon', 'Nantes', 'Brest', 'Caen'],
     );
     assert.deepEqual(
       stats.top.map((entry) => entry.count),
-      [3, 2, 1],
+      [3, 2, 1, 1],
     );
     assert.equal(stats.min, null);
   });
 
+  it('en envoie autant que le bandeau a de lignes, pas une de plus', () => {
+    // Le bandeau réserve sept lignes : au-delà, les valeurs envoyées ne
+    // seraient jamais affichées et ne feraient qu'alourdir chaque message.
+    const villes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+    const stats = statsOf(`ville\n${villes.join('\n')}\n`)[0];
+    assert.equal(TOP_VALUES, 7);
+    assert.equal(stats.top.length, 7);
+    assert.equal(stats.distinct, 10);
+  });
+
   it('regroupe le reste sous Other pour totaliser 100 %', () => {
-    const stats = statsOf('ville\nLyon\nLyon\nLyon\nNantes\nNantes\nBrest\nCaen\nRennes\nTours\n')[0];
+    const villes = ['A', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    const stats = statsOf(`ville\n${villes.join('\n')}\n`)[0];
     assert.equal(stats.present, 9);
-    // Lyon 3 + Nantes 2 + Brest 1 = 6 ; restent Caen, Rennes, Tours.
-    assert.equal(stats.otherCount, 3);
+    // Sept valeurs retenues (A×2, B, C, D, E, F, G) ; restent H et… rien d'autre.
+    assert.equal(stats.otherCount, 1);
     const total = stats.top.reduce((acc, entry) => acc + entry.share, 0) + stats.otherShare;
     assert.ok(Math.abs(total - 1) < 1e-9, `total des parts : ${total}`);
   });

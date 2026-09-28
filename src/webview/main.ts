@@ -29,6 +29,8 @@ const MAX_WIDTH = 460;
  * graphique qui tient.
  */
 const HIST_HEIGHT = 84;
+/** Lignes réservées au palmarès d'une colonne texte, « Other » compris. */
+const BAND_ROWS = 7;
 const WIDTH_SAMPLE_ROWS = 60;
 const OVERSCAN = 8;
 
@@ -81,6 +83,18 @@ type Filter =
    * lignes explicite est nécessaire plutôt qu'une condition sur une colonne. */
   | { kind: 'duplicates'; column: number; rows: Set<number>; label: string };
 
+/**
+ * Un regroupement installe un tableau d'agrégats à la place des lignes du
+ * fichier — deux colonnes, une par valeur distincte et son compte. Les noms des
+ * colonnes d'origine sont conservés : les filtres actifs les désignent encore,
+ * et le code pandas généré doit pouvoir les nommer.
+ */
+interface Group {
+  column: number;
+  name: string;
+  names: string[];
+}
+
 interface State {
   headers: string[];
   rows: string[][];
@@ -107,6 +121,8 @@ interface State {
   active: { row: number; column: number } | null;
   themeId: string;
   ready: boolean;
+  /** Regroupement en cours, ou null quand le tableau montre les lignes du fichier. */
+  group: Group | null;
   /** Texte brut du fichier, demandé une seule fois au premier clic sur « Raw ». */
   rawLines: string[] | null;
   rawLoading: boolean;
@@ -131,6 +147,7 @@ const state: State = {
   active: null,
   themeId: THEMES[0].id,
   ready: false,
+  group: null,
   rawLines: null,
   rawLoading: false,
   showRaw: false,
@@ -166,7 +183,7 @@ window.addEventListener('message', (event: MessageEvent) => {
       state.fileName = (message.fileName as string) ?? '';
       state.order = state.headers.map((_, index) => index);
       state.themeId = themeById(message.theme as string | undefined).id;
-      if (message.insights === false) toggleInsights(false);
+      if (message.insights === false) toggleInsights(false, false);
       elements.shape.textContent = `${count(state.rowCount)} rows × ${count(state.headers.length)} columns`;
       if (message.truncated) {
         elements.notice.textContent = `Truncated: only the first ${count(state.rowCount)} rows are analysed.`;
@@ -254,10 +271,17 @@ function measureWidths(): void {
       // La colonne doit loger les deux lignes de bornes : tronquées, elles ne
       // renseignent plus sur rien.
       const pair = (left: string, right: string) => widthOf(left) + widthOf(right) + 24;
+      // Les deux bornes sont mesurees sur la plus longue des deux : un filtre
+      // peut restreindre à « Min 999,999 » là où le fichier entier affichait
+      // « Min 0 », et la largeur ne se rediscute plus apres l'ouverture.
+      const longest = (left: number, right: number) =>
+        widthOf(num(left)) >= widthOf(num(right)) ? num(left) : num(right);
+      const bound = longest(column.min ?? 0, column.max ?? 0);
+      const central = longest(column.mean ?? 0, column.median ?? 0);
       widest = Math.max(
         widest,
-        pair(`Min ${num(column.min ?? 0)}`, `Max ${num(column.max ?? 0)}`),
-        column.mean === null ? 0 : pair(`Mean ${num(column.mean)}`, `Median ${num(column.median ?? 0)}`),
+        pair(`Min ${bound}`, `Max ${bound}`),
+        column.mean === null ? 0 : pair(`Mean ${central}`, `Median ${central}`),
       );
     }
     return Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, widest + 28)));
@@ -290,8 +314,8 @@ function matches(cells: string[], filter: Filter, rowIndex: number): boolean {
 }
 
 /** Indices des lignes retenues par les filtres actifs. */
-function filteredRows(): number[] {
-  const rows = state.rows;
+/** Les lignes retenues parmi celles qu'on lui donne. */
+function keptRows(rows: string[][]): number[] {
   if (state.filters.length === 0) return rows.map((_, index) => index);
   const kept: number[] = [];
   for (let row = 0; row < rows.length; row++) {
@@ -299,6 +323,14 @@ function filteredRows(): number[] {
     if (cells && state.filters.every((filter) => matches(cells, filter, row))) kept.push(row);
   }
   return kept;
+}
+
+function filteredRows(): number[] {
+  // Regroupé, les filtres ont déjà servi à bâtir l'agrégat : les réappliquer à
+  // ses deux colonnes ne retiendrait plus rien, une condition sur « departure »
+  // ne trouvant plus de colonne de ce nom.
+  if (state.group !== null) return state.rows.map((_, index) => index);
+  return keptRows(state.rows);
 }
 
 /**
@@ -398,7 +430,7 @@ function bandCell(modelIndex: number): HTMLElement {
   // Le corps du bandeau — histogramme ou palmarès — est un bloc à part, pour
   // qu'un seul écart le sépare du décompte au-dessus, quel que soit son contenu.
   const body = document.createElement('div');
-  body.className = 'band-body';
+  body.className = column.histogram.length > 0 ? 'band-body stretch' : 'band-body';
   if (column.histogram.length > 0) {
     body.appendChild(histogram(column, colours, state.widths[modelIndex]));
     const bounds = document.createElement('div');
@@ -419,7 +451,18 @@ function bandCell(modelIndex: number): HTMLElement {
       body.appendChild(central);
     }
   } else {
-    for (const share of column.top) {
+    // Sept lignes en tout, « Other » compris. S'il reste quelque chose derrière
+    // le palmarès, la dernière place lui revient et la septième valeur le
+    // rejoint : le total fait ainsi toujours 100 %, sans jamais déborder du
+    // bandeau. Sans reste, les sept valeurs s'affichent et « Other » disparaît,
+    // puisqu'une ligne à 0.0% ne dirait rien.
+    const remainder = column.otherCount > 0;
+    const shown = column.top.slice(0, remainder ? BAND_ROWS - 1 : BAND_ROWS);
+    const folded = column.top.slice(shown.length);
+    const otherCount = column.otherCount + folded.reduce((sum, entry) => sum + entry.count, 0);
+    const otherShare = column.present === 0 ? 0 : otherCount / column.present;
+
+    for (const share of shown) {
       body.appendChild(
         valueLine(share.value, share.share, colours.text, colours.accent, false, () =>
           toggleFilter(valuesFilter(modelIndex, [share.value])),
@@ -427,8 +470,8 @@ function bandCell(modelIndex: number): HTMLElement {
       );
     }
     if (column.top.length === 0) body.appendChild(line('type', 'no values'));
-    if (column.otherCount > 0) {
-      const other = valueLine('Other', column.otherShare, colours.text, colours.text, true, () =>
+    if (otherCount > 0) {
+      const other = valueLine('Other', otherShare, colours.text, colours.text, true, () =>
         openValuePicker(modelIndex, other),
       );
       other.title = 'Show all values';
@@ -489,6 +532,10 @@ function histogram(column: ColumnStats, colours: Palette, width: number): SVGSVG
   svg.setAttribute('width', String(inner));
   svg.setAttribute('height', String(height));
   svg.setAttribute('viewBox', `0 0 ${inner} ${height}`);
+  // Le dessin reste exprimé dans un repère de 84 unités ; « none » laisse le
+  // navigateur l'étirer verticalement jusqu'à la hauteur que le CSS lui donne,
+  // sans que le code des barres ait à connaître cette hauteur.
+  svg.setAttribute('preserveAspectRatio', 'none');
 
   const peak = Math.max(...column.histogram, 0);
   const bins = column.histogram.length;
@@ -555,25 +602,80 @@ function paintHead(): void {
     const cell = document.createElement('div');
     cell.className = 'head-cell';
     cell.style.width = `${state.widths[modelIndex]}px`;
-    cell.textContent = state.stats[modelIndex].name;
-    if (state.sort?.index === modelIndex) {
-      const arrow = document.createElement('span');
-      arrow.className = 'arrow';
-      arrow.textContent = state.sort.ascending ? ' ↑' : ' ↓';
-      cell.appendChild(arrow);
-    }
-    cell.addEventListener('click', () => {
-      // Trois états, et non deux : croissant, décroissant, puis retour à l'ordre
-      // du fichier. Sans le troisième, l'ordre d'origine est perdu dès le
-      // premier clic et rien ne permet d'y revenir.
-      if (state.sort?.index !== modelIndex) state.sort = { index: modelIndex, ascending: true };
-      else if (state.sort.ascending) state.sort = { index: modelIndex, ascending: false };
-      else state.sort = null;
-      rebuildView();
-      paint();
+
+    const name = document.createElement('span');
+    name.className = 'head-name';
+    name.textContent = state.stats[modelIndex].name;
+    name.addEventListener('click', () => cycleSort(modelIndex));
+
+    // Deux boutons permanents plutôt que des gestes à deviner : le tri ne se
+    // devinait qu'en cliquant le titre, et le filtre dormait dans le menu « ⋯ ».
+    const filter = headButton('\u25BE', 'Filter or group this column', (event) => {
+      event.stopPropagation();
+      openColumnFilter(modelIndex, filter);
     });
+    filter.classList.toggle('on', state.filters.some((active) => active.column === modelIndex));
+
+    const sorted = state.sort?.index === modelIndex;
+    const sort = headButton(
+      sorted ? (state.sort?.ascending ? '\u2191' : '\u2193') : '\u21C5',
+      'Sort ascending, then descending, then back to the file order',
+      (event) => {
+        event.stopPropagation();
+        cycleSort(modelIndex);
+      },
+    );
+    sort.classList.toggle('on', sorted);
+
+    cell.append(name, filter, sort);
     elements.head.appendChild(cell);
   }
+}
+
+function headButton(glyph: string, title: string, action: (event: MouseEvent) => void): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.className = 'head-button';
+  button.type = 'button';
+  button.textContent = glyph;
+  button.title = title;
+  button.addEventListener('click', action);
+  return button;
+}
+
+/** Trois états, et non deux : croissant, décroissant, puis retour à l'ordre du
+ * fichier. Sans le troisième, l'ordre d'origine est perdu dès le premier clic
+ * et rien ne permet d'y revenir. */
+function cycleSort(modelIndex: number): void {
+  if (state.sort?.index !== modelIndex) state.sort = { index: modelIndex, ascending: true };
+  else if (state.sort.ascending) state.sort = { index: modelIndex, ascending: false };
+  else state.sort = null;
+  rebuildView();
+  paint();
+}
+
+/**
+ * « Group by », depuis le même panneau que le filtre.
+ *
+ * Le bouton de gauche ouvre le filtre en un clic parce que c'est son usage
+ * courant ; le regroupement y tient sa place plutôt qu'un bouton de plus dans
+ * un en-tête déjà chargé.
+ */
+function groupButton(columnIndex: number): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.className = 'picker-button';
+  button.textContent = state.group?.column === columnIndex ? 'Ungroup' : 'Group by';
+  button.addEventListener('click', () => {
+    closePicker();
+    groupByColumn(columnIndex);
+  });
+  return button;
+}
+
+/** Le panneau du bouton de gauche : filtrer, et regrouper. */
+function openColumnFilter(modelIndex: number, anchor: HTMLElement): void {
+  const column = state.stats[modelIndex];
+  if (column?.type === 'numeric' && state.group === null) openRangePicker(modelIndex, anchor);
+  else openValuePicker(modelIndex, anchor);
 }
 
 function paintRows(): void {
@@ -1047,7 +1149,7 @@ function openValuePicker(columnIndex: number, anchor: HTMLElement): void {
     const everything = values.length === counts.length;
     setColumnFilter(columnIndex, values.length === 0 || everything ? null : valuesFilter(columnIndex, values));
   });
-  footer.append(cancel, apply);
+  footer.append(groupButton(columnIndex), cancel, apply);
   elements.picker.appendChild(footer);
 
   placeFloating(elements.picker, anchor);
@@ -1116,7 +1218,7 @@ function openRangePicker(columnIndex: number, anchor: HTMLElement): void {
       label: `${column?.name} ${num(Math.min(from, to))} – ${num(Math.max(from, to))}`,
     });
   });
-  footer.append(clear, apply);
+  footer.append(groupButton(columnIndex), clear, apply);
   elements.picker.appendChild(footer);
 
   placeFloating(elements.picker, anchor);
@@ -1389,6 +1491,14 @@ function datasetTransformLines(): string[] {
     for (const filter of state.filters) lines.push(`# ${filter.label}`, filterToPandas(filter));
   }
 
+  if (state.group !== null) {
+    lines.push(
+      '',
+      `# Grouped by ${state.group.name}`,
+      `df = df.groupby(${JSON.stringify(state.group.name)}).size().reset_index(name="count")`,
+    );
+  }
+
   if (state.sort) {
     const name = state.stats[state.sort.index]?.name ?? `column ${state.sort.index + 1}`;
     const direction = state.sort.ascending ? 'ascending' : 'descending';
@@ -1404,7 +1514,10 @@ function datasetTransformLines(): string[] {
 
 function filterToPandas(filter: Filter): string {
   if (filter.kind === 'duplicates') return 'df = df[df.duplicated(keep=False)]';
-  const name = JSON.stringify(state.stats[filter.column]?.name ?? `column ${filter.column + 1}`);
+  // Les noms d'origine, pas ceux de l'agrégat : un filtre posé avant un
+  // regroupement désigne une colonne que state.stats ne connaît plus.
+  const names = state.group ? state.group.names : state.stats.map((column) => column.name);
+  const name = JSON.stringify(names[filter.column] ?? `column ${filter.column + 1}`);
   switch (filter.kind) {
     case 'contains':
       return `df = df[df[${name}].astype(str).str.contains(${JSON.stringify(filter.text)}, case=False, na=False)]`;
@@ -1523,6 +1636,8 @@ function openDataset(anchor: HTMLElement): void {
 
   elements.picker.appendChild(footer([['Close', closePicker, true]]));
   placeFloating(elements.picker, anchor);
+  openPanel = 'dataset';
+  elements.datasetButton.classList.add('active');
 }
 
 function head(text: string): HTMLElement {
@@ -1583,13 +1698,28 @@ function footer(buttons: Array<[string, () => void, boolean]>): HTMLElement {
   return element;
 }
 
+/**
+ * Ce que le panneau montre en ce moment.
+ *
+ * Le panneau est partage entre Dataset, Column details et le selecteur de
+ * valeurs : sans cette distinction, un second clic sur « Dataset » ne saurait
+ * pas s'il doit refermer son propre panneau ou basculer depuis un autre.
+ */
+let openPanel: 'dataset' | 'other' | null = null;
+
 function closePicker(): void {
   elements.picker.classList.remove('wide');
   elements.picker.hidden = true;
+  openPanel = null;
+  elements.datasetButton.classList.remove('active');
 }
 
 /** Positionne un panneau sous son ancre, sans déborder de la fenêtre. */
 function placeFloating(panel: HTMLElement, anchor: HTMLElement): void {
+  if (panel === elements.picker) {
+    openPanel = 'other';
+    elements.datasetButton.classList.remove('active');
+  }
   panel.style.visibility = 'hidden';
   panel.hidden = false;
   const box = anchor.getBoundingClientRect();
@@ -1657,15 +1787,28 @@ function paintChrome(): void {
 
 function paintFilterBar(): void {
   elements.filterBar.textContent = '';
-  elements.filterBar.hidden = state.filters.length === 0;
+  elements.filterBar.hidden = state.filters.length === 0 && state.group === null;
   paintChrome();
-  if (state.filters.length === 0) return;
+  if (elements.filterBar.hidden) return;
 
-  const kept = state.view.length;
   const summary = document.createElement('span');
   summary.className = 'filter-summary';
-  summary.textContent = `${count(kept)} of ${count(state.rows.length)} rows`;
+  // Regroupé, le tableau ne montre plus des lignes du fichier mais des groupes :
+  // « 12 of 7,200 rows » y désignerait deux choses différentes dans la même
+  // phrase.
+  summary.textContent = state.group
+    ? `${count(state.rows.length)} groups`
+    : `${count(state.view.length)} of ${count(state.rows.length)} rows`;
   elements.filterBar.appendChild(summary);
+
+  if (state.group !== null) {
+    const chip = document.createElement('button');
+    chip.className = 'chip-filter';
+    chip.title = 'Back to the rows';
+    chip.append(document.createTextNode(`Grouped by ${state.group.name}`), cross());
+    chip.addEventListener('click', ungroup);
+    elements.filterBar.appendChild(chip);
+  }
 
   for (const filter of state.filters) {
     const chip = document.createElement('button');
@@ -1693,12 +1836,110 @@ function cross(): HTMLElement {
   return mark;
 }
 
+/**
+ * Les lignes du fichier, intactes.
+ *
+ * Grouper installe un tableau d'agrégats à leur place — tout le rendu, bandeau
+ * compris, s'applique alors sans rien savoir du regroupement. Dégrouper les
+ * remet. On repart toujours d'ici : un agrégat calculé sur un agrégat n'aurait
+ * aucun sens.
+ */
+let source: { headers: string[]; rows: string[][] } | null = null;
+
+/** Regroupe sur une colonne, ou dégroupe si c'est déjà elle. */
+function groupByColumn(modelIndex: number): void {
+  if (state.group?.column === modelIndex) {
+    ungroup();
+    return;
+  }
+  if (state.group === null) source = { headers: state.headers, rows: state.rows };
+  const names = state.group ? state.group.names : state.stats.map((column) => column.name);
+  state.group = { column: modelIndex, name: names[modelIndex] ?? `column ${modelIndex + 1}`, names };
+  regroup(true);
+}
+
+function ungroup(): void {
+  if (source === null || state.group === null) return;
+  const names = state.group.names;
+  state.headers = source.headers;
+  state.rows = source.rows;
+  state.group = null;
+  state.order = state.headers.map((_, index) => index);
+  state.sort = null;
+  state.selected.clear();
+  state.forcedTypes.clear();
+  // Vidé d'abord : recomputeStats reprend les noms précédents pour que les
+  // renommages survivent au recalcul, ce qui collerait ici les noms de
+  // l'agrégat sur les colonnes du fichier.
+  state.stats = [];
+  rebuildView();
+  recomputeStats(state.view);
+  for (const [index, column] of state.stats.entries()) column.name = names[index] ?? column.name;
+  measureWidths();
+  paintFilterBar();
+  paint();
+}
+
+/**
+ * Reconstruit le tableau d'agrégats depuis les lignes du fichier.
+ *
+ * Les filtres s'appliquent **avant** le regroupement, comme partout ailleurs
+ * dans l'outil : on groupe ce qu'on regarde. Ils ne doivent donc jamais être
+ * réappliqués à l'agrégat, dont les colonnes n'ont plus rien à voir avec les
+ * leurs — d'où le retour à la source à chaque passage.
+ */
+function regroup(remeasure: boolean): void {
+  const group = state.group;
+  if (group === null || source === null) return;
+  state.headers = source.headers;
+  state.rows = source.rows;
+
+  const kept = keptRows(source.rows);
+  const counts = new Map<string, number>();
+  for (const index of kept) {
+    const raw = source.rows[index]?.[group.column] ?? '';
+    // Une cellule vide n'est pas un groupe : pandas l'écarte aussi, groupby
+    // ayant dropna=True par défaut. Le code généré dirait sinon autre chose
+    // que ce que le tableau montre.
+    if (raw.trim() === '') continue;
+    counts.set(raw, (counts.get(raw) ?? 0) + 1);
+  }
+  const ordered = [...counts.entries()].sort(
+    (left, right) => right[1] - left[1] || (left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0),
+  );
+
+  state.headers = [group.name, 'count'];
+  state.rows = ordered.map(([value, total]) => [value, String(total)]);
+  state.order = [0, 1];
+  state.selected.clear();
+  state.forcedTypes.clear();
+  if (state.sort !== null && state.sort.index > 1) state.sort = null;
+  // Même raison qu'au dégroupement : sans cela, les deux colonnes d'agrégat
+  // hériteraient des noms des deux premières colonnes du fichier.
+  state.stats = [];
+  rebuildView();
+  recomputeStats(state.view);
+  if (remeasure) measureWidths();
+  paintFilterBar();
+  paint();
+}
+
 function refilter(): void {
+  // Un regroupement se recalcule entièrement : les filtres ayant changé, ce
+  // n'est plus le même sous-ensemble qu'on agrège.
+  if (state.group !== null) {
+    regroup(false);
+    return;
+  }
   rebuildView();
   // Le recalcul n'a lieu qu'ici : le mettre dans rebuildView le déclencherait à
   // chaque paquet de lignes reçu, soit cinq fois pour rien sur un gros fichier.
   recomputeStats(state.view);
-  measureWidths();
+  // Surtout pas de measureWidths() ici. La largeur d'une colonne tient compte du
+  // texte « Min … Max … » que son bandeau doit loger ; ces chiffres changent
+  // avec le filtre, et toute la feuille se decalait alors horizontalement a
+  // chaque clic. Une largeur est une propriete du fichier, decidee a
+  // l'ouverture.
   paintFilterBar();
   paint();
 }
@@ -1722,17 +1963,61 @@ function applyDrop(modelIndex: number): void {
  * L'interrupteur vit dans la barre d'outils, et non dans le bandeau : quand il y
  * etait, le replier supprimait le seul bouton capable de le rappeler.
  */
-function toggleInsights(visible = !state.bandVisible): void {
+const FOLD_MS = 140;
+
+function toggleInsights(visible = !state.bandVisible, animate = true): void {
+  const changed = visible !== state.bandVisible;
   state.bandVisible = visible;
   elements.insightsToggle.setAttribute('aria-expanded', String(visible));
+  elements.insightsToggle.classList.toggle('folded', !visible);
   const chevron = elements.insightsToggle.querySelector('.chevron');
-  if (chevron) chevron.textContent = visible ? '\u25BE' : '\u25B8';
+  if (chevron) chevron.textContent = '\u25BE';
   vscode.postMessage({ type: 'setInsights', visible });
+
+  // Le bandeau est peint avant l'animation : il faut sa hauteur naturelle pour
+  // savoir vers quoi — ou depuis quoi — animer.
+  const before = elements.band.getBoundingClientRect().height;
   paint();
+  if (!changed || !animate || reducedMotion()) return;
+  foldBand(visible ? 0 : before, visible ? elements.band.getBoundingClientRect().height : 0);
+}
+
+function reducedMotion(): boolean {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/**
+ * Anime la hauteur du bandeau, sans conteneur supplémentaire.
+ *
+ * Le bandeau et l'en-tête forment un seul bloc collant : y glisser un wrapper
+ * ramènerait le défaut où le texte des lignes débordait au-dessus des titres.
+ * On anime donc l'élément lui-même, d'une hauteur mesurée à l'autre, et on lui
+ * rend sa hauteur automatique à la fin — une hauteur figée en pixels mentirait
+ * dès que le contenu change.
+ */
+function foldBand(from: number, to: number): void {
+  const band = elements.band;
+  if (to === 0) band.hidden = false;
+  band.style.overflow = 'hidden';
+  const animation = band.animate(
+    [{ height: `${from}px` }, { height: `${to}px` }],
+    { duration: FOLD_MS, easing: 'ease-out' },
+  );
+  animation.onfinish = () => {
+    band.style.overflow = '';
+    band.style.height = '';
+    band.hidden = !state.bandVisible;
+  };
 }
 
 elements.insightsToggle.addEventListener('click', () => toggleInsights());
-elements.datasetButton.addEventListener('click', () => openDataset(elements.datasetButton));
+elements.datasetButton.addEventListener('click', () => {
+  // Une bascule, comme « Raw » et « Insights » : un second clic referme. Mais
+  // seulement s'il s'agit bien du panneau Dataset — venant de « Column
+  // details », le clic doit basculer vers Dataset, pas tout fermer.
+  if (openPanel === 'dataset') closePicker();
+  else openDataset(elements.datasetButton);
+});
 
 // ----------------------------------------------------------------- palettes
 

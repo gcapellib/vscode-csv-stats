@@ -77,6 +77,7 @@ body {
   background: var(--vscode-list-hoverBackground);
 }
 
+#dataset-button.active,
 #raw-toggle.active {
   background: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
@@ -100,7 +101,21 @@ body {
 }
 
 #insights-toggle .chevron {
+  display: inline-block;
   opacity: 0.8;
+  transition: transform 140ms ease-out;
+}
+
+/* Le chevron pivote pendant le repli : le mouvement dit ce qui vient de se
+   passer, là où deux caractères différents ne faisaient que l'annoncer. */
+#insights-toggle.folded .chevron {
+  transform: rotate(-90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #insights-toggle .chevron {
+    transition: none;
+  }
 }
 
 #theme-button {
@@ -346,6 +361,10 @@ body {
 
 .band-cell {
   position: relative;
+  /* Colonne flex : le bloc d'un histogramme peut alors absorber la place libre
+     et descendre jusqu'au bas de la cellule, là où un palmarès reste en haut. */
+  display: flex;
+  flex-direction: column;
   flex: 0 0 auto;
   padding: 10px 12px 8px;
   border-top: 3px solid transparent;
@@ -427,6 +446,23 @@ body {
   margin-top: 24px;
 }
 
+/* L'histogramme prend toute la hauteur restante — les colonnes de barres
+   montent jusqu'à l'écart sous « Distinct » — et Min/Max/Mean/Median se posent
+   au bas de la cellule. Le plancher garde les 84 px d'origine pour un fichier
+   sans colonne texte, où plus rien ne fixerait la hauteur. */
+.band-body.stretch {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.band-body.stretch .hist {
+  flex: 1;
+  width: 100%;
+  min-height: 84px;
+}
+
 .hist {
   display: block;
   margin: 0 0 6px;
@@ -447,14 +483,49 @@ body {
 
 .head-cell {
   flex: 0 0 auto;
-  padding: 5px 8px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 4px 5px 8px;
   border-right: 1px solid var(--vscode-panel-border);
   background: var(--vscode-editorGroupHeader-tabsBackground);
   color: var(--vscode-foreground);
-  cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
+}
+
+/* Le nom cède la place aux boutons plutôt que de les pousser hors de la
+   cellule : tronqué il reste lisible, absents ils seraient introuvables. */
+.head-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.head-button {
+  flex: 0 0 auto;
+  width: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  /* Discrets tant qu'ils ne servent pas, mais toujours là : c'est tout le
+     propos — le tri ne se devinait qu'en cliquant le titre. */
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.head-button:hover {
+  opacity: 1;
+}
+
+.head-button.on {
+  opacity: 1;
+  color: var(--vscode-textLink-foreground, inherit);
 }
 
 .head-cell:hover {
