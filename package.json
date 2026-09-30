@@ -79,13 +79,18 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "node esbuild.mjs",
     "test": "npm run compile && node --test out/test/*.test.js",
-    "package": "npm run build && vsce package --no-dependencies"
+    "package": "npm run build && vsce package --no-dependencies",
+    "lint": "eslint src eslint.config.mjs"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.0.0",
     "@types/vscode": "1.90.0",
     "@vscode/vsce": "^3.0.0",
     "esbuild": "^0.25.0",
-    "typescript": "^5.9.0"
+    "eslint": "^10.11.0",
+    "playwright": "^1.63.0",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.71.0"
   }
 }

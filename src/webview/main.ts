@@ -18,6 +18,7 @@ import { parseNumber, type ColumnType } from '../core/types';
 import { paletteFor, THEMES, themeById, gradientFor, type CsvTheme, type Palette } from '../core/themes';
 import { datasetTransformLines as coreDatasetTransformLines, type Filter } from '../core/filters';
 import { foldRanking } from '../core/stats';
+import { FloatingManager } from './floating';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
@@ -78,6 +79,59 @@ const elements = {
   menu: byId('menu'),
   picker: byId('picker'),
 };
+
+/**
+ * Un seul registre pour le menu, le sélecteur de thème et le panneau — voir
+ * webview/floating.ts pour la raison d'être de cette unification.
+ */
+const floating = new FloatingManager();
+
+floating.register('menu', {
+  element: elements.menu,
+  onClose: () => {
+    menuColumn = null;
+  },
+});
+
+floating.register('theme', {
+  element: elements.themePopup,
+  onClose: () => {
+    elements.themeButton.setAttribute('aria-expanded', 'false');
+    // L'aperçu ne doit pas rester collé après un clic ailleurs, un Échap ou un
+    // second clic sur le bouton. Le clic sur une palette, lui, a déjà inscrit
+    // son choix juste avant de fermer.
+    if (chosenThemeId !== null && chosenThemeId !== state.themeId) {
+      state.themeId = chosenThemeId;
+      paintChrome();
+      paint();
+      if (state.showRaw) paintRaw();
+    }
+    showCurrentTheme();
+  },
+});
+
+floating.register('picker', {
+  element: elements.picker,
+  onClose: () => {
+    elements.picker.classList.remove('wide');
+    elements.datasetButton.classList.remove('active');
+    openPanel = null;
+  },
+});
+
+/** Positionne un élément flottant sous son ancre, sans déborder de la fenêtre. */
+function positionFloating(panel: HTMLElement, anchor: HTMLElement): void {
+  // Mesurer un élément encore « hidden » renvoie une taille nulle, et le
+  // panneau se calait hors écran. On le rend donc invisible mais présent, le
+  // temps de connaître ses dimensions réelles.
+  panel.style.visibility = 'hidden';
+  panel.hidden = false;
+  const box = anchor.getBoundingClientRect();
+  const size = panel.getBoundingClientRect();
+  panel.style.left = `${Math.max(4, Math.min(box.left, window.innerWidth - size.width - 8))}px`;
+  panel.style.top = `${Math.max(4, Math.min(box.bottom + 2, window.innerHeight - size.height - 8))}px`;
+  panel.style.visibility = 'visible';
+}
 
 function byId(id: string): HTMLElement {
   const element = document.getElementById(id);
@@ -660,7 +714,6 @@ function openColumnFilter(modelIndex: number, anchor: HTMLElement): void {
   const column = state.stats[modelIndex];
   if (column?.type === 'numeric') openRangePicker(modelIndex, anchor);
   else openValuePicker(modelIndex, anchor);
-  pickerToggle = anchor;
 }
 
 function paintRows(): void {
@@ -858,8 +911,8 @@ function escape(text: string): string {
 let menuColumn: number | null = null;
 
 function openMenu(modelIndex: number, anchor: HTMLElement): void {
-  if (menuColumn === modelIndex && !elements.menu.hidden) {
-    closeMenu();
+  if (floating.isOpen('menu') && menuColumn === modelIndex) {
+    floating.close();
     return;
   }
   menuColumn = modelIndex;
@@ -913,32 +966,13 @@ function openMenu(modelIndex: number, anchor: HTMLElement): void {
     elements.menu.appendChild(item);
   }
 
-  // Mesurer un élément encore « hidden » renvoie une taille nulle, et le menu
-  // se calait alors hors écran. On le rend donc invisible mais présent, le temps
-  // de connaître ses dimensions réelles.
-  const box = anchor.getBoundingClientRect();
-  elements.menu.style.visibility = 'hidden';
-  elements.menu.hidden = false;
-  const menuBox = elements.menu.getBoundingClientRect();
-  elements.menu.style.left = `${Math.max(4, Math.min(box.left, window.innerWidth - menuBox.width - 8))}px`;
-  elements.menu.style.top = `${Math.max(4, Math.min(box.bottom + 2, window.innerHeight - menuBox.height - 8))}px`;
-  elements.menu.style.visibility = 'visible';
+  floating.open('menu', anchor);
+  positionFloating(elements.menu, anchor);
 }
 
 function closeMenu(): void {
-  elements.menu.hidden = true;
-  menuColumn = null;
+  floating.close();
 }
-
-// Fermeture au clic en dehors. On écarte explicitement le bouton d'ouverture au
-// lieu de compter sur un stopPropagation : un vrai clic souris refermait le menu
-// dans la foulée de son ouverture, là où un clic programmatique ne le faisait pas.
-document.addEventListener('mousedown', (event) => {
-  const target = event.target as HTMLElement;
-  if (elements.menu.hidden) return;
-  if (elements.menu.contains(target) || target.closest('.dots')) return;
-  closeMenu();
-});
 
 function applySort(modelIndex: number, ascending: boolean): void {
   state.sort = { index: modelIndex, ascending };
@@ -1146,7 +1180,8 @@ function openValuePicker(columnIndex: number, anchor: HTMLElement): void {
   footer.append(cancel, apply);
   elements.picker.appendChild(footer);
 
-  placeFloating(elements.picker, anchor);
+  floating.open('picker', anchor);
+  positionFloating(elements.picker, anchor);
   openPanel = `filter:${columnIndex}`;
   search.focus();
 }
@@ -1216,7 +1251,8 @@ function openRangePicker(columnIndex: number, anchor: HTMLElement): void {
   footer.append(clear, apply);
   elements.picker.appendChild(footer);
 
-  placeFloating(elements.picker, anchor);
+  floating.open('picker', anchor);
+  positionFloating(elements.picker, anchor);
   openPanel = `filter:${columnIndex}`;
   low.focus();
 }
@@ -1301,7 +1337,8 @@ function openDetails(columnIndex: number, anchor: HTMLElement): void {
   }
 
   elements.picker.appendChild(footer([['Close', closePicker, true]]));
-  placeFloating(elements.picker, anchor);
+  floating.open('picker', anchor);
+  positionFloating(elements.picker, anchor);
   openPanel = `details:${columnIndex}`;
 }
 
@@ -1581,7 +1618,8 @@ function openDataset(anchor: HTMLElement): void {
   elements.picker.appendChild(list);
 
   elements.picker.appendChild(footer([['Close', closePicker, true]]));
-  placeFloating(elements.picker, anchor);
+  floating.open('picker', anchor);
+  positionFloating(elements.picker, anchor);
   openPanel = 'dataset';
   elements.datasetButton.classList.add('active');
 }
@@ -1647,48 +1685,16 @@ function footer(buttons: Array<[string, () => void, boolean]>): HTMLElement {
 /**
  * Ce que le panneau montre en ce moment.
  *
- * Le panneau est partage entre Dataset, Column details et le selecteur de
+ * Le panneau est partagé entre Dataset, Column details et le sélecteur de
  * valeurs : sans cette distinction, un second clic sur « Dataset » ne saurait
  * pas s'il doit refermer son propre panneau ou basculer depuis un autre.
+ * L'ouverture, la fermeture et le clic extérieur, eux, sont délégués à
+ * `floating` — voir son enregistrement plus haut.
  */
 let openPanel: string | null = null;
 
-/**
- * Le bouton qui referme le panneau, quand il en existe un.
- *
- * Sans cette exception, le clic extérieur fermait le panneau **avant** que le
- * clic n'atteigne le bouton, lequel le rouvrait dans la foulée : le panneau
- * semblait ne jamais se refermer. Seuls les boutons qui font réellement
- * bascule y figurent — « ⋯ » ouvre le menu, pas le panneau, et doit donc
- * continuer à le fermer.
- */
-let pickerToggle: HTMLElement | null = null;
-
 function closePicker(): void {
-  elements.picker.classList.remove('wide');
-  elements.picker.hidden = true;
-  openPanel = null;
-  pickerToggle = null;
-  elements.datasetButton.classList.remove('active');
-}
-
-/** Positionne un panneau sous son ancre, sans déborder de la fenêtre. */
-function placeFloating(panel: HTMLElement, anchor: HTMLElement): void {
-  if (panel === elements.picker) {
-    // Chaque ouvreur pose ensuite sa propre clé ; celui qui oublierait de le
-    // faire laisse simplement un panneau qu'aucun bouton ne referme, jamais un
-    // panneau qui se referme au mauvais moment.
-    openPanel = null;
-    pickerToggle = null;
-    elements.datasetButton.classList.remove('active');
-  }
-  panel.style.visibility = 'hidden';
-  panel.hidden = false;
-  const box = anchor.getBoundingClientRect();
-  const size = panel.getBoundingClientRect();
-  panel.style.left = `${Math.max(4, Math.min(box.left, window.innerWidth - size.width - 8))}px`;
-  panel.style.top = `${Math.max(4, Math.min(box.bottom + 2, window.innerHeight - size.height - 8))}px`;
-  panel.style.visibility = 'visible';
+  floating.close();
 }
 
 /** Applique une condition, ou la retire si elle est déjà posée. */
@@ -1889,7 +1895,6 @@ elements.datasetButton.addEventListener('click', () => {
     return;
   }
   openDataset(elements.datasetButton);
-  pickerToggle = elements.datasetButton;
 });
 
 // ----------------------------------------------------------------- palettes
@@ -2014,57 +2019,32 @@ function showCurrentTheme(): void {
 
 function openThemePopup(): void {
   chosenThemeId = state.themeId;
-  elements.themePopup.style.visibility = 'hidden';
-  elements.themePopup.hidden = false;
-  const box = elements.themeButton.getBoundingClientRect();
-  const popup = elements.themePopup.getBoundingClientRect();
-  elements.themePopup.style.left = `${Math.max(4, Math.min(box.left, window.innerWidth - popup.width - 8))}px`;
-  elements.themePopup.style.top = `${Math.max(4, Math.min(box.bottom + 2, window.innerHeight - popup.height - 8))}px`;
-  elements.themePopup.style.visibility = 'visible';
+  floating.open('theme', elements.themeButton);
+  positionFloating(elements.themePopup, elements.themeButton);
   elements.themeButton.setAttribute('aria-expanded', 'true');
   elements.themePopup.querySelector<HTMLElement>('.theme-item.current')?.scrollIntoView({ block: 'nearest' });
 }
 
 function closeThemePopup(): void {
-  elements.themePopup.hidden = true;
-  elements.themeButton.setAttribute('aria-expanded', 'false');
-  // Toute sortie du panneau passe par ici : l'aperçu ne peut donc pas rester
-  // collé après un clic ailleurs, un Échap ou un second clic sur le bouton. Le
-  // clic sur une palette, lui, a déjà inscrit son choix juste avant.
-  if (chosenThemeId !== null && chosenThemeId !== state.themeId) {
-    state.themeId = chosenThemeId;
-    paintChrome();
-    paint();
-    if (state.showRaw) paintRaw();
-  }
-  showCurrentTheme();
+  floating.close();
 }
 
 elements.themeButton.addEventListener('click', () => {
-  if (elements.themePopup.hidden) openThemePopup();
-  else closeThemePopup();
+  if (floating.isOpen('theme')) floating.close();
+  else openThemePopup();
 });
 
+// Un seul écouteur pour tout ce qui flotte : avant, trois gestionnaires
+// indépendants (menu, thème, panneau) portaient chacun leur propre exception
+// au clic extérieur, écrite à des moments différents — le panneau n'avait pas
+// la sienne, ce qui a laissé un bug (le second clic ne refermait rien)
+// survivre plusieurs versions avant d'être corrigé en 0.15.1.
 document.addEventListener('mousedown', (event) => {
-  const target = event.target as HTMLElement;
-  if (elements.themePopup.hidden) return;
-  if (elements.themePopup.contains(target) || elements.themeButton.contains(target)) return;
-  closeThemePopup();
+  floating.handleOutsideClick(event.target);
 });
 
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') {
-    closeThemePopup();
-    closeMenu();
-    closePicker();
-  }
-});
-
-document.addEventListener('mousedown', (event) => {
-  const target = event.target as HTMLElement;
-  if (elements.picker.hidden || elements.picker.contains(target)) return;
-  if (pickerToggle?.contains(target)) return;
-  closePicker();
+  if (event.key === 'Escape') floating.close();
 });
 
 vscode.postMessage({ type: 'ready' });
