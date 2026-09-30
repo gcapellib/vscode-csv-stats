@@ -80,10 +80,12 @@
     "build": "node esbuild.mjs",
     "test": "npm run compile && node --test out/test/*.test.js",
     "package": "npm run build && vsce package --no-dependencies",
-    "lint": "eslint src eslint.config.mjs"
+    "lint": "eslint src eslint.config.mjs",
+    "test:integration": "npm run build && playwright test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^22.0.0",
     "@types/vscode": "1.90.0",
     "@vscode/vsce": "^3.0.0",

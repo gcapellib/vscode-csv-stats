@@ -222,10 +222,20 @@ From `./vscode-csv-stats-main/`:
 
 ```bash
 npm install
-npm test       # parsing, statistics and palettes
-npm run build  # bundles dist/extension.js and dist/webview.js
-npm run package  # produces csv-stats-<version>.vsix
+npm run lint              # style and correctness rules
+npm test                  # parsing, statistics, palettes, filters — no DOM
+npm run test:integration  # the real bundle, in a real browser (Playwright)
+npm run build              # bundles dist/extension.js and dist/webview.js
+npm run package            # produces csv-stats-<version>.vsix
 ```
+
+`npm test` runs against `core/` — pure logic, no browser. `npm run test:integration`
+runs the actual `dist/webview.js` inside headless Chromium, driving it with real
+mouse clicks rather than synthetic events: it is the only layer that can catch a
+bug in event ordering (mousedown before click) or in a measurement taken while an
+element is `hidden` — both have happened in this project, and neither is visible
+to a unit test. A GitHub Actions workflow (`.github/workflows/ci.yml`) runs all
+of the above on every push and pull request.
 
 ## Install
 

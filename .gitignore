@@ -3,3 +3,5 @@ out/
 dist/
 *.vsix
 harness.html
+test-results/
+playwright-report/
