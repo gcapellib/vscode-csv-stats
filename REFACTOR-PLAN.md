@@ -61,35 +61,44 @@ Quatre pistes proposées en dehors du refactoring lui-même :
 3. **ESLint** ✅ commit `fb33f23` — `eslint.config.mjs`, zéro avertissement.
 4. **Un `dispatch` plutôt qu'un `state` mutable** — concrétisé pour le seul
    périmètre où il avait un sens immédiat : `FloatingManager` (phase 2). Un
-   store générique pour les ~25 champs de `State` (filtres, tri, thème,
-   sélection…) resterait à faire, mais c'est le découpage de la phase 3
-   ci-dessous qui le rendrait raisonnable à entreprendre — le faire avant
-   aurait mélangé deux refactorings dans le même fichier.
+   store générique pour les ~25 champs de `State` reste la seule pièce non
+   faite ; la phase 3 étant désormais terminée, elle serait maintenant
+   raisonnable à entreprendre — mais seulement si l'état devient réellement
+   difficile à suivre, ce qui n'est pas encore le cas.
 
-## Phase 3 — découper la vue par zone (non commencé)
+## Phase 3 — découper la vue par zone ✅ fait
 
-`main.ts` mélange aujourd'hui le câblage de la barre d'outils, le rendu du
-bandeau, celui du tableau, la vue brute, et la fabrique des quatre panneaux
-flottants (`openValuePicker`, `openRangePicker`, `openDetails`,
-`openDataset` — 106 à 117 lignes chacun, largement redondants entre eux).
+Commit `897515f`. `main.ts` passe de **2050 à 126 lignes** — plus que du
+câblage. Vingt modules, aucun au-dessus de 353 lignes.
 
-Découpage proposé, purement mécanique une fois la phase 2 faite (les
-panneaux n'ont alors plus besoin de gérer eux-mêmes leur fermeture) :
+| Module | Lignes | Rôle |
+|---|---|---|
+| `table.ts` | 353 | en-têtes, lignes, tri, filtrage, largeurs, sélection |
+| `panels/column-details.ts` | 236 | |
+| `band.ts` | 210 | bandeau, histogramme, palmarès |
+| `panels/dataset.ts` | 169 | |
+| `theme-picker.ts` | 157 | |
+| `toolbar.ts` | 155 | barres du haut, pliage, animations |
+| `panels/value-picker.ts` | 130 | |
+| `main.ts` | 126 | **câblage seul** |
+| `raw.ts` | 105 | |
+| `actions.ts` | 93 | refilter, filtres, renommage, retrait de colonne |
+| `menu.ts` | 88 | |
+| `panels/range-picker.ts` | 78 | |
+| `state.ts` | 75 | |
+| `constants.ts` | 44 | |
+| `panels/shared.ts` | 43 | fabriques de panneaux |
+| `dom.ts` | 38 | |
+| `floating-setup.ts` | 26 | |
+| `paint.ts` | 21 | le repeint complet |
+| `prompt.ts` | 20 | |
+| `tooltip.ts` | 15 | |
+| `vscode-api.ts` | 5 | |
 
-```
-webview/
-  main.ts          # câblage : reçoit les messages, orchestre, quelques centaines de lignes
-  floating.ts       # phase 2
-  band.ts           # bandCell, histogram, valueLine
-  table.ts          # paintHead, paintRows, sélection
-  raw.ts            # toggleRaw, paintRaw, rawSegments (déjà en core)
-  toolbar.ts         # theme picker, gradient, fold animation
-  panels/
-    value-picker.ts
-    range-picker.ts
-    column-details.ts
-    dataset.ts
-```
+Trois variables mutables traversaient des frontières de modules. Une liaison
+importée étant en lecture seule en ES modules, elles passent par des
+fonctions : `getOpenPanel`/`setOpenPanel`, `resetMenuColumn`,
+`commitThemeChoice`.
 
 ## Phase 4 — revérifier
 
