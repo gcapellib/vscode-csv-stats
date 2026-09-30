@@ -26,6 +26,11 @@ export function filterToPandas(filter: Filter, columnName: string): string {
         ? `df = df[df[${name}] == ${JSON.stringify(filter.values[0])}]`
         : `df = df[df[${name}].isin(${JSON.stringify(filter.values)})]`;
     case 'range':
+      // Une borne unique et fermée désigne une seule valeur : « == 7 » se lit,
+      // « between(7, 7) » se déchiffre.
+      if (filter.last && filter.low === filter.high) {
+        return `df = df[df[${name}] == ${filter.low}]`;
+      }
       // Une classe d'histogramme exclut sa borne haute ; une plage saisie à la
       // main (Filter by range…) inclut les deux, d'où les deux formes.
       return filter.last

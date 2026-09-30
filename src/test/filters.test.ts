@@ -34,6 +34,20 @@ describe('filterToPandas', () => {
     );
   });
 
+  it('traduit une borne unique et fermée en égalité', () => {
+    const filter: Filter = { kind: 'range', column: 0, low: 7, high: 7, last: true, label: '' };
+    assert.equal(filterToPandas(filter, 'quality_score'), 'df = df[df["quality_score"] == 7]');
+  });
+
+  it('ne traduit pas en égalité une classe d’histogramme dégénérée', () => {
+    // Borne haute exclue : l'intervalle est vide, pas une valeur unique.
+    const filter: Filter = { kind: 'range', column: 0, low: 7, high: 7, last: false, label: '' };
+    assert.equal(
+      filterToPandas(filter, 'quality_score'),
+      'df = df[(df["quality_score"] >= 7) & (df["quality_score"] < 7)]',
+    );
+  });
+
   it('traduit le constat de doublons sans référencer aucune colonne', () => {
     const filter: Filter = { kind: 'duplicates', column: -1, rows: new Set(), label: '' };
     assert.equal(filterToPandas(filter, 'peu importe'), 'df = df[df.duplicated(keep=False)]');

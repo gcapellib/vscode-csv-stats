@@ -805,6 +805,43 @@ body {
   font: inherit;
 }
 
+/* Chromium ne montre les flèches d'un champ numérique qu'au survol ou au
+   focus : cliquer dans un champ les faisait donc disparaître de l'autre, ce
+   qui se lit comme une panne alors que c'est le comportement natif. */
+.picker-number::-webkit-inner-spin-button,
+.picker-number::-webkit-outer-spin-button {
+  opacity: 1;
+}
+
+/* Une grille, et non une rangée souple : l'étiquette occupe une colonne de
+   largeur fixe, sinon « From » et « To », de longueurs différentes, laissent
+   des champs de tailles différentes. */
+.picker-bound {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+}
+
+/* Les deux modes de saisie s'excluent : le dire, plutôt que de le laisser
+   découvrir en tapant. */
+.picker-or {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 6px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+}
+
+.picker-or::before,
+.picker-or::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--vscode-panel-border);
+}
+
 .picker-list {
   flex: 1;
   min-height: 0;

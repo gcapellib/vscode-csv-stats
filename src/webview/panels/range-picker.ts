@@ -25,21 +25,47 @@ export function openRangePicker(columnIndex: number, anchor: HTMLElement): void 
   title.textContent = column?.name ?? '';
   elements.picker.appendChild(title);
 
-  const make = (label: string, value: number) => {
+  const make = (label: string, value: string) => {
     const row = document.createElement('label');
-    row.className = 'picker-row';
+    // Classe propre aux bornes : « picker-row » sert aussi aux cases à cocher
+    // du sélecteur de valeurs, dont la disposition n'a rien à voir.
+    row.className = 'picker-bound';
     row.append(textSpan(label));
     const input = document.createElement('input');
     input.className = 'picker-number';
     input.type = 'number';
     input.step = 'any';
-    input.value = String(value);
+    input.value = value;
     row.appendChild(input);
     elements.picker.appendChild(row);
     return input;
   };
-  const low = make('From', current?.low ?? column?.min ?? 0);
-  const high = make('To', current?.high ?? column?.max ?? 0);
+
+  // Un filtre sur une seule valeur se lit « = 7 », pas « de 7 à 7 » : il est
+  // rouvert dans son propre champ plutôt qu'étalé sur les deux bornes.
+  const point = current !== undefined && current.low === current.high;
+  const low = make('From', point ? '' : String(current?.low ?? column?.min ?? 0));
+  const high = make('To', point ? '' : String(current?.high ?? column?.max ?? 0));
+
+  const separator = document.createElement('div');
+  separator.className = 'picker-or';
+  separator.textContent = 'or';
+  elements.picker.appendChild(separator);
+
+  const exact = make('Exactly', point ? String(current.low) : '');
+
+  // Les deux modes s'excluent : remplir l'un vide l'autre, plutôt que de
+  // laisser deviner lequel l'emporte au moment d'appliquer.
+  for (const bound of [low, high]) {
+    bound.addEventListener('input', () => {
+      if (bound.value !== '') exact.value = '';
+    });
+  }
+  exact.addEventListener('input', () => {
+    if (exact.value === '') return;
+    low.value = '';
+    high.value = '';
+  });
 
   const footer = document.createElement('div');
   footer.className = 'picker-footer';
@@ -54,8 +80,26 @@ export function openRangePicker(columnIndex: number, anchor: HTMLElement): void 
   apply.className = 'picker-button primary';
   apply.textContent = 'Apply';
   apply.addEventListener('click', () => {
+    const single = Number(exact.value);
+    if (exact.value.trim() !== '' && Number.isFinite(single)) {
+      closePicker();
+      // Une borne unique reste un intervalle, fermé des deux côtés : la
+      // comparaison demeure numérique, donc « 7 » retient aussi « 7.0 », ce
+      // qu'une égalité de texte manquerait.
+      setColumnFilter(columnIndex, {
+        kind: 'range',
+        column: columnIndex,
+        low: single,
+        high: single,
+        last: true,
+        label: `${column?.name} = ${num(single)}`,
+      });
+      return;
+    }
+
     const from = Number(low.value);
     const to = Number(high.value);
+    if (low.value.trim() === '' || high.value.trim() === '') return;
     if (!Number.isFinite(from) || !Number.isFinite(to)) return;
     closePicker();
     setColumnFilter(columnIndex, {
