@@ -48,6 +48,24 @@ C'est directement la cause du bug « le menu ne se referme pas » corrigé en
 bouton qui ouvre) d'exister à un seul des trois endroits sans que ce soit
 visible.
 
+## Idées d'amélioration — trois sur quatre faites
+
+Quatre pistes proposées en dehors du refactoring lui-même :
+
+1. **CI GitHub Actions** ✅ `.github/workflows/ci.yml` — typecheck, lint,
+   tests, build sur chaque push/pull request, plus un second job pour les
+   tests d'intégration.
+2. **Tests d'intégration** ✅ commit `7c8b60e` — Playwright contre le vrai
+   bundle, 13 tests, dont un qui reproduit le bug de 0.15.1 et prouve qu'il
+   l'aurait attrapé.
+3. **ESLint** ✅ commit `fb33f23` — `eslint.config.mjs`, zéro avertissement.
+4. **Un `dispatch` plutôt qu'un `state` mutable** — concrétisé pour le seul
+   périmètre où il avait un sens immédiat : `FloatingManager` (phase 2). Un
+   store générique pour les ~25 champs de `State` (filtres, tri, thème,
+   sélection…) resterait à faire, mais c'est le découpage de la phase 3
+   ci-dessous qui le rendrait raisonnable à entreprendre — le faire avant
+   aurait mélangé deux refactorings dans le même fichier.
+
 ## Phase 3 — découper la vue par zone (non commencé)
 
 `main.ts` mélange aujourd'hui le câblage de la barre d'outils, le rendu du
