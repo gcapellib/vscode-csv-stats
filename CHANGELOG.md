@@ -4,6 +4,27 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.18.x
+
+- **Palettes tirées au sort**, alternant fond coloré et texte coloré, avec une
+  liste personnelle persistée. Le hasard porte sur la couleur, jamais sur la
+  lisibilité : teintes réparties sur le cercle chromatique, styles et fonds
+  puisés dans des valeurs éprouvées, et 200 tirages soumis aux mêmes seuils que
+  les palettes livrées.
+- **Palettes scientifiques** — Okabe-Ito, Tol Bright, Tol Muted — conçues pour
+  que des catégories restent distinguables, y compris par un œil daltonien.
+  Leurs couleurs sont données une à une plutôt que dérivées d'une teinte :
+  Okabe-Ito distingue son bleu ciel de son bleu par la clarté, pas par la
+  teinte. Valeurs assombries en mode clair et éclaircies en mode sombre juste
+  ce qu'il faut pour rester lisibles comme *texte* — les valeurs publiées sont
+  calibrées pour des marques dans un graphique.
+  Sources : [Okabe & Ito](https://jfly.uni-koeln.de/color/),
+  [Paul Tol](https://personal.sron.nl/~pault/).
+- **Quatre palettes de confort visuel** — Clay, Sage, Dusk, Bloom — et trois
+  nouveaux styles (lavé, terreux, électrique), qui font varier saturation et
+  luminosité et non plus seulement la teinte.
+- Seize palettes retirées.
+
 ## 0.16.x
 
 - **Folding the bands narrows the columns.** Column widths account for the

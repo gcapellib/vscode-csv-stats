@@ -33,10 +33,10 @@ function difference(first: string, second: string): number {
 }
 
 describe('palettes', () => {
-  it('en compte vingt-neuf, aux identifiants et libellés uniques', () => {
-    assert.equal(THEMES.length, 29);
-    assert.equal(new Set(THEMES.map((theme) => theme.id)).size, 29);
-    assert.equal(new Set(THEMES.map((theme) => theme.label)).size, 29);
+  it('en compte trente-six, aux identifiants et libellés uniques', () => {
+    assert.equal(THEMES.length, 36);
+    assert.equal(new Set(THEMES.map((theme) => theme.id)).size, 36);
+    assert.equal(new Set(THEMES.map((theme) => theme.label)).size, 36);
   });
 
   it('range chaque palette dans une famille et une seule', () => {
@@ -49,7 +49,7 @@ describe('palettes', () => {
       else if (theme.neutral) familles.encre++;
       else familles.duo++;
     }
-    assert.deepEqual(familles, { fond: 12, encre: 12, duo: 5 });
+    assert.deepEqual(familles, { fond: 16, encre: 15, duo: 5 });
   });
 
   it('retombe sur la palette par défaut pour un identifiant inconnu', () => {
@@ -140,6 +140,30 @@ describe('formats', () => {
     assert.equal(num(120.6), '120.6');
     assert.equal(num(845000), '845,000');
     assert.equal(num(-3.25), '-3.25');
+  });
+});
+
+describe('palettes à encres données', () => {
+  it('utilise ses couleurs exactes, sans les dériver d’une teinte', () => {
+    // Tout l'intérêt d'Okabe-Ito : son bleu ciel et son bleu ont la même
+    // teinte et ne se distinguent que par la clarté. Un modèle qui dériverait
+    // la couleur de la teinte seule les confondrait, et perdrait précisément
+    // ce qui rend la palette lisible par un œil daltonien.
+    const okabe = themeById('okabe');
+    assert.ok(okabe.inks, 'Okabe-Ito doit porter des encres explicites');
+    const first = paletteFor(okabe, 0, false);
+    assert.equal(first.text, okabe.inks!.light[0]);
+    assert.equal(first.accent, okabe.inks!.light[0], 'histogramme et texte partagent la couleur');
+
+    const ciel = paletteFor(okabe, 1, false).text;
+    const bleu = paletteFor(okabe, 4, false).text;
+    assert.notEqual(ciel, bleu, 'deux couleurs de même teinte doivent rester distinctes');
+  });
+
+  it('cycle sur ses encres au-delà de la palette', () => {
+    const okabe = themeById('okabe');
+    const taille = okabe.inks!.light.length;
+    assert.equal(paletteFor(okabe, 0, false).text, paletteFor(okabe, taille, false).text);
   });
 });
 

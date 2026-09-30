@@ -21,6 +21,16 @@ const PASTEL: Style = { cellSaturation: 0.13, cellBrightness: 0.99, cellSaturati
 const VIVID: Style = { cellSaturation: 0.24, cellBrightness: 1.0, cellSaturationDark: 0.55, cellBrightnessDark: 0.26, accentSaturation: 0.85, accentBrightness: 0.66, accentBrightnessDark: 0.84 };
 const MUTED: Style = { cellSaturation: 0.1, cellBrightness: 0.97, cellSaturationDark: 0.28, cellBrightnessDark: 0.24, accentSaturation: 0.45, accentBrightness: 0.54, accentBrightnessDark: 0.7 };
 const DEEP: Style = { cellSaturation: 0.18, cellBrightness: 0.95, cellSaturationDark: 0.62, cellBrightnessDark: 0.2, accentSaturation: 0.75, accentBrightness: 0.5, accentBrightnessDark: 0.74 };
+/**
+ * Trois styles ajoutés parce que les tirages se ressemblaient tous : ils ne
+ * faisaient varier que la teinte, tandis que saturation et luminosité venaient
+ * toujours des quatre mêmes réglages. C'est le style qui donne son caractère à
+ * une palette, pas la teinte.
+ */
+const WASHED: Style = { cellSaturation: 0.07, cellBrightness: 1.0, cellSaturationDark: 0.2, cellBrightnessDark: 0.28, accentSaturation: 0.34, accentBrightness: 0.58, accentBrightnessDark: 0.72 };
+const EARTH: Style = { cellSaturation: 0.17, cellBrightness: 0.93, cellSaturationDark: 0.34, cellBrightnessDark: 0.21, accentSaturation: 0.52, accentBrightness: 0.46, accentBrightnessDark: 0.66 };
+const ELECTRIC: Style = { cellSaturation: 0.3, cellBrightness: 0.98, cellSaturationDark: 0.68, cellBrightnessDark: 0.3, accentSaturation: 0.95, accentBrightness: 0.68, accentBrightnessDark: 0.9 };
+
 const GREY: Style = { cellSaturation: 0, cellBrightness: 0.97, cellSaturationDark: 0, cellBrightnessDark: 0.26, accentSaturation: 0, accentBrightness: 0.45, accentBrightnessDark: 0.72 };
 
 export interface CsvTheme {
@@ -32,6 +42,15 @@ export interface CsvTheme {
   neutral?: { light: string; dark: string };
   /** Couleur de texte unique ; absente quand le texte est coloré par colonne. */
   uniformInk?: { light: string; dark: string };
+  /**
+   * Encres données une à une plutôt que dérivées d'une teinte.
+   *
+   * Indispensable pour les palettes scientifiques : Okabe-Ito distingue son
+   * bleu ciel de son bleu par la clarté, pas par la teinte — deux couleurs de
+   * même teinte, que ce modèle réduirait sinon à une seule. C'est précisément
+   * cet écart de clarté qui les rend discernables par un œil daltonien.
+   */
+  inks?: { light: string[]; dark: string[] };
   /** Amplitude de la rampe de luminosité sur l'ensemble des teintes. */
   spread: number;
 }
@@ -51,6 +70,49 @@ function inked(id: string, label: string, hues: number[], backLight: string, bac
   return { id, label, hues, style: VIVID, neutral: { light: backLight, dark: backDark }, spread: 0 };
 }
 
+/**
+ * Palette dont les encres sont données, non dérivées. Les teintes restent
+ * fournies pour que le reste du modèle (pastille d'aperçu, dégradé) continue
+ * de fonctionner sans savoir d'où viennent les couleurs.
+ */
+function explicit(
+  id: string,
+  label: string,
+  light: string[],
+  dark: string[],
+  backLight: string,
+  backDark: string,
+): CsvTheme {
+  return {
+    id,
+    label,
+    hues: light.map(hueOf),
+    style: VIVID,
+    neutral: { light: backLight, dark: backDark },
+    inks: { light, dark },
+    spread: 0,
+  };
+}
+
+/** Teinte d'un « #rrggbb », en degrés — l'inverse partiel de hsb(). */
+export function hueOf(hex: string): number {
+  const value = hex.replace('#', '');
+  const red = parseInt(value.slice(0, 2), 16) / 255;
+  const green = parseInt(value.slice(2, 4), 16) / 255;
+  const blue = parseInt(value.slice(4, 6), 16) / 255;
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  if (max === min) return 0;
+  const span = max - min;
+  const hue =
+    max === red
+      ? ((green - blue) / span) % 6
+      : max === green
+        ? (blue - red) / span + 2
+        : (red - green) / span + 4;
+  return Math.round(((hue * 60) % 360 + 360) % 360);
+}
+
 function duo(id: string, label: string, hues: number[], style: Style, spread = 0.24): CsvTheme {
   return { id, label, hues, style, spread };
 }
@@ -68,6 +130,12 @@ const TINTED: CsvTheme[] = [
   tinted('nordic', 'Nordic', [205, 220, 195, 230, 185, 240], MUTED, '#16222E', '#DCE6F0'),
   tinted('mint', 'Mint', [160, 150, 170, 140, 180, 130], PASTEL, '#0F2B24', '#D6F0E6'),
   tinted('meadow', 'Meadow', [95, 80, 110, 65, 125, 50], VIVID, '#1B2E0F', '#E0F2CC'),
+  // Teintes reprises de palettes reconnues pour leur confort visuel : tons
+  // terreux sourds, sauge et pastels poudrés (voir CHANGELOG pour les sources).
+  tinted('clay', 'Clay', [28, 82, 45, 95, 15, 60], EARTH, '#2A2118', '#F3E7D8'),
+  tinted('sage', 'Sage', [95, 150, 75, 175, 120, 200], WASHED, '#1C2620', '#DCE8DE'),
+  tinted('dusk', 'Dusk', [225, 260, 200, 290, 240, 320], WASHED, '#191C28', '#DEE2F0'),
+  tinted('bloom', 'Bloom', [330, 20, 285, 50, 355, 200], ELECTRIC, '#25101C', '#FBDCEC'),
   tinted('mono', 'Monochrome', [0, 0, 0, 0, 0, 0], GREY, '#1C1C1C', '#E0E0E0', 0.26),
 ];
 
@@ -88,6 +156,39 @@ const INKED: CsvTheme[] = [
   inked('midnight', 'Midnight', [326, 191, 135, 31, 265, 0, 65], '#FBF7FF', '#282A36'),
   inked('frost', 'Frost', [193, 354, 92, 213, 40, 311, 14], '#ECEFF4', '#2E3440'),
   inked('solar', 'Solar', [45, 331, 175, 18, 237, 68, 1, 205], '#FDF6E3', '#002B36'),
+  // Palettes conçues pour que des catégories restent distinguables, y compris
+  // par un œil daltonien — c'est exactement le problème d'un tableau dont
+  // chaque colonne porte une couleur.
+  //
+  // Les valeurs publiées sont calibrées pour des marques dans un graphique, pas
+  // pour du texte : le jaune d'Okabe-Ito sur fond blanc donnait un contraste de
+  // 39 pour un seuil de 60. Elles sont donc assombries en mode clair et
+  // éclaircies en mode sombre juste ce qu'il faut pour passer ce seuil, la
+  // teinte restant intacte — c'est elle qui porte la distinction.
+  explicit(
+    'okabe',
+    'Okabe-Ito',
+    ['#E69F00', '#56B4E9', '#009E73', '#D1C73A', '#0072B2', '#D55E00', '#CC79A7'],
+    ['#E6AC29', '#70BEE9', '#1C9E7B', '#F0E661', '#207EB2', '#D57326', '#CC88AE'],
+    '#FCFCFD',
+    '#1E1F22',
+  ),
+  explicit(
+    'tol-bright',
+    'Tol Bright',
+    ['#4477AA', '#EE6677', '#228833', '#CCBB44', '#66CCEE', '#AA3377', '#777777'],
+    ['#5680AA', '#EE7E8C', '#348842', '#CCBE5C', '#7ED2EE', '#AA4880', '#777777'],
+    '#FDFDFC',
+    '#1A1C20',
+  ),
+  explicit(
+    'tol-muted',
+    'Tol Muted',
+    ['#CC6677', '#332288', '#C9B96C', '#117733', '#85C8E9', '#882255', '#44AA99', '#999933', '#AA4499'],
+    ['#CC7886', '#604CC5', '#DDCF89', '#268145', '#9AD2EE', '#A23E70', '#56AA9C', '#999945', '#AA569C'],
+    '#FBFAF7',
+    '#1D1B22',
+  ),
   inked('ember', 'Ember', [4, 162, 42, 343, 101, 27, 61], '#FBF1C7', '#282828'),
 ];
 
@@ -151,7 +252,10 @@ export function themeById(id: string | undefined): CsvTheme {
 /** Les deux familles qu'un tirage peut produire. */
 export type RandomFamily = 'background' | 'text';
 
-const RANDOM_STYLES: Style[] = [PASTEL, VIVID, MUTED, DEEP];
+// Sept styles plutôt que quatre : c'est ce qui sépare deux tirages, bien plus
+// que leurs teintes. Avec quatre, toutes les palettes tirées finissaient par
+// se ressembler quelle que soit la couleur.
+const RANDOM_STYLES: Style[] = [PASTEL, VIVID, MUTED, DEEP, WASHED, EARTH, ELECTRIC];
 
 /** Encres et fonds éprouvés : seules les teintes sont tirées au sort. */
 const RANDOM_INKS: Array<[string, string]> = [
@@ -167,6 +271,19 @@ const RANDOM_GROUNDS: Array<[string, string]> = [
   ['#EFF1F5', '#1E1E2E'],
   ['#FBF7FF', '#282A36'],
   ['#ECEFF4', '#2E3440'],
+  // Fonds franchement teintés : un gris presque noir à chaque tirage donnait
+  // le même décor à toutes les palettes.
+  ['#FBF1C7', '#282828'],
+  ['#FDF6E3', '#002B36'],
+  ['#F4F7F2', '#16211A'],
+  ['#F7F3FA', '#1E1728'],
+  ['#F2F6F9', '#141E28'],
+];
+
+const RANDOM_INKS_EXTRA: Array<[string, string]> = [
+  ['#2A2118', '#F3E7D8'],
+  ['#1C2620', '#DCE8DE'],
+  ['#191C28', '#DEE2F0'],
 ];
 
 /**
@@ -200,7 +317,8 @@ export function randomTheme(
     return inked(id, label, hues, light, dark);
   }
   const style = RANDOM_STYLES[Math.floor(random() * RANDOM_STYLES.length)];
-  const [inkLight, inkDark] = RANDOM_INKS[Math.floor(random() * RANDOM_INKS.length)];
+  const inks = [...RANDOM_INKS, ...RANDOM_INKS_EXTRA];
+  const [inkLight, inkDark] = inks[Math.floor(random() * inks.length)];
   // La rampe de luminosité n'est pas décorative : c'est elle qui distingue deux
   // colonnes voisines quand le fond est peu saturé. Un tirage qui la supprimait
   // une fois sur deux produisait, avec le style MUTED, des colonnes
@@ -238,6 +356,18 @@ export function paletteFor(theme: CsvTheme, column: number, dark: boolean): Pale
 
   if (theme.neutral) {
     const uniform = dark ? theme.neutral.dark : theme.neutral.light;
+    if (theme.inks) {
+      const list = dark ? theme.inks.dark : theme.inks.light;
+      const ink = list[column % list.length];
+      return {
+        cell: uniform,
+        band: shiftBrightness(uniform, dark ? 0.1 : -0.05),
+        // L'histogramme reprend l'encre : deux couleurs pour une même colonne
+        // demanderaient au lecteur de faire le lien lui-même.
+        accent: ink,
+        text: ink,
+      };
+    }
     return {
       cell: uniform,
       band: shiftBrightness(uniform, dark ? 0.1 : -0.05),
