@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 import { count, num, percent } from '../core/format';
-import { DEFAULT_THEME, paletteFor, THEMES, themeById } from '../core/themes';
+import { DEFAULT_THEME, gradientFor, paletteFor, THEMES, themeById, withAlpha } from '../core/themes';
 
 function channels(hex: string): [number, number, number] {
   return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
@@ -79,6 +79,36 @@ describe('palettes', () => {
     // cycle doit être franc, pas une couleur par défaut silencieuse.
     const theme = themeById('ocean');
     assert.equal(paletteFor(theme, 0, false).cell, paletteFor(theme, 6, false).cell);
+  });
+});
+
+describe('withAlpha', () => {
+  it('convertit un hex en rgba avec l’alpha demandé', () => {
+    assert.equal(withAlpha('#458dd6', 0.3), 'rgba(69, 141, 214, 0.3)');
+  });
+});
+
+describe('gradientFor', () => {
+  it('pose un arrêt par teinte, dans l’ordre de la palette', () => {
+    const theme = themeById('syntax');
+    const gradient = gradientFor(theme, false);
+    assert.ok(gradient.startsWith('linear-gradient(90deg, '));
+    // Autant d'arrêts que de teintes : un dégradé qui en perdrait en route se
+    // remarquerait à l'écran par des bandes de couleur manquantes.
+    const stops = gradient.match(/rgba\([^)]+\)/g) ?? [];
+    assert.equal(stops.length, theme.hues.length);
+  });
+
+  it('respecte l’opacité donnée', () => {
+    const theme = themeById('rainbow');
+    const gradient = gradientFor(theme, false, 0.5);
+    assert.ok(gradient.includes(', 0.5)'), gradient);
+  });
+
+  it('change avec le thème', () => {
+    const a = gradientFor(themeById('sunset'), false);
+    const b = gradientFor(themeById('ocean'), false);
+    assert.notEqual(a, b);
   });
 });
 

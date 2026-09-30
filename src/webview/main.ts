@@ -15,7 +15,9 @@ import {
 } from '../core/details';
 import { rawSegments } from '../core/csv';
 import { parseNumber, type ColumnType } from '../core/types';
-import { paletteFor, THEMES, themeById, type CsvTheme, type Palette } from '../core/themes';
+import { paletteFor, THEMES, themeById, gradientFor, type CsvTheme, type Palette } from '../core/themes';
+import { datasetTransformLines as coreDatasetTransformLines, type Filter } from '../core/filters';
+import { foldRanking } from '../core/stats';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
@@ -45,8 +47,6 @@ const MAX_WIDTH = 460;
  * graphique qui tient.
  */
 const HIST_HEIGHT = 84;
-/** Lignes réservées au palmarès d'une colonne texte, « Other » compris. */
-const BAND_ROWS = 7;
 const WIDTH_SAMPLE_ROWS = 60;
 const OVERSCAN = 8;
 
@@ -91,14 +91,6 @@ function byId(id: string): HTMLElement {
  * Chacune porte son propre libellé : la barre de filtres doit pouvoir dire ce
  * qu'elle retient sans avoir à reconstituer la phrase depuis les données.
  */
-type Filter =
-  | { kind: 'contains'; column: number; text: string; label: string }
-  | { kind: 'values'; column: number; values: string[]; label: string }
-  | { kind: 'range'; column: number; low: number; high: number; last: boolean; label: string }
-  /** Lignes dupliquées, désignées par leur index — seul cas où un ensemble de
-   * lignes explicite est nécessaire plutôt qu'une condition sur une colonne. */
-  | { kind: 'duplicates'; column: number; rows: Set<number>; label: string };
-
 interface State {
   headers: string[];
   rows: string[][];
@@ -457,16 +449,9 @@ function bandCell(modelIndex: number): HTMLElement {
       body.appendChild(central);
     }
   } else {
-    // Sept lignes en tout, « Other » compris. S'il reste quelque chose derrière
-    // le palmarès, la dernière place lui revient et la septième valeur le
-    // rejoint : le total fait ainsi toujours 100 %, sans jamais déborder du
-    // bandeau. Sans reste, les sept valeurs s'affichent et « Other » disparaît,
-    // puisqu'une ligne à 0.0% ne dirait rien.
-    const remainder = column.otherCount > 0;
-    const shown = column.top.slice(0, remainder ? BAND_ROWS - 1 : BAND_ROWS);
-    const folded = column.top.slice(shown.length);
-    const otherCount = column.otherCount + folded.reduce((sum, entry) => sum + entry.count, 0);
-    const otherShare = column.present === 0 ? 0 : otherCount / column.present;
+    // La règle des sept lignes vit dans core/stats.ts, testée là-bas : ici on ne
+    // fait plus qu'en dessiner le résultat.
+    const { shown, otherCount, otherShare } = foldRanking(column.top, column.otherCount, column.present);
 
     for (const share of shown) {
       body.appendChild(
@@ -1473,66 +1458,26 @@ function markedHistogram(column: ColumnStats, colours: Palette): HTMLElement {
  * entre ce que l'outil montre et ce qu'il exporte.
  */
 /**
- * Toutes les lignes de transformation, dans l'ordre où l'application les
- * applique réellement : renommage et retrait de colonnes en premier (state.order
- * n'affecte que l'affichage, mais un renommage change le nom que les filtres et
- * le tri utilisent déjà), puis les filtres, puis le tri — le même ordre que
- * `rebuildView()` (filteredRows() avant le tri).
+ * Rassemble l'état courant pour core/filters.ts, qui ne connaît que des
+ * données — noms déjà résolus, jamais un index à retrouver dans state.
  */
 function datasetTransformLines(): string[] {
-  const lines: string[] = [];
+  const nameOf = (index: number): string => state.stats[index]?.name ?? `column ${index + 1}`;
 
   const renamed = state.headers
-    .map((original, index) => ({ original, current: state.stats[index]?.name ?? original }))
+    .map((original, index) => ({ original, current: nameOf(index) }))
     .filter(({ original, current }) => current !== original);
-  if (renamed.length > 0) {
-    const mapping = renamed.map(({ original, current }) => `${JSON.stringify(original)}: ${JSON.stringify(current)}`).join(', ');
-    lines.push('', '# Columns renamed in the table', `df = df.rename(columns={${mapping}})`);
-  }
 
   const dropped = state.headers
-    .map((original, index) => ({ index, name: state.stats[index]?.name ?? original }))
-    .filter(({ index }) => !state.order.includes(index));
-  if (dropped.length > 0) {
-    const names = dropped.map(({ name }) => JSON.stringify(name)).join(', ');
-    lines.push('', '# Columns dropped from the table', `df = df.drop(columns=[${names}])`);
-  }
+    .map((_, index) => index)
+    .filter((index) => !state.order.includes(index))
+    .map(nameOf);
 
-  if (state.filters.length > 0) {
-    lines.push('', '# Matching the filters applied in this session');
-    for (const filter of state.filters) lines.push(`# ${filter.label}`, filterToPandas(filter));
-  }
+  const filters = state.filters.map((filter) => ({ filter, columnName: nameOf(filter.column) }));
 
-  if (state.sort) {
-    const name = state.stats[state.sort.index]?.name ?? `column ${state.sort.index + 1}`;
-    const direction = state.sort.ascending ? 'ascending' : 'descending';
-    lines.push(
-      '',
-      `# Sorted ${direction} by ${name} in the table`,
-      `df = df.sort_values(${JSON.stringify(name)}, ascending=${state.sort.ascending ? 'True' : 'False'})`,
-    );
-  }
+  const sort = state.sort ? { columnName: nameOf(state.sort.index), ascending: state.sort.ascending } : null;
 
-  return lines;
-}
-
-function filterToPandas(filter: Filter): string {
-  if (filter.kind === 'duplicates') return 'df = df[df.duplicated(keep=False)]';
-  const name = JSON.stringify(state.stats[filter.column]?.name ?? `column ${filter.column + 1}`);
-  switch (filter.kind) {
-    case 'contains':
-      return `df = df[df[${name}].astype(str).str.contains(${JSON.stringify(filter.text)}, case=False, na=False)]`;
-    case 'values':
-      return filter.values.length === 1
-        ? `df = df[df[${name}] == ${JSON.stringify(filter.values[0])}]`
-        : `df = df[df[${name}].isin(${JSON.stringify(filter.values)})]`;
-    case 'range':
-      // Une classe d'histogramme exclut sa borne haute ; une plage saisie à la
-      // main (Filter by range…) inclut les deux, d'où les deux formes.
-      return filter.last
-        ? `df = df[df[${name}].between(${filter.low}, ${filter.high})]`
-        : `df = df[(df[${name}] >= ${filter.low}) & (df[${name}] < ${filter.high})]`;
-  }
+  return coreDatasetTransformLines({ renamed, dropped, filters, sort });
 }
 
 function openDataset(anchor: HTMLElement): void {
@@ -1768,36 +1713,9 @@ function clearFilters(): void {
  * des chiffres partiels en les croyant complets. C'est la moitié de la
  * fonctionnalité, pas sa décoration.
  */
-/** Convertit un « #rrggbb » en rgba, pour pouvoir l'atténuer sans y perdre le texte. */
-function withAlpha(hex: string, alpha: number): string {
-  const value = hex.replace('#', '');
-  const red = parseInt(value.slice(0, 2), 16);
-  const green = parseInt(value.slice(2, 4), 16);
-  const blue = parseInt(value.slice(4, 6), 16);
-  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
-}
-
-/**
- * Dégradé horizontal tissé dans les teintes du thème actif.
- *
- * Sans lui, les deux barres du haut empruntaient un gris neutre sans rapport
- * avec la palette choisie juste en dessous. L'opacité reste faible : boutons,
- * pastilles et texte doivent rester lisibles par-dessus, le dégradé ne fait que
- * teinter le fond derrière eux.
- */
-function themeGradient(): string {
-  const theme = themeById(state.themeId);
-  const dark = isDark();
-  const stops = theme.hues.map((_, index) => withAlpha(paletteFor(theme, index, dark).accent, 0.3));
-  if (stops.length === 0) return 'none';
-  if (stops.length === 1) return `linear-gradient(90deg, ${stops[0]}, ${stops[0]})`;
-  const steps = stops.map((colour, index) => `${colour} ${Math.round((index / (stops.length - 1)) * 100)}%`);
-  return `linear-gradient(90deg, ${steps.join(', ')})`;
-}
-
 /** Teinte les deux barres du haut : celle des boutons et celle des filtres. */
 function paintChrome(): void {
-  const gradient = themeGradient();
+  const gradient = gradientFor(themeById(state.themeId), isDark());
   elements.toolbar.style.backgroundImage = gradient;
   elements.filterBar.style.backgroundImage = gradient;
 }

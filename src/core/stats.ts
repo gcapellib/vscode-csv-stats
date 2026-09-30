@@ -61,6 +61,41 @@ export const HISTOGRAM_BINS = 20;
  */
 export const TOP_VALUES = 7;
 
+/**
+ * Lignes que le bandeau réserve au palmarès d'une colonne texte, « Other »
+ * compris — la même limite que TOP_VALUES, nommée pour ce qu'elle représente
+ * côté affichage plutôt que côté calcul des statistiques.
+ */
+export const BAND_ROWS = TOP_VALUES;
+
+export interface RankingFold {
+  shown: ValueShare[];
+  otherCount: number;
+  otherShare: number;
+}
+
+/**
+ * Répartit le palmarès d'une colonne texte entre les lignes affichées et
+ * « Other », dans la limite des lignes que le bandeau réserve.
+ *
+ * S'il reste quelque chose derrière le palmarès, la dernière place lui revient
+ * et la valeur suivante le rejoint : le total fait ainsi toujours 100 %, sans
+ * jamais déborder du bandeau. Sans reste, les valeurs s'affichent toutes et
+ * « Other » disparaît, puisqu'une ligne à 0.0% ne dirait rien.
+ */
+export function foldRanking(top: ValueShare[], otherCount: number, present: number, rows = BAND_ROWS): RankingFold {
+  // Le total ne doit jamais dépasser « rows », même si l'appelant fournit un
+  // « top » plus long que prévu : c'est le rôle de cette fonction de le
+  // garantir, pas une hypothèse qu'elle est en droit de faire sur ses entrées.
+  const needsOther = otherCount > 0 || top.length > rows;
+  const shown = top.slice(0, Math.max(0, needsOther ? rows - 1 : rows));
+  const folded = top.slice(shown.length);
+  const foldedCount = otherCount + folded.reduce((sum, entry) => sum + entry.count, 0);
+  const foldedShare = present === 0 ? 0 : foldedCount / present;
+  return { shown, otherCount: foldedCount, otherShare: foldedShare };
+}
+
+
 export function isMissing(raw: string): boolean {
   return raw.trim() === '';
 }

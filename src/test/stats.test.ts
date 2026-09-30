@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 import { parse } from '../core/csv';
-import { compute, computeAll, HISTOGRAM_BINS, parseNumber, TOP_VALUES } from '../core/stats';
+import { compute, computeAll, foldRanking, HISTOGRAM_BINS, parseNumber, TOP_VALUES, BAND_ROWS } from '../core/stats';
 
 function statsOf(text: string) {
   return computeAll(parse(text));
@@ -165,3 +165,54 @@ describe('StatsComputer', () => {
 function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
 }
+
+describe('foldRanking', () => {
+  const share = (value: string, count: number) => ({ value, count, share: 0 });
+
+  it("affiche tout et n'ajoute pas Other quand ça rentre sans reste", () => {
+    const top = ['A', 'B', 'C'].map((v) => share(v, 1));
+    const result = foldRanking(top, 0, 3);
+    assert.equal(result.shown.length, 3);
+    assert.equal(result.otherCount, 0);
+    assert.equal(result.otherShare, 0);
+  });
+
+  it('réserve la dernière place à Other dès qu’il reste quelque chose', () => {
+    // Comme le fournit vraiment computeAll : top déjà tronqué à sept entrées
+    // (A..G), otherCount portant ce qui reste au-delà (H, I, J => 3).
+    const top = 'ABCDEFG'.split('').map((v) => share(v, 1));
+    const result = foldRanking(top, 3, 10);
+    assert.equal(BAND_ROWS, 7);
+    assert.equal(result.shown.length, 6);
+    assert.deepEqual(
+      result.shown.map((s) => s.value),
+      ['A', 'B', 'C', 'D', 'E', 'F'],
+    );
+    // G plie dans Other, pas seulement H/I/J qui y étaient déjà.
+    assert.equal(result.otherCount, 4);
+    assert.equal(result.otherShare, 0.4);
+  });
+
+  it("plie l'excédent même si l'appelant fournit un top plus long que le budget", () => {
+    // La fonction doit garantir la limite elle-même : dix valeurs dans top et
+    // un otherCount à zéro ne doivent pas produire plus de sept lignes.
+    const top = 'ABCDEFGHIJ'.split('').map((v) => share(v, 1));
+    const result = foldRanking(top, 0, 10);
+    assert.equal(result.shown.length, 6);
+    assert.equal(result.otherCount, 4);
+  });
+
+  it('affiche les sept valeurs sans Other quand il y en a exactement sept', () => {
+    const top = 'ABCDEFG'.split('').map((v) => share(v, 1));
+    const result = foldRanking(top, 0, 7);
+    assert.equal(result.shown.length, 7);
+    assert.equal(result.otherCount, 0);
+  });
+
+  it('respecte un budget de lignes différent, si on le lui donne', () => {
+    const top = 'ABC'.split('').map((v) => share(v, 1));
+    const result = foldRanking(top, 2, 5, 3);
+    assert.equal(result.shown.length, 2);
+    assert.equal(result.otherCount, 3);
+  });
+});

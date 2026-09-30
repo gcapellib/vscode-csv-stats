@@ -173,6 +173,31 @@ export function paletteFor(theme: CsvTheme, column: number, dark: boolean): Pale
   return { cell, band, accent, text };
 }
 
+/** Convertit un « #rrggbb » en rgba, pour pouvoir l'atténuer sans y perdre le texte. */
+export function withAlpha(hex: string, alpha: number): string {
+  const value = hex.replace('#', '');
+  const red = parseInt(value.slice(0, 2), 16);
+  const green = parseInt(value.slice(2, 4), 16);
+  const blue = parseInt(value.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+/**
+ * Dégradé horizontal tissé dans les teintes d'un thème.
+ *
+ * Sans lui, la barre de filtres et la barre des boutons empruntaient un gris
+ * neutre sans rapport avec la palette choisie juste en dessous. L'opacité reste
+ * faible : boutons, pastilles et texte doivent rester lisibles par-dessus, le
+ * dégradé ne fait que teinter le fond derrière eux.
+ */
+export function gradientFor(theme: CsvTheme, dark: boolean, alpha = 0.3): string {
+  const stops = theme.hues.map((_, index) => withAlpha(paletteFor(theme, index, dark).accent, alpha));
+  if (stops.length === 0) return 'none';
+  if (stops.length === 1) return `linear-gradient(90deg, ${stops[0]}, ${stops[0]})`;
+  const steps = stops.map((colour, index) => `${colour} ${Math.round((index / (stops.length - 1)) * 100)}%`);
+  return `linear-gradient(90deg, ${steps.join(', ')})`;
+}
+
 function clamp(value: number, low: number, high: number): number {
   return Math.min(high, Math.max(low, value));
 }
