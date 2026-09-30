@@ -31,7 +31,6 @@ const WASHED: Style = { cellSaturation: 0.07, cellBrightness: 1.0, cellSaturatio
 const EARTH: Style = { cellSaturation: 0.17, cellBrightness: 0.93, cellSaturationDark: 0.34, cellBrightnessDark: 0.21, accentSaturation: 0.52, accentBrightness: 0.46, accentBrightnessDark: 0.66 };
 const ELECTRIC: Style = { cellSaturation: 0.3, cellBrightness: 0.98, cellSaturationDark: 0.68, cellBrightnessDark: 0.3, accentSaturation: 0.95, accentBrightness: 0.68, accentBrightnessDark: 0.9 };
 
-const GREY: Style = { cellSaturation: 0, cellBrightness: 0.97, cellSaturationDark: 0, cellBrightnessDark: 0.26, accentSaturation: 0, accentBrightness: 0.45, accentBrightnessDark: 0.72 };
 
 export interface CsvTheme {
   id: string;
@@ -123,20 +122,14 @@ const TINTED: CsvTheme[] = [
   tinted('ocean', 'Ocean', [200, 186, 212, 174, 222, 164], PASTEL, '#0E2A3A', '#CFE8F5'),
   tinted('forest', 'Forest', [140, 95, 160, 110, 80, 175], MUTED, '#14301C', '#D3EBD8'),
   tinted('lavender', 'Lavender', [270, 285, 255, 300, 240, 315], PASTEL, '#241A38', '#E4D9F5'),
-  tinted('citrus', 'Citrus', [48, 60, 35, 75, 25, 90], VIVID, '#332600', '#F7EBC6'),
   tinted('neon', 'Neon', [300, 180, 120, 60, 330, 200], VIVID, '#14001F', '#F2E4FF'),
   tinted('soft', 'Soft pastel', [340, 200, 150, 50, 270, 20], MUTED, '#2B2B2B', '#E6E6E6'),
-  tinted('seaside', 'Seaside', [190, 40, 175, 55, 205, 30], PASTEL, '#102B33', '#DDEFF2'),
   tinted('nordic', 'Nordic', [205, 220, 195, 230, 185, 240], MUTED, '#16222E', '#DCE6F0'),
   tinted('mint', 'Mint', [160, 150, 170, 140, 180, 130], PASTEL, '#0F2B24', '#D6F0E6'),
   tinted('meadow', 'Meadow', [95, 80, 110, 65, 125, 50], VIVID, '#1B2E0F', '#E0F2CC'),
   // Teintes reprises de palettes reconnues pour leur confort visuel : tons
   // terreux sourds, sauge et pastels poudrés (voir CHANGELOG pour les sources).
-  tinted('clay', 'Clay', [28, 82, 45, 95, 15, 60], EARTH, '#2A2118', '#F3E7D8'),
   tinted('sage', 'Sage', [95, 150, 75, 175, 120, 200], WASHED, '#1C2620', '#DCE8DE'),
-  tinted('dusk', 'Dusk', [225, 260, 200, 290, 240, 320], WASHED, '#191C28', '#DEE2F0'),
-  tinted('bloom', 'Bloom', [330, 20, 285, 50, 355, 200], ELECTRIC, '#25101C', '#FBDCEC'),
-  tinted('mono', 'Monochrome', [0, 0, 0, 0, 0, 0], GREY, '#1C1C1C', '#E0E0E0', 0.26),
 ];
 
 /** Fond uni, texte coloré par colonne. */
@@ -180,14 +173,6 @@ const INKED: CsvTheme[] = [
     ['#5680AA', '#EE7E8C', '#348842', '#CCBE5C', '#7ED2EE', '#AA4880', '#777777'],
     '#FDFDFC',
     '#1A1C20',
-  ),
-  explicit(
-    'tol-muted',
-    'Tol Muted',
-    ['#CC6677', '#332288', '#C9B96C', '#117733', '#85C8E9', '#882255', '#44AA99', '#999933', '#AA4499'],
-    ['#CC7886', '#604CC5', '#DDCF89', '#268145', '#9AD2EE', '#A23E70', '#56AA9C', '#999945', '#AA569C'],
-    '#FBFAF7',
-    '#1D1B22',
   ),
   inked('ember', 'Ember', [4, 162, 42, 343, 101, 27, 61], '#FBF1C7', '#282828'),
 ];

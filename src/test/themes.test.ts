@@ -33,10 +33,10 @@ function difference(first: string, second: string): number {
 }
 
 describe('palettes', () => {
-  it('en compte trente-six, aux identifiants et libellés uniques', () => {
-    assert.equal(THEMES.length, 36);
-    assert.equal(new Set(THEMES.map((theme) => theme.id)).size, 36);
-    assert.equal(new Set(THEMES.map((theme) => theme.label)).size, 36);
+  it('en compte vingt-neuf, aux identifiants et libellés uniques', () => {
+    assert.equal(THEMES.length, 29);
+    assert.equal(new Set(THEMES.map((theme) => theme.id)).size, 29);
+    assert.equal(new Set(THEMES.map((theme) => theme.label)).size, 29);
   });
 
   it('range chaque palette dans une famille et une seule', () => {
@@ -49,7 +49,7 @@ describe('palettes', () => {
       else if (theme.neutral) familles.encre++;
       else familles.duo++;
     }
-    assert.deepEqual(familles, { fond: 16, encre: 15, duo: 5 });
+    assert.deepEqual(familles, { fond: 10, encre: 14, duo: 5 });
   });
 
   it('retombe sur la palette par défaut pour un identifiant inconnu', () => {
