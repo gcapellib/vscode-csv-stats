@@ -116,6 +116,10 @@ function themeItem(theme: CsvTheme, removable: boolean): HTMLElement {
 }
 
 export function buildThemePicker(): void {
+  // La liste est reconstruite en entier à chaque fois : sans mémoriser sa
+  // position, elle remonte en haut et l'on perd de vue ce qu'on regardait —
+  // la palette qu'on vient de tirer, par exemple.
+  const scrolled = elements.themePopup.querySelector('.theme-list')?.scrollTop ?? 0;
   elements.themePopup.textContent = '';
 
   // Seule la liste défile : la rangée de boutons reste visible, sinon tirer
@@ -143,7 +147,13 @@ export function buildThemePicker(): void {
   }
 
   elements.themePopup.append(list, randomRow());
+  list.scrollTop = scrolled;
   showCurrentTheme();
+}
+
+/** Amène la palette courante sous les yeux — celle qu'on vient de tirer. */
+function revealCurrent(): void {
+  elements.themePopup.querySelector<HTMLElement>('.theme-item.current')?.scrollIntoView({ block: 'nearest' });
 }
 
 /**
@@ -174,6 +184,9 @@ function randomRow(): HTMLElement {
     paint();
     if (state.showRaw) paintRaw();
     buildThemePicker();
+    // « My palettes » est en bas de liste : sans cela, on ne voit pas ce qu'on
+    // vient de tirer.
+    revealCurrent();
   });
 
   const keep = document.createElement('button');
@@ -191,6 +204,7 @@ function randomRow(): HTMLElement {
     vscode.postMessage({ type: 'saveTheme', theme: kept });
     vscode.postMessage({ type: 'selectTheme', id: kept.id });
     buildThemePicker();
+    revealCurrent();
   });
 
   row.append(draw, keep);
