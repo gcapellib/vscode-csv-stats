@@ -85,17 +85,21 @@ function themeItem(theme: CsvTheme, removable: boolean): HTMLElement {
 
   if (!removable) return item;
 
-  // Seules les palettes gardées se suppriment ; celles livrées avec
-  // l'extension restent, quoi qu'il arrive.
+  // Seules les palettes personnelles se retirent — gardées ou simplement
+  // tirées ; celles livrées avec l'extension restent, quoi qu'il arrive.
   const remove = document.createElement('span');
   remove.className = 'theme-remove';
   remove.textContent = '\u00D7';
-  remove.title = 'Remove this palette';
+  remove.title = theme === draftTheme() ? 'Discard this draw' : 'Remove this palette';
   remove.addEventListener('click', (event) => {
     event.stopPropagation();
-    setCustomThemes(customThemes().filter((kept) => kept.id !== theme.id));
-    vscode.postMessage({ type: 'deleteTheme', id: theme.id });
-    // La palette supprimée était peut-être celle en cours : themeById retombe
+    if (theme === draftTheme()) {
+      setDraftTheme(null);
+    } else {
+      setCustomThemes(customThemes().filter((kept) => kept.id !== theme.id));
+      vscode.postMessage({ type: 'deleteTheme', id: theme.id });
+    }
+    // La palette retirée était peut-être celle en cours : themeById retombe
     // alors sur la palette par défaut, et l'écran doit suivre.
     if (state.themeId === theme.id) {
       state.themeId = themeById(undefined).id;
@@ -114,6 +118,12 @@ function themeItem(theme: CsvTheme, removable: boolean): HTMLElement {
 export function buildThemePicker(): void {
   elements.themePopup.textContent = '';
 
+  // Seule la liste défile : la rangée de boutons reste visible, sinon tirer
+  // une palette demande d'abord de dérouler vingt-neuf lignes pour retrouver
+  // le bouton.
+  const list = document.createElement('div');
+  list.className = 'theme-list';
+
   const groups: Array<[string, CsvTheme[], boolean]> = THEME_GROUPS.map(
     ([label, themes]) => [label, themes, false] as [string, CsvTheme[], boolean],
   );
@@ -126,14 +136,13 @@ export function buildThemePicker(): void {
     const heading = document.createElement('div');
     heading.className = 'theme-group';
     heading.textContent = label;
-    elements.themePopup.appendChild(heading);
+    list.appendChild(heading);
     for (const theme of themes) {
-      // Le tirage en cours n'est pas encore gardé : rien à en supprimer.
-      elements.themePopup.appendChild(themeItem(theme, removable && theme !== draft));
+      list.appendChild(themeItem(theme, removable));
     }
   }
 
-  elements.themePopup.appendChild(randomRow());
+  elements.themePopup.append(list, randomRow());
   showCurrentTheme();
 }
 

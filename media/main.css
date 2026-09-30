@@ -162,14 +162,25 @@ body {
 #theme-popup {
   position: fixed;
   z-index: 30;
+  display: flex;
+  flex-direction: column;
   max-height: 60vh;
   min-width: 240px;
-  overflow-y: auto;
-  padding: 4px 0;
+  /* Le panneau ne défile plus lui-même : c'est la liste, à l'intérieur, qui le
+     fait. Sans cela, la rangée « Random palette / Keep » disparaissait vers le
+     bas et demandait de dérouler vingt-neuf palettes pour la retrouver. */
+  overflow: hidden;
   border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border));
   background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
   color: var(--vscode-menu-foreground, var(--vscode-foreground));
   box-shadow: 0 4px 12px rgb(0 0 0 / 35%);
+}
+
+.theme-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 0;
 }
 
 .theme-group {
@@ -226,6 +237,7 @@ body {
 
 /* La rangée du bas, séparée des palettes : elle n'en est pas une. */
 .theme-random {
+  flex: 0 0 auto;
   display: flex;
   gap: 6px;
   margin-top: 4px;
