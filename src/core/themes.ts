@@ -1,5 +1,8 @@
 /**
- * Les quarante palettes — port fidèle de celles du plugin PyCharm.
+ * Les palettes.
+ *
+ * Le noyau vient du plugin PyCharm ; s'y ajoutent depuis des palettes conçues
+ * pour la lisibilité des catégories, et un tirage au sort.
  *
  * Une palette ne fixe pas ses couleurs une à une. Elle fixe une liste de teintes
  * et un style qui en dérive les intensités, pour le thème clair comme pour le
