@@ -7,7 +7,7 @@
  * flottants, poser les écouteurs globaux.
  */
 import { count } from '../core/format';
-import { themeById } from '../core/themes';
+import { setCustomThemes, themeById, type CsvTheme } from '../core/themes';
 import { type ColumnStats } from '../core/stats';
 import { vscode } from './vscode-api';
 import { elements } from './dom';
@@ -61,6 +61,9 @@ window.addEventListener('message', (event: MessageEvent) => {
       state.rowCount = message.rowCount as number;
       state.fileName = (message.fileName as string) ?? '';
       state.order = state.headers.map((_, index) => index);
+      // Les palettes gardées d'une session précédente doivent être connues
+      // avant de résoudre la palette courante : elle en fait peut-être partie.
+      setCustomThemes((message.customThemes as CsvTheme[]) ?? []);
       state.themeId = themeById(message.theme as string | undefined).id;
       if (message.insights === false) toggleInsights(false, false);
       elements.shape.textContent = `${count(state.rowCount)} rows × ${count(state.headers.length)} columns`;

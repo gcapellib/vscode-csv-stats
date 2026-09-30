@@ -1,4 +1,14 @@
-import { paletteFor, themeById, type CsvTheme } from '../core/themes';
+import {
+  customThemes,
+  draftTheme,
+  paletteFor,
+  randomTheme,
+  setCustomThemes,
+  setDraftTheme,
+  themeById,
+  type CsvTheme,
+  type RandomFamily,
+} from '../core/themes';
 import { byId, elements, textSpan } from './dom';
 import { floating, positionFloating } from './floating-setup';
 import { paint } from './paint';
@@ -50,36 +60,132 @@ export function swatch(theme: CsvTheme): HTMLElement {
   return element;
 }
 
+/** Les deux familles s'alternent d'un tirage à l'autre, comme demandé. */
+let nextFamily: RandomFamily = 'background';
+
+function themeItem(theme: CsvTheme, removable: boolean): HTMLElement {
+  const item = document.createElement('button');
+  item.type = 'button';
+  item.className = 'theme-item';
+  item.setAttribute('role', 'option');
+  item.dataset.id = theme.id;
+  item.append(swatch(theme), textSpan(theme.label));
+  // Survoler suffit à voir : une pastille de cinq carrés ne dit pas ce qu'une
+  // palette donne sur ses propres données, et choisir à l'aveugle obligeait à
+  // ouvrir le panneau autant de fois qu'il y a de palettes. Le clic, lui,
+  // reste le seul geste qui engage.
+  item.addEventListener('mouseenter', () => previewTheme(theme.id));
+  item.addEventListener('focus', () => previewTheme(theme.id));
+  item.addEventListener('click', () => {
+    chosenThemeId = theme.id;
+    vscode.postMessage({ type: 'selectTheme', id: theme.id });
+    closeThemePopup();
+    buildThemePicker();
+  });
+
+  if (!removable) return item;
+
+  // Seules les palettes gardées se suppriment ; celles livrées avec
+  // l'extension restent, quoi qu'il arrive.
+  const remove = document.createElement('span');
+  remove.className = 'theme-remove';
+  remove.textContent = '\u00D7';
+  remove.title = 'Remove this palette';
+  remove.addEventListener('click', (event) => {
+    event.stopPropagation();
+    setCustomThemes(customThemes().filter((kept) => kept.id !== theme.id));
+    vscode.postMessage({ type: 'deleteTheme', id: theme.id });
+    // La palette supprimée était peut-être celle en cours : themeById retombe
+    // alors sur la palette par défaut, et l'écran doit suivre.
+    if (state.themeId === theme.id) {
+      state.themeId = themeById(undefined).id;
+      chosenThemeId = state.themeId;
+      vscode.postMessage({ type: 'selectTheme', id: state.themeId });
+      paintChrome();
+      paint();
+      if (state.showRaw) paintRaw();
+    }
+    buildThemePicker();
+  });
+  item.appendChild(remove);
+  return item;
+}
+
 export function buildThemePicker(): void {
   elements.themePopup.textContent = '';
-  for (const [label, themes] of THEME_GROUPS) {
+
+  const groups: Array<[string, CsvTheme[], boolean]> = THEME_GROUPS.map(
+    ([label, themes]) => [label, themes, false] as [string, CsvTheme[], boolean],
+  );
+  const mine = [...customThemes()];
+  const draft = draftTheme();
+  if (draft !== null) mine.push(draft);
+  if (mine.length > 0) groups.push(['My palettes', mine, true]);
+
+  for (const [label, themes, removable] of groups) {
     const heading = document.createElement('div');
     heading.className = 'theme-group';
     heading.textContent = label;
     elements.themePopup.appendChild(heading);
     for (const theme of themes) {
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'theme-item';
-      item.setAttribute('role', 'option');
-      item.dataset.id = theme.id;
-      item.append(swatch(theme), textSpan(theme.label));
-      // Survoler suffit à voir : une pastille de cinq carrés ne dit pas ce que
-      // quarante-cinq palettes donnent sur ses propres données, et choisir à
-      // l'aveugle obligeait à ouvrir le panneau autant de fois qu'il y a de
-      // palettes. Le clic, lui, reste le seul geste qui engage.
-      item.addEventListener('mouseenter', () => previewTheme(theme.id));
-      item.addEventListener('focus', () => previewTheme(theme.id));
-      item.addEventListener('click', () => {
-        chosenThemeId = theme.id;
-        vscode.postMessage({ type: 'selectTheme', id: theme.id });
-        closeThemePopup();
-        buildThemePicker();
-      });
-      elements.themePopup.appendChild(item);
+      // Le tirage en cours n'est pas encore gardé : rien à en supprimer.
+      elements.themePopup.appendChild(themeItem(theme, removable && theme !== draft));
     }
   }
+
+  elements.themePopup.appendChild(randomRow());
   showCurrentTheme();
+}
+
+/**
+ * La rangée du bas : tirer, puis garder.
+ *
+ * Tirer applique aussitôt, sans fermer le panneau — on peut donc enchaîner les
+ * tirages jusqu'à tomber sur une palette qui plaît, et seulement alors la
+ * garder.
+ */
+function randomRow(): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'theme-random';
+
+  const draw = document.createElement('button');
+  draw.type = 'button';
+  draw.className = 'theme-draw';
+  draw.textContent = '\u2728 Random palette';
+  draw.title = 'Draw a new palette, alternating coloured background and coloured text';
+  draw.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const family = nextFamily;
+    nextFamily = family === 'background' ? 'text' : 'background';
+    const id = `custom-${Date.now()}`;
+    setDraftTheme(randomTheme(family, id, `Palette ${customThemes().length + 1}`));
+    state.themeId = id;
+    chosenThemeId = id;
+    paintChrome();
+    paint();
+    if (state.showRaw) paintRaw();
+    buildThemePicker();
+  });
+
+  const keep = document.createElement('button');
+  keep.type = 'button';
+  keep.className = 'theme-keep';
+  keep.textContent = '\u2661 Keep';
+  keep.title = 'Add this palette to your own list';
+  keep.disabled = draftTheme() === null;
+  keep.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const kept = draftTheme();
+    if (kept === null) return;
+    setDraftTheme(null);
+    setCustomThemes([...customThemes(), kept]);
+    vscode.postMessage({ type: 'saveTheme', theme: kept });
+    vscode.postMessage({ type: 'selectTheme', id: kept.id });
+    buildThemePicker();
+  });
+
+  row.append(draw, keep);
+  return row;
 }
 
 /**

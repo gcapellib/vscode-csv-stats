@@ -5,6 +5,8 @@ import { compute, computeAll, type ColumnStats, type ColumnType } from './core/s
 const VIEW_TYPE = 'csvStats.editor';
 const THEME_KEY = 'csvStats.theme';
 const INSIGHTS_KEY = 'csvStats.insights';
+/** Les palettes tirées au sort puis gardées : elles survivent aux sessions. */
+const CUSTOM_THEMES_KEY = 'csvStats.customThemes';
 
 /** Au-delà, on refuse de charger plutôt que de saturer la mémoire de l'hôte. */
 const MAX_FILE_BYTES = 300 * 1024 * 1024;
@@ -88,6 +90,19 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
         case 'selectTheme':
           await this.context.globalState.update(THEME_KEY, message.id as string);
           break;
+        case 'saveTheme': {
+          const saved = this.context.globalState.get<unknown[]>(CUSTOM_THEMES_KEY) ?? [];
+          await this.context.globalState.update(CUSTOM_THEMES_KEY, [...saved, message.theme]);
+          break;
+        }
+        case 'deleteTheme': {
+          const saved = this.context.globalState.get<Array<{ id: string }>>(CUSTOM_THEMES_KEY) ?? [];
+          await this.context.globalState.update(
+            CUSTOM_THEMES_KEY,
+            saved.filter((theme) => theme.id !== message.id),
+          );
+          break;
+        }
         case 'setInsights':
           await this.context.globalState.update(INSIGHTS_KEY, message.visible as boolean);
           break;
@@ -153,6 +168,7 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
             fileName: basename(document.uri),
             stats,
             theme: this.context.globalState.get<string>(THEME_KEY),
+            customThemes: this.context.globalState.get<unknown[]>(CUSTOM_THEMES_KEY) ?? [],
             insights: this.context.globalState.get<boolean>(INSIGHTS_KEY) ?? true,
           });
 

@@ -1,7 +1,20 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 import { count, num, percent } from '../core/format';
-import { DEFAULT_THEME, gradientFor, paletteFor, THEMES, themeById, withAlpha } from '../core/themes';
+import {
+  DEFAULT_THEME,
+  allThemes,
+  customThemes,
+  draftTheme,
+  gradientFor,
+  paletteFor,
+  randomTheme,
+  setCustomThemes,
+  setDraftTheme,
+  THEMES,
+  themeById,
+  withAlpha,
+} from '../core/themes';
 
 function channels(hex: string): [number, number, number] {
   return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
@@ -20,10 +33,10 @@ function difference(first: string, second: string): number {
 }
 
 describe('palettes', () => {
-  it('en compte quarante-cinq, aux identifiants et libellés uniques', () => {
-    assert.equal(THEMES.length, 45);
-    assert.equal(new Set(THEMES.map((theme) => theme.id)).size, 45);
-    assert.equal(new Set(THEMES.map((theme) => theme.label)).size, 45);
+  it('en compte vingt-neuf, aux identifiants et libellés uniques', () => {
+    assert.equal(THEMES.length, 29);
+    assert.equal(new Set(THEMES.map((theme) => theme.id)).size, 29);
+    assert.equal(new Set(THEMES.map((theme) => theme.label)).size, 29);
   });
 
   it('range chaque palette dans une famille et une seule', () => {
@@ -36,7 +49,7 @@ describe('palettes', () => {
       else if (theme.neutral) familles.encre++;
       else familles.duo++;
     }
-    assert.deepEqual(familles, { fond: 20, encre: 15, duo: 10 });
+    assert.deepEqual(familles, { fond: 12, encre: 12, duo: 5 });
   });
 
   it('retombe sur la palette par défaut pour un identifiant inconnu', () => {
@@ -127,5 +140,102 @@ describe('formats', () => {
     assert.equal(num(120.6), '120.6');
     assert.equal(num(845000), '845,000');
     assert.equal(num(-3.25), '-3.25');
+  });
+});
+
+describe('palettes tirées au sort', () => {
+  /** Un générateur reproductible : un test qui échoue doit pouvoir se rejouer. */
+  function seeded(seed: number): () => number {
+    let value = seed;
+    return () => {
+      value = (value * 1103515245 + 12345) % 2147483648;
+      return value / 2147483648;
+    };
+  }
+
+  function channels(hex: string): [number, number, number] {
+    return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+  }
+  function luminance(hex: string): number {
+    const [red, green, blue] = channels(hex);
+    return (299 * red + 587 * green + 114 * blue) / 1000;
+  }
+  function difference(first: string, second: string): number {
+    const left = channels(first);
+    const right = channels(second);
+    return Math.max(...left.map((value, index) => Math.abs(value - right[index])));
+  }
+
+  it('produit une palette utilisable dans chaque famille', () => {
+    const fond = randomTheme('background', 'x', 'X', seeded(1));
+    assert.ok(fond.uniformInk, 'une palette à fond coloré porte une encre unique');
+    const texte = randomTheme('text', 'y', 'Y', seeded(2));
+    assert.ok(texte.neutral, 'une palette à texte coloré porte un fond uni');
+  });
+
+  it('tient les mêmes seuils de lisibilité que les palettes livrées', () => {
+    // Deux cents tirages, soumis exactement aux deux règles qui protègent les
+    // palettes d'origine : des colonnes voisines distinguables, et un texte
+    // jamais confondu avec son fond. Le hasard porte sur la couleur, pas sur
+    // la lisibilité — c'est ce que ce test vérifie.
+    let pireEcart = Infinity;
+    let pireContraste = Infinity;
+    for (let seed = 1; seed <= 100; seed++) {
+      for (const family of ['background', 'text'] as const) {
+        const theme = randomTheme(family, `r${seed}`, `R${seed}`, seeded(seed * 7 + (family === 'text' ? 1 : 0)));
+        for (const dark of [false, true]) {
+          for (let column = 0; column < 6; column++) {
+            const left = paletteFor(theme, column, dark);
+            const right = paletteFor(theme, column + 1, dark);
+            const gap = Math.max(difference(left.cell, right.cell), difference(left.text, right.text));
+            pireEcart = Math.min(pireEcart, gap);
+            pireContraste = Math.min(pireContraste, Math.abs(luminance(left.text) - luminance(left.cell)));
+          }
+        }
+      }
+    }
+    assert.ok(pireEcart >= 10, `écart minimal entre colonnes voisines : ${pireEcart}`);
+    assert.ok(pireContraste > 60, `contraste minimal texte/fond : ${pireContraste}`);
+  });
+
+  it('écarte les teintes plutôt que de les tirer indépendamment', () => {
+    // Le vrai risque d'un tirage naïf : deux teintes voisines à quelques
+    // degrés, donc deux colonnes de la même couleur.
+    for (let seed = 1; seed <= 50; seed++) {
+      const theme = randomTheme('background', 'z', 'Z', seeded(seed));
+      const ordered = [...theme.hues].sort((a, b) => a - b);
+      for (let i = 1; i < ordered.length; i++) {
+        assert.ok(ordered[i] - ordered[i - 1] >= 15, `teintes trop proches : ${ordered.join(', ')}`);
+      }
+    }
+  });
+});
+
+describe('palette en cours de tirage', () => {
+  it('se résout comme les autres, sinon le tirage n’aurait aucun effet visible', () => {
+    // Le défaut réel : le brouillon vivait dans la vue, pas dans ce point de
+    // résolution. themeById ne le trouvait donc pas et retombait sur la palette
+    // par défaut — quatre tirages de suite donnaient exactement la même couleur.
+    const draft = randomTheme('background', 'custom-draft', 'Brouillon');
+    setDraftTheme(draft);
+    assert.equal(themeById('custom-draft').id, 'custom-draft');
+    assert.equal(draftTheme()?.id, 'custom-draft');
+    setDraftTheme(null);
+    assert.equal(themeById('custom-draft'), DEFAULT_THEME);
+  });
+});
+
+describe('palettes personnelles', () => {
+  it('s’ajoutent aux palettes livrées sans les remplacer', () => {
+    const mine = randomTheme('background', 'custom-1', 'Custom 1');
+    setCustomThemes([mine]);
+    assert.equal(allThemes().length, THEMES.length + 1);
+    assert.equal(customThemes().length, 1);
+    assert.equal(themeById('custom-1').id, 'custom-1');
+    // Les livrées restent joignables.
+    assert.equal(themeById('rainbow').id, 'rainbow');
+    setCustomThemes([]);
+    // Une palette supprimée retombe sur la palette par défaut, sans casser.
+    assert.equal(themeById('custom-1'), DEFAULT_THEME);
   });
 });

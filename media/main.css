@@ -204,6 +204,59 @@ body {
   color: var(--vscode-list-activeSelectionForeground, inherit);
 }
 
+/* La croix d'une palette gardée : discrète, elle n'apparaît qu'au survol de sa
+   ligne — supprimer ne doit pas être aussi facile que choisir. */
+.theme-remove {
+  margin-left: auto;
+  padding: 0 4px;
+  opacity: 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+.theme-item:hover .theme-remove {
+  opacity: 0.7;
+}
+
+.theme-remove:hover {
+  opacity: 1;
+  color: var(--vscode-errorForeground, inherit);
+}
+
+/* La rangée du bas, séparée des palettes : elle n'en est pas une. */
+.theme-random {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--vscode-panel-border);
+}
+
+.theme-draw,
+.theme-keep {
+  padding: 3px 10px;
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border));
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.theme-draw {
+  flex: 1;
+}
+
+.theme-draw:hover,
+.theme-keep:not(:disabled):hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.theme-keep:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 #shape,
 #selection,
 #notice {
