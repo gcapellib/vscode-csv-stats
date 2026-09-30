@@ -192,7 +192,12 @@ function randomRow(): HTMLElement {
   const keep = document.createElement('button');
   keep.type = 'button';
   keep.className = 'theme-keep';
-  keep.textContent = '\u2661 Keep';
+  // Le cœur est isolé dans son propre élément pour pouvoir rougir au survol
+  // sans emporter le libellé avec lui.
+  const heart = document.createElement('span');
+  heart.className = 'theme-heart';
+  heart.textContent = '\u2661';
+  keep.append(heart, textSpan(' Keep'));
   keep.title = 'Add this palette to your own list';
   keep.disabled = draftTheme() === null;
   keep.addEventListener('click', (event) => {

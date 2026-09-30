@@ -269,6 +269,21 @@ body {
   cursor: default;
 }
 
+/* Le cœur rougit au survol — mais pas quand il n'y a rien à garder. */
+.theme-heart {
+  transition: color 120ms ease-out;
+}
+
+.theme-keep:not(:disabled):hover .theme-heart {
+  color: #e5534b;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-heart {
+    transition: none;
+  }
+}
+
 #shape,
 #selection,
 #notice {
