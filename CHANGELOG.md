@@ -4,6 +4,21 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.20.0
+
+Le code de la vue, jusqu'ici un seul fichier de 2152 lignes qu'aucun test ne
+pouvait atteindre, est découpé en vingt modules dont aucun ne dépasse 353
+lignes. Aucun changement de comportement : 98 tests unitaires et 13 tests
+d'intégration (Playwright, sur le bundle réel dans un vrai navigateur) le
+vérifient, avec ESLint et une CI GitHub Actions qui les exécutent à chaque
+poussée.
+
+- **Filtre numérique** : un troisième champ pour filtrer sur une valeur unique,
+  des champs de même largeur, et les flèches qui restent visibles.
+- **Palettes tirées au sort** et liste personnelle persistée (voir ci-dessous).
+- **Okabe-Ito** et **Tol Bright**, conçues pour que des catégories restent
+  distinguables y compris par un œil daltonien.
+
 ## 0.18.x
 
 - **Palettes tirées au sort**, alternant fond coloré et texte coloré, avec une

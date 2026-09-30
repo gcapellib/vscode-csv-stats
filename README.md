@@ -17,9 +17,8 @@ only requested the first time you click it, then cached, and only the visible
 lines are ever built into the page: a hundred thousand lines sit in the same few
 dozen DOM nodes as the table below, with no size cap standing in the way.
 
-The interface is **in English**, numbers included: comma thousands separator and
-decimal point. The table itself shows the cells exactly as they are written in
-the file.
+Numbers are shown with a comma thousands separator and a decimal point. The
+table itself shows the cells exactly as they are written in the file.
 
 ![The stats band over a 423-row wine dataset, Prism duo palette: a seven-line ranking with Other on the region column, a three-line ranking with no Other on color, and histograms flush with the band's bottom edge](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-band.png)
 
@@ -108,7 +107,10 @@ active filters but not the column's own, otherwise unticking a value would make
 it vanish from the list you were unticking it in.
 
 Numeric columns get the same entry as a pair of bounds instead of a list: the
-histogram bins cannot express *between 0 and 10*.
+histogram bins cannot express *between 0 and 10*. A third field takes a single
+value, because asking for *exactly 7* by typing it into both bounds is a puzzle,
+not an interface — and the generated pandas then reads `== 7` rather than
+`between(7, 7)`.
 
 Conditions combine with AND, and each of them shows as a chip in a bar under the
 toolbar, with the count of rows kept. Clicking a chip removes that one
@@ -179,22 +181,41 @@ values, which makes the guess a hundred times cheaper.
 ## Palettes
 
 **Hovering a palette applies it to the sheet straight away**; only a click
-chooses it. Five chips cannot say what forty-five palettes do to your own
-columns, and judging them one commit at a time meant reopening the picker
-forty-five times. Until you click, nothing is decided: the toolbar button and
-the tick still name your current palette, and leaving the picker any way at all
-— a click elsewhere, Escape, the button again — puts it back.
+chooses it. Five chips cannot say what a palette does to your own columns, and
+judging them one commit at a time meant reopening the picker once per palette.
+Until you click, nothing is decided: the toolbar button and the tick still name
+your current palette, and leaving the picker any way at all — a click elsewhere,
+Escape, the button again — puts it back.
 
-A picker offers **forty-five palettes** in three families: coloured background
-with uniform text (twenty), uniform background with text coloured per column,
-the way syntax highlighting does (fifteen), and both at once (ten). Your choice
-is remembered from one session to the next.
+A picker offers **twenty-nine palettes** in three families: coloured background
+with uniform text, uniform background with text coloured per column the way
+syntax highlighting does, and both at once. Your choice is remembered from one
+session to the next.
 
-Five of the coloured-text palettes — **Mocha**, **Midnight**, **Frost**,
-**Solar**, **Ember** — take after the editor colour schemes most people already
-read code in: an almost-neutral dark ground and frank but unshouted ink. Their
-hues are ordered so that two neighbouring columns fall as far apart as possible,
-since the original swatches sometimes put two oranges side by side.
+Two of them — **Okabe-Ito** and **Tol Bright** — come from palettes designed so
+that categories stay distinguishable, including for a colour-blind reader. That is exactly the problem a table with one colour per
+column has. Their colours are given one by one rather than derived from a hue:
+Okabe-Ito tells its sky blue from its blue by lightness, not by hue, and a
+hue-derived model would collapse the two. The published values are calibrated
+for marks in a chart rather than for text — its yellow on white reads at a
+contrast of 39 against a threshold of 60 — so they are darkened in light mode
+and lightened in dark mode by just what it takes, the hues left untouched.
+
+**Random palette**, at the foot of the list, draws a new one on every click,
+alternating coloured background and coloured text. It applies at once without
+closing the picker, so you can keep drawing until one suits; **Keep** then adds
+it to your own list, which survives restarts. Drawn palettes and kept ones both
+carry a cross; the ones shipped with the extension do not, and cannot be
+removed.
+
+The draw is random in colour, never in legibility. Hues are spaced around the
+wheel rather than picked independently, and the styles, inks and grounds come
+from values already proven. Two hundred draws are put through the same two
+thresholds the shipped palettes must meet — neighbouring columns distinguishable,
+text never confused with its ground — which is how two defects were caught before
+they shipped: a jitter that let two hues fall 15° apart, invisible on a saturated
+style and fatal on a quiet one, and a brightness ramp that flattened out once
+spread over eight hues instead of six.
 
 ## How files are read
 
@@ -240,7 +261,7 @@ of the above on every push and pull request.
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.16.2.vsix
+code --install-extension csv-stats-0.20.0.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**
