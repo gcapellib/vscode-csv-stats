@@ -21,25 +21,21 @@ The interface is **in English**, numbers included: comma thousands separator and
 decimal point. The table itself shows the cells exactly as they are written in
 the file.
 
-![The stats band over a 7,200-row file, Rainbow palette, with a row selected](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-rainbow.png)
+![The stats band over a 423-row wine dataset, Prism duo palette: a seven-line ranking with Other on the region column, a three-line ranking with no Other on color, and histograms flush with the band's bottom edge](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-band.png)
 
-*Per-column stats, a rainbow palette, and a row marked in the table below.*
+*Prism duo, on a wine-tasting file: `region` fills its seven-line ranking and falls back to **Other**; `color`, with only three values, never needs to.*
 
-![The Column details panel: completeness, a histogram with median and quartiles marked, and full statistics](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-column-details.png)
+![The palette picker open, with the sheet already recoloured to Frost from hovering it in the list](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-theme-preview.png)
 
-*`⋯` → Column details: what pandas would make of the column, and the chart that fits it — here a histogram with Q1, median and Q3 marked on it.*
+*Hovering a palette applies it to the sheet at once, so you judge it against your own data — not a five-chip preview. Only a click commits it.*
 
-![The palette picker, with a preview of each palette](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-themes.png)
+![The same file with the bands folded: twelve columns fit on screen at once, narrower than with the bands open](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-folded.png)
 
-*Forty-five palettes, each previewed by five chips showing background and ink.*
+*Folding the bands also narrows every column to what its own values need — all twelve columns on screen instead of a handful.*
 
-![The same file with the Console palette, where each column carries its own ink colour on a plain background](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-console.png)
+![The Raw view: the file exactly as written on disk, each field coloured by the column it belongs to](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-raw.png)
 
-*Console: a plain background, each column keeping its own ink colour — the way syntax highlighting does.*
-
-![The same file with the Prism duo palette, where both the background and the text are coloured per column](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-prismduo.png)
-
-*Prism duo: background and text both coloured, the text much denser than its background.*
+*Raw, Jungle palette: the unparsed file, each field still carrying its column's colour — the same landmarks as the analysed view.*
 
 ## What the tab shows
 
@@ -234,7 +230,7 @@ npm run package  # produces csv-stats-<version>.vsix
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.16.1.vsix
+code --install-extension csv-stats-0.16.2.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**

@@ -1,8 +1,8 @@
 {
   "name": "csv-stats",
   "displayName": "CSV Stats",
-  "description": "Explore CSV files inside VS Code: per-column stats, cross-filtering, and the pandas read_csv call that matches what was detected.",
-  "version": "0.16.1",
+  "description": "Explore CSV files in VS Code: column stats, filtering, colour palettes, and ready-to-use pandas code.",
+  "version": "0.16.2",
   "publisher": "GabrielCapelli",
   "icon": "media/icon.png",
   "galleryBanner": {
@@ -27,7 +27,8 @@
     "data engineering",
     "data exploration",
     "statistics",
-    "filter"
+    "filter",
+    "color themes"
   ],
   "main": "./dist/extension.js",
   "contributes": {
