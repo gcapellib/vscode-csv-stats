@@ -8,3 +8,10 @@ esbuild.mjs
 **/*.map
 media/screenshot-*.png
 harness.html
+tests/**
+test-results/**
+playwright-report/**
+playwright.config.ts
+eslint.config.mjs
+.github/**
+REFACTOR-PLAN.md
