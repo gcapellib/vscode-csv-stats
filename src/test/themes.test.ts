@@ -55,7 +55,7 @@ describe('palettes', () => {
   it('gardent leur modèle d’origine', () => {
     // Le modèle des tirages leur est réservé : les palettes livrées ne
     // doivent pas changer d'apparence à la mise à jour.
-    assert.ok(THEMES.every((theme) => !theme.look));
+    assert.ok(THEMES.every((theme) => !theme.sample));
   });
 
   it('retombe sur la palette par défaut pour un identifiant inconnu', () => {
@@ -204,12 +204,12 @@ describe('palettes tirées au sort', () => {
       for (const dark of [false, true]) {
         const fond = randomTheme('background', 'x', 'X', seeded(seed));
         const cellules = new Set([0, 1, 2, 3].map((column) => paletteFor(fond, column, dark).cell));
-        assert.ok(cellules.size > 1, `fond coloré sans fonds différents (${fond.look?.recipe}/${fond.look?.style})`);
+        assert.ok(cellules.size > 1, `fond coloré sans fonds différents (${fond.sample?.source})`);
         const texte = randomTheme('text', 'y', 'Y', seeded(seed));
         const unis = new Set([0, 1, 2, 3].map((column) => paletteFor(texte, column, dark).cell));
         const encres = new Set([0, 1, 2, 3].map((column) => paletteFor(texte, column, dark).text));
-        assert.equal(unis.size, 1, `texte coloré sans fond uni (${texte.look?.style})`);
-        assert.ok(encres.size > 1, `texte coloré sans encres différentes (${texte.look?.style})`);
+        assert.equal(unis.size, 1, `texte coloré sans fond uni (${texte.sample?.source})`);
+        assert.ok(encres.size > 1, `texte coloré sans encres différentes (${texte.sample?.source})`);
       }
     }
   });
@@ -300,9 +300,12 @@ describe('palettes tirées au sort', () => {
     for (let seed = 1; seed <= 200; seed++) {
       for (const colour of shown(seed)) {
         const { l, c, h } = oklch(colour.hex);
-        // Un grand aplat rouge foncé se lit aussi comme du brun (bordeaux).
-        const debut = colour.role === 'fond' ? 15 : 40;
-        if (h >= debut && h <= 145 && c >= 0.03 && l < 0.6) bruns.push(`${colour.hex} (${colour.role}, ${colour.dark ? 'sombre' : 'clair'})`);
+        // Un grand aplat se lit brun dès une faible chroma, et le rouge foncé
+        // y vire au bordeaux ; une encre olive se voit même assez claire.
+        const fond = colour.role === 'fond';
+        const brun = fond ? h >= 15 && h <= 145 && c >= 0.015 && l < 0.6 : h >= 40 && h <= 145 && c >= 0.03 && l < 0.6;
+        const olive = !fond && h >= 95 && h <= 135 && c >= 0.1 && l < 0.72;
+        if (brun || olive) bruns.push(`${colour.hex} (${colour.role}, ${colour.dark ? 'sombre' : 'clair'})`);
       }
     }
     assert.deepEqual(bruns.slice(0, 5), [], `${bruns.length} couleurs brunes ou olive`);
@@ -319,19 +322,41 @@ describe('palettes tirées au sort', () => {
   });
 
   it('varie vraiment d’un tirage à l’autre', () => {
-    // Le reproche constant : « les thèmes se ressemblent ». Trois recettes et
-    // cinq styles retenus au nuancier font quinze combinaisons ; en deux cents
-    // tirages, toutes doivent apparaître, et aucune ne doit écraser les autres.
+    // Le reproche constant : « les thèmes se ressemblent ». Les quatre
+    // sources retenues au nuancier doivent toutes sortir, dans les deux
+    // familles, et aucune ne doit écraser les autres.
     const vues = new Map<string, number>();
     for (let seed = 1; seed <= 200; seed++) {
       for (const family of ['background', 'text'] as const) {
-        const { look } = randomTheme(family, 'd', 'D', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
-        const key = `${look?.recipe}/${look?.style}`;
+        const { sample } = randomTheme(family, 'd', 'D', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
+        const key = `${sample?.source}/${sample?.tint ? 'fond' : 'texte'}`;
         vues.set(key, (vues.get(key) ?? 0) + 1);
       }
     }
-    assert.equal(vues.size, 15, [...vues.keys()].sort().join(', '));
-    assert.ok(Math.max(...vues.values()) <= 400 / 15 * 2, `combinaison la plus fréquente : ${Math.max(...vues.values())} sur 400`);
+    assert.equal(vues.size, 8, [...vues.keys()].sort().join(', '));
+    assert.ok(Math.max(...vues.values()) <= (400 / 8) * 2, `combinaison la plus fréquente : ${Math.max(...vues.values())} sur 400`);
+  });
+
+  it('reprend les couleurs officielles des thèmes, sans les retoucher', () => {
+    // L'harmonie vient du travail de leurs auteurs : une couleur recalculée
+    // ne serait plus la leur. Mocha et Latte, selon catppuccin/palette.
+    const mocha = ['#F5E0DC', '#F2CDCD', '#F5C2E7', '#CBA6F7', '#F38BA8', '#EBA0AC', '#FAB387', '#F9E2AF', '#A6E3A1', '#94E2D5', '#89DCEB', '#74C7EC', '#89B4FA', '#B4BEFE'];
+    const latte = ['#DC8A78', '#DD7878', '#EA76CB', '#8839EF', '#D20F39', '#E64553', '#FE640B', '#DF8E1D', '#40A02B', '#179299', '#04A5E5', '#209FB5', '#1E66F5', '#7287FD'];
+    let vus = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      const { sample } = randomTheme('text', 'c', 'C', seeded(seed));
+      if (sample?.source !== 'Catppuccin') continue;
+      vus++;
+      assert.equal(sample.dark.ground, '#1E1E2E');
+      assert.equal(sample.light.ground, '#EFF1F5');
+      sample.dark.colours.forEach((colour, i) => {
+        const role = mocha.indexOf(colour);
+        assert.ok(role >= 0, `${colour} n'est pas une couleur Mocha`);
+        // Même rôle dans les deux thèmes : le rose sombre reste le rose clair.
+        assert.equal(sample.light.colours[i], latte[role]);
+      });
+    }
+    assert.ok(vus > 20, `tirages Catppuccin observés : ${vus}`);
   });
 });
 

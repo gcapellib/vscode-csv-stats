@@ -208,20 +208,25 @@ it to your own list, which survives restarts. Drawn palettes and kept ones both
 carry a cross; the ones shipped with the extension do not, and cannot be
 removed.
 
-A draw combines a **recipe** of hues with a **style** of laying them down, both
-chosen by eye from two swatch books of twelve: rainbow, monochrome or candy
-pastels, laid as neon ink on black, printer's ink on cream paper, neon on a
-violet night, tone on tone, or watercolour washes. Fifteen combinations, each
-with its own variations — varying a single recipe only ever turned the same
-rainbow a few degrees. Coloured background and coloured text still alternate.
+A draw no longer invents its colours: it takes them from palettes people
+already love. Four versions generated colours by formula, and every one looked
+generated; the editor themes people adopt are picked by hand by designers and
+proven by thousands of users. Each draw takes one source — **Catppuccin**
+(Mocha / Latte), **One Dark / One Light** or **Everforest**, each with its
+official light and dark versions, or a **cosine palette** after
+[Inigo Quilez](https://iquilezles.org/articles/palettes/) — then six to eight of
+its colours, in an order that keeps neighbouring columns apart in both modes.
+The colours are copied exactly as their authors defined them. Coloured
+background and coloured text still alternate.
 
-Everything is computed in OKLCH, where equal lightness looks equal whatever the
-hue. Brown and olive never appear: wherever a hue would darken into them, the
-colour wheel is folded so the hues skip that stretch while keeping their order;
-dark backgrounds skip red too, which turns burgundy there. Two hundred draws are
-put through the same thresholds as the shipped palettes — neighbouring columns
-distinguishable, text never confused with its ground — and must show all
-fifteen combinations and no brown among the 38,400 colours they display.
+Colours that would read as brown or olive in either mode are left out: the
+orange of One Light (#B76B01), the green of Everforest light (#8DA101), and on
+dark tinted backgrounds every warm tint that turns khaki or burgundy. Two
+hundred draws are put through the same thresholds as the shipped palettes,
+must use all four sources in both families, and show no brown among the 38,400
+colours they display.
+
+Catppuccin, One Dark / One Light (Atom) and Everforest are MIT-licensed.
 
 ## How files are read
 

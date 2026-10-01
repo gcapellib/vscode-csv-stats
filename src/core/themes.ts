@@ -47,24 +47,31 @@ export interface CsvTheme {
   /** Amplitude de la rampe de luminosité sur l'ensemble des teintes. */
   spread: number;
   /**
-   * Palette tirée au sort : un style de pose de la couleur, appliqué aux
-   * teintes d'une recette. Réservé aux tirages ; les palettes livrées ne le
-   * portent pas.
+   * Palette tirée au sort : ses couleurs exactes, pour les deux thèmes.
+   * Elles sont copiées dans la palette plutôt que désignées par un nom, pour
+   * qu'une palette gardée ne dépende d'aucune table susceptible de changer.
+   * Réservé aux tirages ; les palettes livrées ne le portent pas.
    */
-  look?: Look;
+  sample?: Sample;
 }
 
-/**
- * Les styles retenus au nuancier, sur douze présentés : la façon de poser la
- * couleur, indépendamment des teintes posées.
- */
-export type LookStyle = 'neon' | 'tone' | 'synthwave' | 'watercolour' | 'ink';
+/** Ce qu'un tirage affiche dans un thème, clair ou sombre. */
+export interface SampleMode {
+  /** Fond du tableau. */
+  ground: string;
+  /** Texte, quand c'est le fond qui porte la couleur. */
+  ink: string;
+  /** Une couleur par colonne, dans l'ordre. */
+  colours: string[];
+}
 
-export interface Look {
-  recipe: Recipe;
-  style: LookStyle;
-  /** Écart de clarté propre à chaque teinte, entre -0,5 et 0,5 (monochrome). */
-  shades: number[];
+export interface Sample {
+  /** D'où viennent les couleurs : un thème d'éditeur, ou une courbe cosinus. */
+  source: string;
+  /** Couleur au fond des cellules (vrai) ou au texte (faux). */
+  tint: boolean;
+  light: SampleMode;
+  dark: SampleMode;
 }
 
 export interface Palette {
@@ -251,29 +258,69 @@ export function themeById(id: string | undefined): CsvTheme {
 export type RandomFamily = 'background' | 'text';
 
 /**
- * Les tirages au sort combinent une recette de teintes et un style de pose,
- * tous deux choisis à l'œil sur deux nuanciers : trois recettes sur douze,
- * cinq styles sur douze. Trois tentatives précédentes ne faisaient varier que
- * les réglages d'une seule recette — un arc-en-ciel tourné de 40° reste un
- * arc-en-ciel — et tous les tirages se ressemblaient. La diversité vient de
- * la combinaison : quinze, chacune avec ses variantes.
+ * Les tirages au sort puisent dans des palettes faites à la main plutôt que
+ * de fabriquer leurs couleurs.
  *
- * Tout se calcule en OKLCH, où une même clarté se perçoit comme telle quelle
- * que soit la teinte.
+ * Quatre versions ont généré les couleurs par formule — arc-en-ciel tourné,
+ * teintes resserrées et désaturées, Prism recalculé, recettes × styles — et
+ * toutes ont été jugées répétitives ou disgracieuses. Les thèmes d'éditeur
+ * que les gens adoptent sont choisis à la main par des designers puis
+ * éprouvés par des milliers d'utilisateurs ; « copier ce qui est beau » est
+ * le dernier conseil du guide de Datawrapper sur les palettes. Trois thèmes
+ * ont été retenus à l'œil sur dix présentés, avec leurs versions claires
+ * officielles. S'y ajoutent les palettes cosinus d'Inigo Quilez, retenues
+ * trois fois sur quatre, qui donnent des dégradés organiques.
+ *
+ * Catppuccin (MIT), One Dark et One Light d'Atom (MIT), Everforest (MIT).
  */
-export type Recipe = 'rainbow' | 'mono' | 'candy';
-const RECIPES: Recipe[] = ['rainbow', 'mono', 'candy'];
-
-/** Fond coloré et texte coloré : l'alternance du bouton est conservée. */
-const BACKGROUND_LOOKS: LookStyle[] = ['tone', 'watercolour'];
-const TEXT_LOOKS: LookStyle[] = ['neon', 'synthwave', 'ink'];
-
-/** Les pastels sucrés du nuancier « Bonbon » : rose, lilas, menthe, ciel, pêche, citron. */
-const CANDY = [350, 300, 165, 220, 25, 95, 260, 190];
-
-function pick<T>(list: readonly T[], random: () => number): T {
-  return list[Math.floor(random() * list.length)];
+interface Source {
+  name: string;
+  /** Thème clair puis sombre : fond, texte, couleurs alignées par rôle. */
+  light: { ground: string; ink: string; colours: string[] };
+  dark: { ground: string; ink: string; colours: string[] };
 }
+
+const SOURCES: Source[] = [
+  {
+    // https://github.com/catppuccin/palette — Latte et Mocha.
+    name: 'Catppuccin',
+    light: {
+      ground: '#EFF1F5',
+      ink: '#4C4F69',
+      colours: ['#DC8A78', '#DD7878', '#EA76CB', '#8839EF', '#D20F39', '#E64553', '#FE640B', '#DF8E1D', '#40A02B', '#179299', '#04A5E5', '#209FB5', '#1E66F5', '#7287FD'],
+    },
+    dark: {
+      ground: '#1E1E2E',
+      ink: '#CDD6F4',
+      colours: ['#F5E0DC', '#F2CDCD', '#F5C2E7', '#CBA6F7', '#F38BA8', '#EBA0AC', '#FAB387', '#F9E2AF', '#A6E3A1', '#94E2D5', '#89DCEB', '#74C7EC', '#89B4FA', '#B4BEFE'],
+    },
+  },
+  {
+    // atom/packages/one-light-syntax et one-dark-syntax, colors.less. L'orange
+    // est écarté : sa version claire, #B76B01, est un brun.
+    name: 'One',
+    light: { ground: '#FAFAFA', ink: '#383A42', colours: ['#E45649', '#CB7701', '#50A14F', '#0184BC', '#4078F2', '#A626A4'] },
+    dark: { ground: '#282C34', ink: '#ABB2BF', colours: ['#E06C75', '#E5C07B', '#98C379', '#56B6C2', '#61AFEF', '#C678DD'] },
+  },
+  {
+    // https://github.com/sainnhe/everforest — variantes « medium ».
+    name: 'Everforest',
+    light: { ground: '#FDF6E3', ink: '#5C6A72', colours: ['#F85552', '#F57D26', '#DFA000', '#8DA101', '#35A77C', '#3A94C5', '#DF69BA'] },
+    dark: { ground: '#2D353B', ink: '#D3C6AA', colours: ['#E67E80', '#E69875', '#DBBC7F', '#A7C080', '#83C092', '#7FBBB3', '#D699B6'] },
+  },
+];
+
+/** Fonds et textes des palettes cosinus, qui n'en apportent pas. */
+const COSINE_MODES = {
+  light: { ground: '#FBFBFC', ink: '#1B1B1F' },
+  dark: { ground: '#1F2128', ink: '#E6E6EA' },
+};
+
+/** Écart minimal entre deux colonnes voisines : le seuil que tiennent les palettes livrées. */
+const MIN_APART = 12;
+
+/** Part de la couleur mêlée au fond, quand c'est le fond qui la porte. */
+const TINT = { light: 0.25, dark: 0.22 };
 
 /**
  * Replie le cercle chromatique pour qu'il évite l'arc [from, to].
@@ -288,46 +335,112 @@ function avoiding(hue: number, from: number, to: number): number {
   return (to + ((((hue - to) % 360) + 360) % 360) * (kept / 360)) % 360;
 }
 
-/**
- * Où le brun guette : une encre foncée, ou pire, un fond foncé — qui évite
- * aussi le rouge, viré au bordeaux sur un grand aplat.
- */
+/** Où le brun guette, pour une encre foncée : de l'orange au vert-jaune. */
 const DARK_INK_BAND: [number, number] = [35, 150];
-const DARK_CELL_BAND: [number, number] = [0, 150];
 
-/** Teintes et écarts de clarté d'une recette, dans l'ordre des colonnes. */
-function recipeHues(recipe: Recipe, random: () => number): { hues: number[]; shades: number[] } {
-  const wrap = (hue: number) => Math.round(((hue % 360) + 360) % 360);
-  if (recipe === 'candy') {
-    const offset = Math.floor(random() * CANDY.length);
-    return { hues: CANDY.map((_, i) => CANDY[(i + offset) % CANDY.length]), shades: CANDY.map(() => 0) };
-  }
-  if (recipe === 'mono') {
-    // Une teinte, parcourue en aller-retour du clair au foncé. Jamais tirée
-    // dans la zone qui brunit : repliée, elle changerait de couleur entière.
-    const base = DARK_INK_BAND[1] + random() * (360 - (DARK_INK_BAND[1] - DARK_INK_BAND[0]));
-    const level = (i: number) => Math.min(i, 8 - i);
-    return {
-      hues: Array.from({ length: 8 }, (_, i) => wrap(base + (level(i) - 2) * 8)),
-      shades: Array.from({ length: 8 }, (_, i) => level(i) / 4 - 0.5),
-    };
-  }
-  // L'arc-en-ciel de Prism : pas régulier, départ et sens au hasard.
-  const count = 6 + Math.floor(random() * 3);
-  const start = random() * 360;
-  const direction = random() < 0.5 ? 1 : -1;
+/**
+ * Brun ou olive : un orange, un jaune ou un vert-jaune à la fois foncé et
+ * coloré.
+ *
+ * Sur un grand aplat, l'œil le voit dès une chroma de 0,015, et le rouge foncé
+ * y vire au bordeaux : un premier seuil à 0,03 laissait passer des fonds kaki
+ * (#484331, chroma 0,029). Pour une encre, l'olive se voit même assez clair :
+ * le vert d'Everforest clair, #8DA101, a une clarté de 0,67.
+ */
+function muddy(hex: string, large: boolean): boolean {
+  const [lightness, a, b] = toOklab(hex);
+  const chroma = Math.hypot(a, b);
+  const hue = (((Math.atan2(b, a) * 180) / Math.PI) % 360 + 360) % 360;
+  if (large) return hue >= 15 && hue <= 145 && chroma >= 0.015 && lightness < 0.6;
+  const brown = hue >= 40 && hue <= 145 && chroma >= 0.03 && lightness < 0.6;
+  const olive = hue >= 95 && hue <= 135 && chroma >= 0.1 && lightness < 0.72;
+  return brown || olive;
+}
+
+/** Écart le plus grand sur une composante : ce que l'œil distingue d'une colonne à l'autre. */
+function apart(first: string, second: string): number {
+  return Math.max(...[1, 3, 5].map((at) => Math.abs(parseInt(first.slice(at, at + 2), 16) - parseInt(second.slice(at, at + 2), 16))));
+}
+
+function mix(ground: string, colour: string, share: number): string {
+  const channel = (hex: string, at: number) => parseInt(hex.slice(at, at + 2), 16) / 255;
+  const [r, g, b] = [1, 3, 5].map((at) => channel(ground, at) + (channel(colour, at) - channel(ground, at)) * share);
+  return toHex(r, g, b);
+}
+
+/** Ce qu'une couleur devient à l'écran, selon qu'elle colore le fond ou le texte. */
+function shown(mode: { ground: string }, colour: string, tint: boolean, dark: boolean): string {
+  return tint ? mix(mode.ground, colour, dark ? TINT.dark : TINT.light) : colour;
+}
+
+/** Huit couleurs le long d'une courbe cosinus (Inigo Quilez), ramenées à une clarté lisible. */
+function cosineSource(random: () => number): Source {
+  const c = [0, 1, 2].map(() => 0.5 + random() * 0.8);
+  const d = [0, 1, 2].map(() => random());
+  const raw = Array.from({ length: 8 }, (_, i) =>
+    [0, 1, 2].map((k) => 0.5 + 0.5 * Math.cos(2 * Math.PI * (c[k] * (i / 8) + d[k]))),
+  );
+  const relit = (lightness: number, ceiling: number, fold: boolean) =>
+    raw.map(([r, g, b]) => {
+      const [, a, bb] = toOklab(toHex(r, g, b));
+      const hue = (((Math.atan2(bb, a) * 180) / Math.PI) % 360 + 360) % 360;
+      return oklch(lightness, Math.min(Math.hypot(a, bb), ceiling), fold ? avoiding(hue, ...DARK_INK_BAND) : hue);
+    });
   return {
-    hues: Array.from({ length: count }, (_, i) => wrap(start + (direction * i * 360) / count)),
-    shades: Array.from({ length: count }, () => 0),
+    name: 'Cosinus',
+    light: { ...COSINE_MODES.light, colours: relit(0.5, 0.14, true) },
+    dark: { ...COSINE_MODES.dark, colours: relit(0.8, 0.13, false) },
   };
 }
 
 /**
- * Tire une palette au sort.
+ * Les couleurs d'une source retenues pour un tirage, dans l'ordre des colonnes,
+ * et le plus petit écart entre deux voisines.
  *
- * Le hasard choisit la recette, le style dans la famille demandée, et les
- * variantes de la recette — jamais la lisibilité : deux cents tirages sont
- * soumis aux mêmes seuils que les palettes livrées.
+ * Les couleurs qui brunissent dans l'un des deux thèmes sont écartées.
+ * Plusieurs ordres sont essayés et le plus lisible gardé : un mélange au
+ * hasard met parfois côte à côte deux couleurs sœurs (le rose et le rose pâle
+ * de Catppuccin), que la teinte de fond rapproche encore. Si aucun ordre ne
+ * sépare assez deux voisines, on prend une couleur de moins : sur une courbe
+ * cosinus, deux couleurs successives sont proches par construction.
+ */
+function arrange(source: Source, tint: boolean, random: () => number): { order: number[]; gap: number } {
+  const usable = source.dark.colours
+    .map((_, index) => index)
+    .filter((index) =>
+      [false, true].every((dark) => {
+        const mode = dark ? source.dark : source.light;
+        return !muddy(shown(mode, mode.colours[index], tint, dark), tint) && !muddy(mode.colours[index], false);
+      }),
+    );
+  // Le dernier et le premier se suivent aussi, quand les couleurs recommencent.
+  const gapOf = (order: number[]) =>
+    Math.min(
+      ...order.flatMap((index, k) =>
+        [false, true].map((dark) => {
+          const mode = dark ? source.dark : source.light;
+          const next = order[(k + 1) % order.length];
+          return apart(shown(mode, mode.colours[index], tint, dark), shown(mode, mode.colours[next], tint, dark));
+        }),
+      ),
+    );
+  let best = { order: [] as number[], gap: -1 };
+  for (let size = Math.min(usable.length, 6 + Math.floor(random() * 3)); size >= 3; size--) {
+    best = { order: [], gap: -1 };
+    for (let attempt = 0; attempt < 60 && best.gap < 24; attempt++) {
+      const order = [...usable].sort(() => random() - 0.5).slice(0, size);
+      const gap = gapOf(order);
+      if (gap > best.gap) best = { order, gap };
+    }
+    if (best.gap >= MIN_APART) break;
+  }
+  return best;
+}
+
+/**
+ * Tire une palette au sort : une source sur quatre, puis six à huit de ses
+ * couleurs, dans un ordre où deux colonnes voisines restent distinctes dans
+ * les deux thèmes.
  */
 export function randomTheme(
   family: RandomFamily,
@@ -335,78 +448,43 @@ export function randomTheme(
   label: string,
   random: () => number = Math.random,
 ): CsvTheme {
-  const recipe = pick(RECIPES, random);
-  const style = pick(family === 'background' ? BACKGROUND_LOOKS : TEXT_LOOKS, random);
-  const { hues, shades } = recipeHues(recipe, random);
-  return { id, label, hues, style: VIVID, spread: 0, look: { recipe, style, shades } };
+  const tint = family === 'background';
+  // Une source peut ne rien offrir de lisible — une courbe cosinus dont les
+  // couleurs restantes, une fois le brun écarté, sont trois bleus voisins. On
+  // en tire alors une autre plutôt que de livrer deux colonnes jumelles.
+  let source: Source = SOURCES[0];
+  let order: number[] = [];
+  for (let draw = 0; draw < 20; draw++) {
+    const pickSource = Math.floor(random() * (SOURCES.length + 1));
+    source = pickSource < SOURCES.length ? SOURCES[pickSource] : cosineSource(random);
+    const found = arrange(source, tint, random);
+    order = found.order;
+    if (found.gap >= MIN_APART) break;
+  }
+
+  const pickMode = (mode: Source['light']): SampleMode => ({
+    ground: mode.ground,
+    ink: mode.ink,
+    colours: order.map((index) => mode.colours[index]),
+  });
+  const sample: Sample = { source: source.name, tint, light: pickMode(source.light), dark: pickMode(source.dark) };
+  return { id, label, hues: sample.dark.colours.map(hueOf), style: VIVID, spread: 0, sample };
 }
 
-/** Les fonds des styles à texte coloré, clair puis sombre. */
-const LOOK_GROUNDS: Record<'neon' | 'ink', [string, string]> = {
-  neon: ['#FFFFFF', '#0B0B10'],
-  ink: ['#F6F1E4', '#1F2228'],
-};
-
 /** Couleurs d'une colonne pour une palette tirée. */
-function lookPalette(theme: CsvTheme, look: Look, column: number, dark: boolean): Palette {
-  const index = column % theme.hues.length;
-  const shade = look.shades[index] ?? 0;
-  const colouredGround = look.style === 'tone' || look.style === 'watercolour';
-  // Toute la colonne prend la même teinte repliée, pour que fond et texte
-  // restent de la même famille (« ton sur ton ») : repliée dès que l'un de ses
-  // éléments colorés est assez foncé pour brunir.
-  const hue =
-    dark && colouredGround
-      ? avoiding(theme.hues[index], ...DARK_CELL_BAND)
-      : dark
-        ? theme.hues[index]
-        : avoiding(theme.hues[index], ...DARK_INK_BAND);
-
-  switch (look.style) {
-    case 'neon':
-    case 'ink': {
-      const [light, darkGround] = LOOK_GROUNDS[look.style];
-      const ground = dark ? darkGround : light;
-      const chroma = look.style === 'neon' ? 0.22 : dark ? 0.12 : 0.14;
-      const base = look.style === 'neon' ? (dark ? 0.8 : 0.55) : dark ? 0.8 : 0.45;
-      const ink = oklch(base + shade * 0.16, chroma, hue);
-      return { cell: ground, band: shiftBrightness(ground, dark ? 0.1 : -0.05), accent: ink, text: ink };
-    }
-    case 'synthwave': {
-      // Une nuit violette commune, des encres néon par colonne.
-      const ink = dark ? oklch(0.8 + shade * 0.16, 0.17, hue) : oklch(0.5 + shade * 0.16, 0.17, hue);
-      return {
-        cell: dark ? oklch(0.27, 0.05, 290) : oklch(0.96, 0.025, 290),
-        band: dark ? oklch(0.32, 0.06, 290) : oklch(0.93, 0.035, 290),
-        accent: dark ? oklch(0.75, 0.2, hue) : oklch(0.55, 0.2, hue),
-        text: ink,
-      };
-    }
-    case 'tone': {
-      // Fond et texte de la même teinte, l'un clair, l'autre foncé. En
-      // monochrome, la clarté est seule à distinguer deux colonnes : le fond
-      // et le texte suivent donc tous deux la marche, en sens contraires.
-      const l = dark ? 0.3 + shade * 0.16 : 0.93 + shade * 0.12;
-      return {
-        cell: oklch(l, 0.06, hue),
-        band: oklch(l + (dark ? 0.04 : -0.025), 0.07, hue),
-        accent: dark ? oklch(0.78, 0.13, hue) : oklch(0.55, 0.14, hue),
-        text: dark ? oklch(0.87 - shade * 0.12, 0.09, hue) : oklch(0.4 + shade * 0.12, 0.12, hue),
-      };
-    }
-    case 'watercolour': {
-      // Des lavis à peine teintés, l'encre de la même couleur.
-      // Pas de valeur absolue : deux marches symétriques donnaient la même
-      // clarté, et deux colonnes monochromes voisines se confondaient.
-      const l = dark ? 0.28 + shade * 0.16 : 0.92 + shade * 0.1;
-      return {
-        cell: oklch(l, dark ? 0.035 : 0.03, hue),
-        band: oklch(l + (dark ? 0.04 : -0.02), dark ? 0.045 : 0.04, hue),
-        accent: dark ? oklch(0.7, 0.08, hue) : oklch(0.6, 0.1, hue),
-        text: dark ? oklch(0.84 - shade * 0.12, 0.09, hue) : oklch(0.48 + shade * 0.12, 0.11, hue),
-      };
-    }
+function samplePalette(sample: Sample, column: number, dark: boolean): Palette {
+  const mode = dark ? sample.dark : sample.light;
+  const colour = mode.colours[column % mode.colours.length];
+  if (!sample.tint) {
+    return { cell: mode.ground, band: shiftBrightness(mode.ground, dark ? 0.1 : -0.05), accent: colour, text: colour };
   }
+  const share = dark ? TINT.dark : TINT.light;
+  return {
+    cell: mix(mode.ground, colour, share),
+    band: mix(mode.ground, colour, share * 1.5),
+    accent: colour,
+    text: mode.ink,
+  };
 }
 
 /**
@@ -423,7 +501,7 @@ function offset(theme: CsvTheme, column: number, dark: boolean): number {
 }
 
 export function paletteFor(theme: CsvTheme, column: number, dark: boolean): Palette {
-  if (theme.look) return lookPalette(theme, theme.look, column, dark);
+  if (theme.sample) return samplePalette(theme.sample, column, dark);
   const hue = theme.hues[column % theme.hues.length];
   const style = theme.style;
   const shift = offset(theme, column, dark);
@@ -502,6 +580,19 @@ export function gradientFor(theme: CsvTheme, dark: boolean, alpha = 0.3): string
 
 function fromLinear(channel: number): number {
   return channel <= 0.0031308 ? 12.92 * channel : 1.055 * channel ** (1 / 2.4) - 0.055;
+}
+
+function toOklab(hex: string): [number, number, number] {
+  const linear = (channel: number) => (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+  const [red, green, blue] = [1, 3, 5].map((at) => linear(parseInt(hex.slice(at, at + 2), 16) / 255));
+  const l = Math.cbrt(0.4122214708 * red + 0.5363325363 * green + 0.0514459929 * blue);
+  const m = Math.cbrt(0.2119034982 * red + 0.6806995451 * green + 0.1073969566 * blue);
+  const s = Math.cbrt(0.0883024619 * red + 0.2817188376 * green + 0.6299787005 * blue);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ];
 }
 
 function fromOklab(lightness: number, a: number, b: number): [number, number, number] {

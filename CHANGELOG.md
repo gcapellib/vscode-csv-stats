@@ -9,22 +9,22 @@ file exists so that jump has an explanation.
 **Random palette** only — the shipped palettes render byte for byte as before,
 and so do palettes you already kept.
 
-Draws were garish, brownish, and all alike: every one was the same rainbow
-turned a few degrees. A draw now combines one of three hue recipes (rainbow,
-monochrome, candy pastels) with one of five styles (neon, printer's ink on
-cream paper, synthwave, tone on tone, watercolour), all picked by eye from
-two swatch books of twelve — fifteen combinations, each with its variations.
-Colours are computed in OKLCH, and wherever a hue would darken into brown or
-olive the colour wheel is folded so the hues skip that stretch.
+Draws were garish, brownish, and all alike. They now take their colours from
+palettes made by hand — Catppuccin, One Dark / One Light and Everforest, with
+their official light and dark versions — or from a cosine palette after Inigo
+Quilez, all four picked by eye from a swatch book of fourteen. Colours are
+copied exactly; those that turn brown or olive in either mode are left out, and
+an order is chosen that keeps neighbouring columns apart.
 
 Measured over 200 draws (38,400 colours shown), 0.20.0 against 0.21.0:
 
 | | 0.20.0 | 0.21.0 |
 |---|---|---|
 | Brown or olive colours | 2,452 | 0 |
-| Distinct recipe × style combinations | 1 | 15 |
-| Highest background chroma | 0.184 | 0.062 |
-| Lowest text/background contrast (threshold 60) | 66 | 95 |
+| Highest background chroma | 0.184 | 0.074 |
+| Lowest text/background contrast (threshold 60) | 66 | 78 |
+
+Catppuccin, One Dark / One Light (Atom) and Everforest are MIT-licensed.
 
 ## 0.20.0
 
