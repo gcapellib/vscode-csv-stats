@@ -47,25 +47,24 @@ export interface CsvTheme {
   /** Amplitude de la rampe de luminosité sur l'ensemble des teintes. */
   spread: number;
   /**
-   * Palette décrite en clarté et chroma perçues (OKLCH) plutôt qu'en HSB :
-   * toutes ses colonnes partagent la même chroma et la même clarté de base,
-   * seules la teinte et une légère alternance de clarté les distinguent.
-   * Réservé aux tirages ; les palettes livrées ne le portent pas.
+   * Palette tirée au sort : un style de pose de la couleur, appliqué aux
+   * teintes d'une recette. Réservé aux tirages ; les palettes livrées ne le
+   * portent pas.
    */
-  tone?: Tone;
+  look?: Look;
 }
 
 /**
- * Le caractère d'une palette tirée : sa chroma et sa clarté, communes à
- * toutes les colonnes. Elles portent sur le fond quand le fond est coloré,
- * sur le texte quand c'est lui qui l'est.
+ * Les styles retenus au nuancier, sur douze présentés : la façon de poser la
+ * couleur, indépendamment des teintes posées.
  */
-export interface Tone {
-  chroma: number;
-  /** Clarté OKLCH en thème clair. */
-  light: number;
-  /** Clarté OKLCH en thème sombre. */
-  dark: number;
+export type LookStyle = 'neon' | 'tone' | 'synthwave' | 'watercolour' | 'ink';
+
+export interface Look {
+  recipe: Recipe;
+  style: LookStyle;
+  /** Écart de clarté propre à chaque teinte, entre -0,5 et 0,5 (monochrome). */
+  shades: number[];
 }
 
 export interface Palette {
@@ -252,62 +251,37 @@ export function themeById(id: string | undefined): CsvTheme {
 export type RandomFamily = 'background' | 'text';
 
 /**
- * Les tirages au sort prennent modèle sur Prism, la palette livrée la plus
- * appréciée à l'usage : un arc-en-ciel complet, dans l'ordre du spectre, clair
- * et lumineux. Deux tentatives fondées sur les études d'harmonie (teintes
- * proches, couleurs désaturées) ont été essayées puis rejetées : jugées ternes
- * et brunâtres. Ce qui déplaisait n'était pas la variété des teintes, mais le
- * sombre et le brun.
+ * Les tirages au sort combinent une recette de teintes et un style de pose,
+ * tous deux choisis à l'œil sur deux nuanciers : trois recettes sur douze,
+ * cinq styles sur douze. Trois tentatives précédentes ne faisaient varier que
+ * les réglages d'une seule recette — un arc-en-ciel tourné de 40° reste un
+ * arc-en-ciel — et tous les tirages se ressemblaient. La diversité vient de
+ * la combinaison : quinze, chacune avec ses variantes.
  *
  * Tout se calcule en OKLCH, où une même clarté se perçoit comme telle quelle
- * que soit la teinte — en HSB, un jaune paraît bien plus clair qu'un bleu au
- * même réglage.
+ * que soit la teinte.
  */
+export type Recipe = 'rainbow' | 'mono' | 'candy';
+const RECIPES: Recipe[] = ['rainbow', 'mono', 'candy'];
 
-/** Texte coloré : de l'encre claire et vive en sombre, soutenue en clair. */
-const INK_TONES: Tone[] = [
-  { chroma: 0.11, light: 0.52, dark: 0.84 },
-  { chroma: 0.13, light: 0.5, dark: 0.8 },
-  { chroma: 0.15, light: 0.48, dark: 0.77 },
-];
+/** Fond coloré et texte coloré : l'alternance du bouton est conservée. */
+const BACKGROUND_LOOKS: LookStyle[] = ['tone', 'watercolour'];
+const TEXT_LOOKS: LookStyle[] = ['neon', 'synthwave', 'ink'];
 
-/** Fond coloré : pastel en clair, sans être délavé ; jamais terne en sombre. */
-// Pas de chroma sous 0,055 : en thème sombre, le fond évite la zone qui
-// brunit et ses teintes se resserrent sur ce qui reste du cercle ; plus doux,
-// deux colonnes voisines tombaient sous le seuil de distinction (écart 9).
-const CELL_TONES: Tone[] = [
-  { chroma: 0.055, light: 0.955, dark: 0.33 },
-  { chroma: 0.065, light: 0.94, dark: 0.345 },
-  { chroma: 0.075, light: 0.925, dark: 0.36 },
-];
+/** Les pastels sucrés du nuancier « Bonbon » : rose, lilas, menthe, ciel, pêche, citron. */
+const CANDY = [350, 300, 165, 220, 25, 95, 260, 190];
 
-/** Encres et fonds éprouvés : seules les teintes sont tirées au sort. */
-const RANDOM_INKS: Array<[string, string]> = [
-  ['#1B1B1F', '#F2F2F5'],
-  ['#14301C', '#E6F5EA'],
-  ['#0E2A3A', '#E3F2FA'],
-  ['#241A38', '#EFE8FA'],
-  ['#191C28', '#E9ECF5'],
-];
-
-const RANDOM_GROUNDS: Array<[string, string]> = [
-  ['#FCFCFD', '#1E1F22'],
-  ['#F7F7F4', '#14161A'],
-  ['#EFF1F5', '#1E1E2E'],
-  ['#FBF7FF', '#282A36'],
-  ['#ECEFF4', '#2E3440'],
-  ['#F2F6F9', '#141E28'],
-  ['#F7F3FA', '#1E1728'],
-];
+function pick<T>(list: readonly T[], random: () => number): T {
+  return list[Math.floor(random() * list.length)];
+}
 
 /**
  * Replie le cercle chromatique pour qu'il évite l'arc [from, to].
  *
  * Un orange ou un jaune foncé devient brun, un vert-jaune foncé devient olive :
  * les couleurs les moins aimées (Palmer & Schloss, 2010), et les premières
- * rejetées à l'essai. Plutôt que de retirer une teinte, ce qui casserait
- * l'arc-en-ciel, on comprime le cercle sur ce qui reste : les teintes gardent
- * leur ordre et leurs écarts relatifs, et sautent la zone qui brunit.
+ * rejetées à l'essai. Plutôt que de retirer une teinte, on comprime le cercle
+ * sur ce qui reste : les teintes gardent leur ordre et sautent la zone.
  */
 function avoiding(hue: number, from: number, to: number): number {
   const kept = 360 - (to - from);
@@ -315,20 +289,45 @@ function avoiding(hue: number, from: number, to: number): number {
 }
 
 /**
- * Où le brun guette : le texte foncé du thème clair, le fond du thème sombre.
- * Le fond sombre évite aussi le rouge, qui y vire au bordeaux — un brun de
- * plus à l'œil, vu sur la planche de contrôle. Le texte rouge, lui, reste
- * rouge.
+ * Où le brun guette : une encre foncée, ou pire, un fond foncé — qui évite
+ * aussi le rouge, viré au bordeaux sur un grand aplat.
  */
 const DARK_INK_BAND: [number, number] = [35, 150];
 const DARK_CELL_BAND: [number, number] = [0, 150];
 
+/** Teintes et écarts de clarté d'une recette, dans l'ordre des colonnes. */
+function recipeHues(recipe: Recipe, random: () => number): { hues: number[]; shades: number[] } {
+  const wrap = (hue: number) => Math.round(((hue % 360) + 360) % 360);
+  if (recipe === 'candy') {
+    const offset = Math.floor(random() * CANDY.length);
+    return { hues: CANDY.map((_, i) => CANDY[(i + offset) % CANDY.length]), shades: CANDY.map(() => 0) };
+  }
+  if (recipe === 'mono') {
+    // Une teinte, parcourue en aller-retour du clair au foncé. Jamais tirée
+    // dans la zone qui brunit : repliée, elle changerait de couleur entière.
+    const base = DARK_INK_BAND[1] + random() * (360 - (DARK_INK_BAND[1] - DARK_INK_BAND[0]));
+    const level = (i: number) => Math.min(i, 8 - i);
+    return {
+      hues: Array.from({ length: 8 }, (_, i) => wrap(base + (level(i) - 2) * 8)),
+      shades: Array.from({ length: 8 }, (_, i) => level(i) / 4 - 0.5),
+    };
+  }
+  // L'arc-en-ciel de Prism : pas régulier, départ et sens au hasard.
+  const count = 6 + Math.floor(random() * 3);
+  const start = random() * 360;
+  const direction = random() < 0.5 ? 1 : -1;
+  return {
+    hues: Array.from({ length: count }, (_, i) => wrap(start + (direction * i * 360) / count)),
+    shades: Array.from({ length: count }, () => 0),
+  };
+}
+
 /**
  * Tire une palette au sort.
  *
- * Le hasard choisit le nombre de teintes, leur point de départ, le sens du
- * parcours, un ton et un fond ou une encre — jamais la lisibilité : deux cents
- * tirages sont soumis aux mêmes seuils que les palettes livrées.
+ * Le hasard choisit la recette, le style dans la famille demandée, et les
+ * variantes de la recette — jamais la lisibilité : deux cents tirages sont
+ * soumis aux mêmes seuils que les palettes livrées.
  */
 export function randomTheme(
   family: RandomFamily,
@@ -336,50 +335,78 @@ export function randomTheme(
   label: string,
   random: () => number = Math.random,
 ): CsvTheme {
-  const count = 6 + Math.floor(random() * 3); // 6, 7 ou 8 teintes
-  const start = random() * 360;
-  const direction = random() < 0.5 ? 1 : -1;
-  // L'ordre du spectre, à intervalle régulier : la dernière teinte rejoint la
-  // première aussi doucement que les autres s'enchaînent.
-  const hues = Array.from({ length: count }, (_, index) =>
-    Math.round((((start + (direction * index * 360) / count) % 360) + 360) % 360),
-  );
-
-  if (family === 'text') {
-    const [light, dark] = RANDOM_GROUNDS[Math.floor(random() * RANDOM_GROUNDS.length)];
-    const tone = INK_TONES[Math.floor(random() * INK_TONES.length)];
-    return { ...inked(id, label, hues, light, dark), tone };
-  }
-  const [inkLight, inkDark] = RANDOM_INKS[Math.floor(random() * RANDOM_INKS.length)];
-  const tone = CELL_TONES[Math.floor(random() * CELL_TONES.length)];
-  return { ...tinted(id, label, hues, VIVID, inkLight, inkDark, 0), tone };
+  const recipe = pick(RECIPES, random);
+  const style = pick(family === 'background' ? BACKGROUND_LOOKS : TEXT_LOOKS, random);
+  const { hues, shades } = recipeHues(recipe, random);
+  return { id, label, hues, style: VIVID, spread: 0, look: { recipe, style, shades } };
 }
 
-/** Couleurs d'une colonne pour une palette tirée, décrite en OKLCH. */
-function tonePalette(theme: CsvTheme, tone: Tone, column: number, dark: boolean): Palette {
-  const hue = theme.hues[column % theme.hues.length];
+/** Les fonds des styles à texte coloré, clair puis sombre. */
+const LOOK_GROUNDS: Record<'neon' | 'ink', [string, string]> = {
+  neon: ['#FFFFFF', '#0B0B10'],
+  ink: ['#F6F1E4', '#1F2228'],
+};
 
-  if (theme.neutral) {
-    const ground = dark ? theme.neutral.dark : theme.neutral.light;
-    // En sombre, l'encre est claire : son jaune reste un jaune, comme dans
-    // Prism. En clair, elle doit être foncée, et c'est là qu'elle brunirait.
-    const ink = dark
-      ? oklch(tone.dark, tone.chroma, hue)
-      : oklch(tone.light, tone.chroma, avoiding(hue, ...DARK_INK_BAND));
-    return { cell: ground, band: shiftBrightness(ground, dark ? 0.1 : -0.05), accent: ink, text: ink };
+/** Couleurs d'une colonne pour une palette tirée. */
+function lookPalette(theme: CsvTheme, look: Look, column: number, dark: boolean): Palette {
+  const index = column % theme.hues.length;
+  const shade = look.shades[index] ?? 0;
+  const colouredGround = look.style === 'tone' || look.style === 'watercolour';
+  // Toute la colonne prend la même teinte repliée, pour que fond et texte
+  // restent de la même famille (« ton sur ton ») : repliée dès que l'un de ses
+  // éléments colorés est assez foncé pour brunir.
+  const hue =
+    dark && colouredGround
+      ? avoiding(theme.hues[index], ...DARK_CELL_BAND)
+      : dark
+        ? theme.hues[index]
+        : avoiding(theme.hues[index], ...DARK_INK_BAND);
+
+  switch (look.style) {
+    case 'neon':
+    case 'ink': {
+      const [light, darkGround] = LOOK_GROUNDS[look.style];
+      const ground = dark ? darkGround : light;
+      const chroma = look.style === 'neon' ? 0.22 : dark ? 0.12 : 0.14;
+      const base = look.style === 'neon' ? (dark ? 0.8 : 0.55) : dark ? 0.8 : 0.45;
+      const ink = oklch(base + shade * 0.16, chroma, hue);
+      return { cell: ground, band: shiftBrightness(ground, dark ? 0.1 : -0.05), accent: ink, text: ink };
+    }
+    case 'synthwave': {
+      // Une nuit violette commune, des encres néon par colonne.
+      const ink = dark ? oklch(0.8 + shade * 0.16, 0.17, hue) : oklch(0.5 + shade * 0.16, 0.17, hue);
+      return {
+        cell: dark ? oklch(0.27, 0.05, 290) : oklch(0.96, 0.025, 290),
+        band: dark ? oklch(0.32, 0.06, 290) : oklch(0.93, 0.035, 290),
+        accent: dark ? oklch(0.75, 0.2, hue) : oklch(0.55, 0.2, hue),
+        text: ink,
+      };
+    }
+    case 'tone': {
+      // Fond et texte de la même teinte, l'un clair, l'autre foncé. En
+      // monochrome, la clarté est seule à distinguer deux colonnes : le fond
+      // et le texte suivent donc tous deux la marche, en sens contraires.
+      const l = dark ? 0.3 + shade * 0.16 : 0.93 + shade * 0.12;
+      return {
+        cell: oklch(l, 0.06, hue),
+        band: oklch(l + (dark ? 0.04 : -0.025), 0.07, hue),
+        accent: dark ? oklch(0.78, 0.13, hue) : oklch(0.55, 0.14, hue),
+        text: dark ? oklch(0.87 - shade * 0.12, 0.09, hue) : oklch(0.4 + shade * 0.12, 0.12, hue),
+      };
+    }
+    case 'watercolour': {
+      // Des lavis à peine teintés, l'encre de la même couleur.
+      // Pas de valeur absolue : deux marches symétriques donnaient la même
+      // clarté, et deux colonnes monochromes voisines se confondaient.
+      const l = dark ? 0.28 + shade * 0.16 : 0.92 + shade * 0.1;
+      return {
+        cell: oklch(l, dark ? 0.035 : 0.03, hue),
+        band: oklch(l + (dark ? 0.04 : -0.02), dark ? 0.045 : 0.04, hue),
+        accent: dark ? oklch(0.7, 0.08, hue) : oklch(0.6, 0.1, hue),
+        text: dark ? oklch(0.84 - shade * 0.12, 0.09, hue) : oklch(0.48 + shade * 0.12, 0.11, hue),
+      };
+    }
   }
-
-  // Le fond clair est pâle : un jaune pâle y est un jaune. Le fond sombre l'est
-  // assez pour brunir tout orange et tout jaune ; l'accent, lui, est l'inverse.
-  const cellHue = dark ? avoiding(hue, ...DARK_CELL_BAND) : hue;
-  const accentHue = dark ? hue : avoiding(hue, ...DARK_INK_BAND);
-  const lightness = dark ? tone.dark : tone.light;
-  return {
-    cell: oklch(lightness, tone.chroma, cellHue),
-    band: oklch(lightness + (dark ? 0.04 : -0.025), tone.chroma * 1.15, cellHue),
-    accent: dark ? oklch(0.8, 0.12, accentHue) : oklch(0.58, 0.13, accentHue),
-    text: dark ? theme.uniformInk!.dark : theme.uniformInk!.light,
-  };
 }
 
 /**
@@ -396,7 +423,7 @@ function offset(theme: CsvTheme, column: number, dark: boolean): number {
 }
 
 export function paletteFor(theme: CsvTheme, column: number, dark: boolean): Palette {
-  if (theme.tone) return tonePalette(theme, theme.tone, column, dark);
+  if (theme.look) return lookPalette(theme, theme.look, column, dark);
   const hue = theme.hues[column % theme.hues.length];
   const style = theme.style;
   const shift = offset(theme, column, dark);

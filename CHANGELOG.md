@@ -9,20 +9,22 @@ file exists so that jump has an explanation.
 **Random palette** only — the shipped palettes render byte for byte as before,
 and so do palettes you already kept.
 
-Draws were garish: saturated backgrounds, olive and brown columns, an abrupt
-fall from bright to dark columns. They now take after Prism — a full rainbow in
-spectral order, light and luminous — computed in OKLCH, where equal lightness
-looks equal whatever the hue. Where a hue would darken into brown or olive, the
-colour wheel is folded so the hues skip that stretch without leaving the
-rainbow; dark backgrounds skip red too, which turns burgundy there.
+Draws were garish, brownish, and all alike: every one was the same rainbow
+turned a few degrees. A draw now combines one of three hue recipes (rainbow,
+monochrome, candy pastels) with one of five styles (neon, printer's ink on
+cream paper, synthwave, tone on tone, watercolour), all picked by eye from
+two swatch books of twelve — fifteen combinations, each with its variations.
+Colours are computed in OKLCH, and wherever a hue would darken into brown or
+olive the colour wheel is folded so the hues skip that stretch.
 
 Measured over 200 draws (38,400 colours shown), 0.20.0 against 0.21.0:
 
 | | 0.20.0 | 0.21.0 |
 |---|---|---|
 | Brown or olive colours | 2,452 | 0 |
-| Highest background chroma | 0.184 | 0.077 |
-| Lowest text/background contrast (threshold 60) | 66 | 94 |
+| Distinct recipe × style combinations | 1 | 15 |
+| Highest background chroma | 0.184 | 0.062 |
+| Lowest text/background contrast (threshold 60) | 66 | 95 |
 
 ## 0.20.0
 

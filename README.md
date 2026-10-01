@@ -208,18 +208,20 @@ it to your own list, which survives restarts. Drawn palettes and kept ones both
 carry a cross; the ones shipped with the extension do not, and cannot be
 removed.
 
-A draw takes after **Prism**: a full rainbow, hues in spectral order at even
-steps, light and luminous — only its starting hue, direction, number of hues,
-intensity and ground change from one draw to the next. Everything is computed
-in OKLCH, where equal lightness looks equal whatever the hue. Brown and olive
-never appear: wherever a hue would darken into them — dark text on a light
-ground, a dark background — the colour wheel is folded so the hues skip that
-stretch while keeping their order, rather than dropping a colour from the
-rainbow. Dark backgrounds skip red as well, which turns burgundy there. Two
-hundred draws are put through the same thresholds as the shipped palettes —
-neighbouring columns distinguishable, text never confused with its ground —
-and through a test that finds no brown or olive among the 38,400 colours they
-show.
+A draw combines a **recipe** of hues with a **style** of laying them down, both
+chosen by eye from two swatch books of twelve: rainbow, monochrome or candy
+pastels, laid as neon ink on black, printer's ink on cream paper, neon on a
+violet night, tone on tone, or watercolour washes. Fifteen combinations, each
+with its own variations — varying a single recipe only ever turned the same
+rainbow a few degrees. Coloured background and coloured text still alternate.
+
+Everything is computed in OKLCH, where equal lightness looks equal whatever the
+hue. Brown and olive never appear: wherever a hue would darken into them, the
+colour wheel is folded so the hues skip that stretch while keeping their order;
+dark backgrounds skip red too, which turns burgundy there. Two hundred draws are
+put through the same thresholds as the shipped palettes — neighbouring columns
+distinguishable, text never confused with its ground — and must show all
+fifteen combinations and no brown among the 38,400 colours they display.
 
 ## How files are read
 

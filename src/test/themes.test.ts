@@ -53,9 +53,9 @@ describe('palettes', () => {
   });
 
   it('gardent leur modèle d’origine', () => {
-    // Le modèle OKLCH est réservé aux tirages : les palettes livrées ne
+    // Le modèle des tirages leur est réservé : les palettes livrées ne
     // doivent pas changer d'apparence à la mise à jour.
-    assert.ok(THEMES.every((theme) => !theme.tone));
+    assert.ok(THEMES.every((theme) => !theme.look));
   });
 
   it('retombe sur la palette par défaut pour un identifiant inconnu', () => {
@@ -196,11 +196,22 @@ describe('palettes tirées au sort', () => {
     return Math.max(...left.map((value, index) => Math.abs(value - right[index])));
   }
 
-  it('produit une palette utilisable dans chaque famille', () => {
-    const fond = randomTheme('background', 'x', 'X', seeded(1));
-    assert.ok(fond.uniformInk, 'une palette à fond coloré porte une encre unique');
-    const texte = randomTheme('text', 'y', 'Y', seeded(2));
-    assert.ok(texte.neutral, 'une palette à texte coloré porte un fond uni');
+  it('alterne vraiment fond coloré et texte coloré', () => {
+    // Le bouton alterne les deux familles : il faut que ça se voie. Un tirage
+    // « fond » colore ses cellules colonne par colonne ; un tirage « texte »
+    // garde un fond uni et colore son encre.
+    for (let seed = 1; seed <= 50; seed++) {
+      for (const dark of [false, true]) {
+        const fond = randomTheme('background', 'x', 'X', seeded(seed));
+        const cellules = new Set([0, 1, 2, 3].map((column) => paletteFor(fond, column, dark).cell));
+        assert.ok(cellules.size > 1, `fond coloré sans fonds différents (${fond.look?.recipe}/${fond.look?.style})`);
+        const texte = randomTheme('text', 'y', 'Y', seeded(seed));
+        const unis = new Set([0, 1, 2, 3].map((column) => paletteFor(texte, column, dark).cell));
+        const encres = new Set([0, 1, 2, 3].map((column) => paletteFor(texte, column, dark).text));
+        assert.equal(unis.size, 1, `texte coloré sans fond uni (${texte.look?.style})`);
+        assert.ok(encres.size > 1, `texte coloré sans encres différentes (${texte.look?.style})`);
+      }
+    }
   });
 
   it('tient les mêmes seuils de lisibilité que les palettes livrées', () => {
@@ -307,18 +318,20 @@ describe('palettes tirées au sort', () => {
     assert.ok(pire <= 0.08, `chroma maximale d'un fond : ${pire.toFixed(3)}`);
   });
 
-  it('range ses teintes dans l’ordre de l’arc-en-ciel', () => {
-    // Le modèle retenu est Prism : un pas constant d'une teinte à la suivante,
-    // dans un sens ou dans l'autre, recommencement compris.
-    for (let seed = 1; seed <= 100; seed++) {
-      const { hues } = randomTheme('text', 'p', 'P', seeded(seed));
-      const steps = hues.map((hue, index) => (((hues[(index + 1) % hues.length] - hue) % 360) + 360) % 360);
-      const pas = 360 / hues.length;
-      assert.ok(
-        steps.every((step) => Math.abs(step - pas) <= 1) || steps.every((step) => Math.abs(360 - step - pas) <= 1),
-        `teintes hors de l'ordre du spectre : ${hues.join(', ')}`,
-      );
+  it('varie vraiment d’un tirage à l’autre', () => {
+    // Le reproche constant : « les thèmes se ressemblent ». Trois recettes et
+    // cinq styles retenus au nuancier font quinze combinaisons ; en deux cents
+    // tirages, toutes doivent apparaître, et aucune ne doit écraser les autres.
+    const vues = new Map<string, number>();
+    for (let seed = 1; seed <= 200; seed++) {
+      for (const family of ['background', 'text'] as const) {
+        const { look } = randomTheme(family, 'd', 'D', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
+        const key = `${look?.recipe}/${look?.style}`;
+        vues.set(key, (vues.get(key) ?? 0) + 1);
+      }
     }
+    assert.equal(vues.size, 15, [...vues.keys()].sort().join(', '));
+    assert.ok(Math.max(...vues.values()) <= 400 / 15 * 2, `combinaison la plus fréquente : ${Math.max(...vues.values())} sur 400`);
   });
 });
 
