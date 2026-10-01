@@ -52,6 +52,12 @@ describe('palettes', () => {
     assert.deepEqual(familles, { fond: 10, encre: 14, duo: 5 });
   });
 
+  it('gardent leur rampe d’origine', () => {
+    // La rampe en aller-retour est réservée aux tirages : les palettes livrées
+    // ne doivent pas changer d'apparence à la mise à jour.
+    assert.ok(THEMES.every((theme) => !theme.wave));
+  });
+
   it('retombe sur la palette par défaut pour un identifiant inconnu', () => {
     assert.equal(themeById('palette-qui-n-existe-pas'), DEFAULT_THEME);
     assert.equal(themeById(undefined), DEFAULT_THEME);
@@ -201,14 +207,17 @@ describe('palettes tirées au sort', () => {
     // Deux cents tirages, soumis exactement aux deux règles qui protègent les
     // palettes d'origine : des colonnes voisines distinguables, et un texte
     // jamais confondu avec son fond. Le hasard porte sur la couleur, pas sur
-    // la lisibilité — c'est ce que ce test vérifie.
+    // la lisibilité — c'est ce que ce test vérifie. Seize colonnes, pour
+    // franchir le moment où les teintes recommencent : c'est là que le défaut
+    // de la rampe en dents de scie se cachait, hors de portée d'un test qui
+    // s'arrêtait à la septième.
     let pireEcart = Infinity;
     let pireContraste = Infinity;
     for (let seed = 1; seed <= 100; seed++) {
       for (const family of ['background', 'text'] as const) {
         const theme = randomTheme(family, `r${seed}`, `R${seed}`, seeded(seed * 7 + (family === 'text' ? 1 : 0)));
         for (const dark of [false, true]) {
-          for (let column = 0; column < 6; column++) {
+          for (let column = 0; column < 16; column++) {
             const left = paletteFor(theme, column, dark);
             const right = paletteFor(theme, column + 1, dark);
             const gap = Math.max(difference(left.cell, right.cell), difference(left.text, right.text));
@@ -220,6 +229,41 @@ describe('palettes tirées au sort', () => {
     }
     assert.ok(pireEcart >= 10, `écart minimal entre colonnes voisines : ${pireEcart}`);
     assert.ok(pireContraste > 60, `contraste minimal texte/fond : ${pireContraste}`);
+  });
+
+  it('ne fait jamais sauter la clarté d’une colonne à la suivante', () => {
+    // Le défaut signalé : des colonnes vives suivies d'un coup de colonnes
+    // sombres. Deux causes, mesurées : la rampe retombait de toute son
+    // amplitude au recommencement des teintes (100 points de luminance), et
+    // une case jaune paraissait bien plus claire qu'une case bleue au même
+    // réglage (57). Après correction, le pire saut mesuré est de 21.
+    let pireSaut = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      const theme = randomTheme('background', 'c', 'C', seeded(seed * 7));
+      for (const dark of [false, true]) {
+        for (let column = 0; column < 16; column++) {
+          const saut = Math.abs(
+            luminance(paletteFor(theme, column, dark).cell) - luminance(paletteFor(theme, column + 1, dark).cell),
+          );
+          pireSaut = Math.max(pireSaut, saut);
+        }
+      }
+    }
+    assert.ok(pireSaut <= 25, `pire saut de clarté entre colonnes voisines : ${pireSaut.toFixed(0)}`);
+  });
+
+  it('ne tire plus systématiquement un arc-en-ciel complet', () => {
+    // Toutes les palettes tirées se ressemblaient parce que toutes couvraient
+    // le cercle entier : jamais plus de 80° laissés vides, sur deux cents
+    // tirages. Une palette harmonieuse occupe une partie du cercle seulement.
+    let resserrees = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      const ordered = [...randomTheme('background', 'h', 'H', seeded(seed * 7)).hues].sort((a, b) => a - b);
+      let arcVide = 360 - ordered[ordered.length - 1] + ordered[0];
+      for (let i = 1; i < ordered.length; i++) arcVide = Math.max(arcVide, ordered[i] - ordered[i - 1]);
+      if (arcVide >= 120) resserrees++;
+    }
+    assert.ok(resserrees > 100, `tirages laissant au moins 120° vides : ${resserrees} sur 200`);
   });
 
   it('écarte les teintes plutôt que de les tirer indépendamment', () => {

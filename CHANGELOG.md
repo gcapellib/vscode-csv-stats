@@ -4,6 +4,23 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.21.0
+
+Random palettes only — the shipped ones render byte for byte as before, and so
+do palettes you already kept.
+
+- **No more abrupt switch between bright and dark columns.** The lightness ramp
+  fell back by its whole amplitude when the hues started over: 100 points of
+  luminance between two neighbouring columns, against about 20 elsewhere. It
+  now goes down and back up. Columns also share one *perceived* lightness
+  (OKLab): at the same setting a yellow cell reads far lighter than a blue one,
+  which alone produced jumps of 57.
+- **Draws that differ.** Hues were spread evenly over the whole wheel, so every
+  draw was a rainbow turned a few degrees. A draw now picks a harmony —
+  neighbouring hues, two opposite families, or a base and the two neighbours of
+  its complement; the full rainbow remains, as the exception. Measured over 200
+  draws: 172 leave at least a third of the wheel empty, against none before.
+
 ## 0.20.0
 
 Le code de la vue, jusqu'ici un seul fichier de 2152 lignes qu'aucun test ne

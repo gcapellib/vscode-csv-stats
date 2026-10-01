@@ -208,8 +208,12 @@ it to your own list, which survives restarts. Drawn palettes and kept ones both
 carry a cross; the ones shipped with the extension do not, and cannot be
 removed.
 
-The draw is random in colour, never in legibility. Hues are spaced around the
-wheel rather than picked independently, and the styles, inks and grounds come
+The draw is random in colour, never in legibility. Each draw picks a harmony —
+neighbouring hues, two opposite families, or three — rather than spreading hues
+over the whole wheel, which made every draw a rotated rainbow. Columns share one
+perceived lightness, measured in OKLab, so a yellow column no longer glares next
+to a blue one, and the lightness ramp goes down and back up instead of falling
+back all at once when the hues start over. The styles, inks and grounds come
 from values already proven. Two hundred draws are put through the same two
 thresholds the shipped palettes must meet — neighbouring columns distinguishable,
 text never confused with its ground — which is how two defects were caught before
@@ -261,7 +265,7 @@ of the above on every push and pull request.
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.20.0.vsix
+code --install-extension csv-stats-0.21.0.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**

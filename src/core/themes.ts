@@ -55,6 +55,13 @@ export interface CsvTheme {
   inks?: { light: string[]; dark: string[] };
   /** Amplitude de la rampe de luminosité sur l'ensemble des teintes. */
   spread: number;
+  /**
+   * Rampe en aller-retour plutôt qu'en dents de scie : la luminosité descend
+   * puis remonte, au lieu de retomber d'un coup quand les teintes recommencent.
+   * Absent sur les palettes livrées et sur celles gardées avant son
+   * introduction, qui conservent ainsi exactement leur apparence.
+   */
+  wave?: boolean;
 }
 
 export interface Palette {
@@ -275,17 +282,72 @@ const RANDOM_INKS_EXTRA: Array<[string, string]> = [
 ];
 
 /**
+ * Les schémas d'harmonie entre lesquels un tirage choisit.
+ *
+ * Le tirage répartissait autrefois ses teintes à intervalle régulier sur tout
+ * le cercle : chaque palette était un arc-en-ciel complet, simplement tourné,
+ * d'où l'impression que tous les tirages se ressemblaient. Mesuré sur deux
+ * cents tirages, l'arc laissé vide ne dépassait jamais 80°. Une palette
+ * harmonieuse fait l'inverse : elle n'occupe qu'une partie du cercle — une
+ * famille de teintes voisines, ou deux ou trois familles qui se répondent.
+ */
+type Harmony = 'analogous' | 'complementary' | 'split' | 'spectrum';
+
+/** L'arc-en-ciel reste possible, mais devient l'exception. */
+const HARMONIES: Harmony[] = ['analogous', 'analogous', 'complementary', 'complementary', 'split', 'split', 'spectrum'];
+
+/** Écart minimal entre deux teintes d'une même palette, en degrés. */
+const MIN_HUE_STEP = 15;
+
+/**
+ * Les teintes d'un schéma, dans l'ordre des colonnes.
+ *
+ * L'ordre importe autant que les teintes : dans une famille resserrée, deux
+ * teintes voisines sur le cercle ne se distinguent presque pas. Les colonnes
+ * voisines reçoivent donc des teintes éloignées — on alterne entre familles,
+ * ou, dans une famille seule, entre ses deux moitiés.
+ */
+function harmonyHues(harmony: Harmony, count: number, random: () => number): number[] {
+  const start = random() * 360;
+  const wrap = (hue: number) => Math.round(((hue % 360) + 360) % 360);
+
+  if (harmony === 'spectrum') {
+    // Secousse limitée au sixième de l'intervalle : au-delà, deux teintes
+    // pouvaient se rapprocher à 15°, indiscernables sur un style discret.
+    const step = 360 / count;
+    return Array.from({ length: count }, (_, index) => wrap(start + index * step + (random() - 0.5) * (step / 3)));
+  }
+
+  if (harmony === 'analogous') {
+    // Un seul arc, élargi avec le nombre de teintes pour qu'aucune ne se
+    // rapproche de sa voisine à moins de MIN_HUE_STEP.
+    const arc = MIN_HUE_STEP * (count - 1) + random() * 30;
+    const along = Array.from({ length: count }, (_, index) => start + (arc * index) / (count - 1));
+    const half = count / 2;
+    return Array.from({ length: count }, (_, column) =>
+      wrap(along[column % 2 === 0 ? column / 2 : half + (column - 1) / 2]),
+    );
+  }
+
+  // Deux familles opposées, ou trois : la base et les deux voisines de son
+  // complément, à ±30° de celui-ci.
+  const centres = harmony === 'complementary' ? [0, 180] : [0, 150, 210];
+  const perFamily = count / centres.length;
+  const width = MIN_HUE_STEP * (perFamily - 1) + random() * 15;
+  return Array.from({ length: count }, (_, column) => {
+    const family = column % centres.length;
+    const rank = Math.floor(column / centres.length);
+    const along = perFamily === 1 ? 0 : (width * rank) / (perFamily - 1) - width / 2;
+    return wrap(start + centres[family] + along);
+  });
+}
+
+/**
  * Tire une palette au sort.
  *
- * Les teintes ne sont pas tirées indépendamment : elles sont réparties sur le
- * cercle chromatique à intervalle régulier, à partir d'un angle de départ
- * aléatoire, avec une secousse qui ne dépasse jamais le sixième de
- * l'intervalle — deux teintes restent donc séparées d'au moins deux tiers de
- * celui-ci. Une secousse plus large (le tiers) a été essayée puis rejetée :
- * elle laissait deux teintes se rapprocher à 15°, ce qui passe inaperçu sur un
- * style saturé mais rend deux colonnes identiques sur un style discret comme
- * MUTED. Le reste (styles, encres, fonds) est puisé dans des valeurs déjà
- * éprouvées : le hasard porte sur la couleur, jamais sur la lisibilité.
+ * Le hasard choisit un schéma d'harmonie, un angle de départ, un style, une
+ * encre et un fond ; tout le reste est puisé dans des valeurs déjà éprouvées.
+ * Le hasard porte sur la couleur, jamais sur la lisibilité.
  */
 export function randomTheme(
   family: RandomFamily,
@@ -293,12 +355,13 @@ export function randomTheme(
   label: string,
   random: () => number = Math.random,
 ): CsvTheme {
-  const count = 6 + Math.floor(random() * 3); // 6, 7 ou 8 teintes
-  const step = 360 / count;
-  const start = random() * 360;
-  const hues = Array.from({ length: count }, (_, index) =>
-    Math.round((start + index * step + (random() - 0.5) * (step / 3) + 360) % 360),
-  );
+  const harmony = HARMONIES[Math.floor(random() * HARMONIES.length)];
+  // Toujours un nombre pair : la rampe en aller-retour culmine sur une seule
+  // colonne. Avec un nombre impair, les deux colonnes du sommet auraient la
+  // même luminosité, et ne se distingueraient plus que par la teinte. Six
+  // seulement pour trois familles, qui doivent se partager les teintes.
+  const count = harmony === 'split' ? 6 : random() < 0.5 ? 6 : 8;
+  const hues = harmonyHues(harmony, count, random);
 
   if (family === 'text') {
     const [light, dark] = RANDOM_GROUNDS[Math.floor(random() * RANDOM_GROUNDS.length)];
@@ -308,16 +371,12 @@ export function randomTheme(
   const inks = [...RANDOM_INKS, ...RANDOM_INKS_EXTRA];
   const [inkLight, inkDark] = inks[Math.floor(random() * inks.length)];
   // La rampe de luminosité n'est pas décorative : c'est elle qui distingue deux
-  // colonnes voisines quand le fond est peu saturé. Un tirage qui la supprimait
-  // une fois sur deux produisait, avec le style MUTED, des colonnes
-  // indiscernables — écart mesuré à 5 pour un seuil de 10, alors même que les
-  // teintes étaient séparées de 36°.
-  //
-  // Elle est proportionnelle au nombre de teintes, et non fixe : répartie sur
-  // sept marches plutôt que cinq, une rampe de 0,24 s'aplatit au point de ne
-  // plus rien distinguer (écart 8). C'est le pas entre deux colonnes qui doit
-  // rester constant, pas l'amplitude totale.
-  return tinted(id, label, hues, style, inkLight, inkDark, 0.05 * (hues.length - 1));
+  // colonnes voisines quand le fond est peu saturé — sans elle, avec le style
+  // MUTED, un écart de 5 pour un seuil de 10, à 36° de teinte d'écart. C'est
+  // le pas entre deux colonnes qui doit rester constant (0,05), pas
+  // l'amplitude totale : d'où une amplitude proportionnelle au nombre de marches.
+  const theme = tinted(id, label, hues, style, inkLight, inkDark, 0.05 * (count / 2));
+  return { ...theme, wave: true };
 }
 
 /**
@@ -328,8 +387,16 @@ export function randomTheme(
  */
 function offset(theme: CsvTheme, column: number, dark: boolean): number {
   if (theme.spread === 0) return 0;
-  const steps = Math.max(1, theme.hues.length - 1);
-  const distance = (theme.spread * (column % theme.hues.length)) / steps;
+  const count = theme.hues.length;
+  const position = column % count;
+  // En dents de scie, la dernière teinte est la plus éloignée de la première :
+  // au recommencement, la luminosité sautait de toute l'amplitude d'un coup —
+  // mesuré entre 51 et 81 points, contre 4 à 21 entre deux colonnes ordinaires.
+  // En aller-retour, deux colonnes voisines ne diffèrent jamais que d'une
+  // marche, recommencement compris, et l'amplitude est deux fois moindre.
+  const level = theme.wave ? Math.min(position, count - position) : position;
+  const levels = theme.wave ? Math.floor(count / 2) : count - 1;
+  const distance = (theme.spread * level) / Math.max(1, levels);
   return dark ? distance : -distance;
 }
 
@@ -364,12 +431,22 @@ export function paletteFor(theme: CsvTheme, column: number, dark: boolean): Pale
     };
   }
 
-  const cell = dark
-    ? hsb(hue, style.cellSaturationDark, style.cellBrightnessDark + shift)
-    : hsb(hue, style.cellSaturation, style.cellBrightness + shift);
-  const band = dark
-    ? hsb(hue, style.cellSaturationDark * 1.1, style.cellBrightnessDark + 0.08 + shift)
-    : hsb(hue, style.cellSaturation * 2, style.cellBrightness - 0.03 + shift);
+  const cellAt = (h: number) =>
+    dark
+      ? hsb(h, style.cellSaturationDark, style.cellBrightnessDark + shift)
+      : hsb(h, style.cellSaturation, style.cellBrightness + shift);
+  const bandAt = (h: number) =>
+    dark
+      ? hsb(h, style.cellSaturationDark * 1.1, style.cellBrightnessDark + 0.08 + shift)
+      : hsb(h, style.cellSaturation * 2, style.cellBrightness - 0.03 + shift);
+  // La luminosité HSB n'est pas la clarté perçue : à réglage égal, une case
+  // jaune paraît bien plus claire qu'une case bleue. Une palette qui alterne
+  // les deux faisait sauter la clarté d'une colonne à l'autre — jusqu'à 57
+  // points de luminance entre deux voisines. Les palettes en aller-retour
+  // reçoivent donc toutes, à marche égale, la même clarté perçue : celle de la
+  // moyenne de leurs teintes. Seules la teinte et la rampe les distinguent.
+  const cell = theme.wave ? atLightness(cellAt(hue), meanLightness(theme.hues, cellAt)) : cellAt(hue);
+  const band = theme.wave ? atLightness(bandAt(hue), meanLightness(theme.hues, bandAt)) : bandAt(hue);
   const text = theme.uniformInk
     ? dark
       ? theme.uniformInk.dark
@@ -404,6 +481,64 @@ export function gradientFor(theme: CsvTheme, dark: boolean, alpha = 0.3): string
   if (stops.length === 1) return `linear-gradient(90deg, ${stops[0]}, ${stops[0]})`;
   const steps = stops.map((colour, index) => `${colour} ${Math.round((index / (stops.length - 1)) * 100)}%`);
   return `linear-gradient(90deg, ${steps.join(', ')})`;
+}
+
+// ------------------------------------------------------------------ OKLab
+// Espace où une même valeur de L se perçoit comme une même clarté, quelle que
+// soit la teinte (Björn Ottosson, 2020). Sert uniquement à égaliser la clarté
+// des palettes en aller-retour.
+
+function toLinear(channel: number): number {
+  return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+}
+
+function fromLinear(channel: number): number {
+  return channel <= 0.0031308 ? 12.92 * channel : 1.055 * channel ** (1 / 2.4) - 0.055;
+}
+
+function toOklab(hex: string): [number, number, number] {
+  const [red, green, blue] = [1, 3, 5].map((at) => toLinear(parseInt(hex.slice(at, at + 2), 16) / 255));
+  const l = Math.cbrt(0.4122214708 * red + 0.5363325363 * green + 0.0514459929 * blue);
+  const m = Math.cbrt(0.2119034982 * red + 0.6806995451 * green + 0.1073969566 * blue);
+  const s = Math.cbrt(0.0883024619 * red + 0.2817188376 * green + 0.6299787005 * blue);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ];
+}
+
+function fromOklab(lightness: number, a: number, b: number): [number, number, number] {
+  const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  return [
+    fromLinear(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+    fromLinear(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+    fromLinear(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s),
+  ];
+}
+
+/** Clarté perçue moyenne d'une palette, pour un réglage donné. */
+function meanLightness(hues: number[], colourAt: (hue: number) => string): number {
+  return hues.reduce((sum, hue) => sum + toOklab(colourAt(hue))[0], 0) / hues.length;
+}
+
+/**
+ * La même couleur, ramenée à la clarté perçue demandée.
+ *
+ * Changer la clarté peut faire sortir la couleur de ce qu'un écran affiche :
+ * on réduit alors sa saturation, par paliers, jusqu'à ce qu'elle y rentre —
+ * jamais la clarté, qui est précisément ce qu'on veut garantir.
+ */
+function atLightness(hex: string, lightness: number): string {
+  const [, a, b] = toOklab(hex);
+  for (let keep = 1; keep >= 0; keep -= 0.05) {
+    const rgb = fromOklab(lightness, a * keep, b * keep);
+    if (rgb.every((channel) => channel >= -0.001 && channel <= 1.001)) return toHex(rgb[0], rgb[1], rgb[2]);
+  }
+  const grey = fromOklab(lightness, 0, 0);
+  return toHex(grey[0], grey[1], grey[2]);
 }
 
 function clamp(value: number, low: number, high: number): number {
