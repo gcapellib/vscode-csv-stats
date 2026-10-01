@@ -6,26 +6,23 @@ file exists so that jump has an explanation.
 
 ## 0.21.0
 
-Random palettes only — the shipped ones render byte for byte as before, and so
-do palettes you already kept.
+**Random palette** only — the shipped palettes render byte for byte as before,
+and so do palettes you already kept.
 
-Draws were garish: saturated backgrounds, opposite hues side by side, olive and
-brown columns in dark mode, and an abrupt fall from bright to dark columns
-whenever the hues started over. They are now built on what colour-harmony
-studies measure — close hues, desaturated colours, similar lightness, cool hues
-preferred ([Schloss & Palmer, 2011](https://palmerlab.berkeley.edu/pdf/Schloss&Palmer(2011).pdf);
-[Ou & Luo, 2006](https://onlinelibrary.wiley.com/doi/abs/10.1002/col.20208)),
-no olive or brown ([Palmer & Schloss, 2010](https://www.pnas.org/doi/10.1073/pnas.0906172107))
-— and computed in OKLCH, where equal lightness looks equal whatever the hue.
+Draws were garish: saturated backgrounds, olive and brown columns, an abrupt
+fall from bright to dark columns. They now take after Prism — a full rainbow in
+spectral order, light and luminous — computed in OKLCH, where equal lightness
+looks equal whatever the hue. Where a hue would darken into brown or olive, the
+colour wheel is folded so the hues skip that stretch without leaving the
+rainbow; dark backgrounds skip red too, which turns burgundy there.
 
-Measured over 200 draws, 0.20.0 against 0.21.0:
+Measured over 200 draws (38,400 colours shown), 0.20.0 against 0.21.0:
 
 | | 0.20.0 | 0.21.0 |
 |---|---|---|
-| Highest background chroma | 0.184 | 0.066 |
-| Olive or brown in dark mode (chroma) | 0.175 | 0.021 |
-| Largest lightness jump between neighbouring columns | 100 | 19 |
-| Lowest text/background contrast (threshold 60) | 66 | 128 |
+| Brown or olive colours | 2,452 | 0 |
+| Highest background chroma | 0.184 | 0.077 |
+| Lowest text/background contrast (threshold 60) | 66 | 94 |
 
 ## 0.20.0
 

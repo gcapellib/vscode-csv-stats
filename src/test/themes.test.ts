@@ -252,20 +252,6 @@ describe('palettes tirées au sort', () => {
     assert.ok(pireSaut <= 25, `pire saut de clarté entre colonnes voisines : ${pireSaut.toFixed(0)}`);
   });
 
-  it('ne tire plus systématiquement un arc-en-ciel complet', () => {
-    // Toutes les palettes tirées se ressemblaient parce que toutes couvraient
-    // le cercle entier : jamais plus de 80° laissés vides, sur deux cents
-    // tirages. Une palette harmonieuse occupe une partie du cercle seulement.
-    let resserrees = 0;
-    for (let seed = 1; seed <= 200; seed++) {
-      const ordered = [...randomTheme('background', 'h', 'H', seeded(seed * 7)).hues].sort((a, b) => a - b);
-      let arcVide = 360 - ordered[ordered.length - 1] + ordered[0];
-      for (let i = 1; i < ordered.length; i++) arcVide = Math.max(arcVide, ordered[i] - ordered[i - 1]);
-      if (arcVide >= 120) resserrees++;
-    }
-    assert.ok(resserrees > 100, `tirages laissant au moins 120° vides : ${resserrees} sur 200`);
-  });
-
   /** Clarté et chroma OKLab, calculées ici indépendamment du code testé. */
   function oklch(hex: string): { l: number; c: number; h: number } {
     const lin = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
@@ -279,46 +265,60 @@ describe('palettes tirées au sort', () => {
     return { l: L, c: Math.hypot(A, B), h: ((Math.atan2(B, A) * 180) / Math.PI + 360) % 360 };
   }
 
-  it('ne tire jamais de fond saturé', () => {
-    // Les paires harmonieuses sont « plus désaturées » (Schloss & Palmer,
-    // 2011) ; le style le plus vif d'avant montait à des fonds de chroma 0,18
-    // en thème sombre — les colonnes rouge vif et vert acide signalées.
-    let pire = 0;
-    for (let seed = 1; seed <= 200; seed++) {
-      const theme = randomTheme('background', 's', 'S', seeded(seed * 7));
+  /** Toutes les couleurs qu'un tirage montre à l'écran, dans les deux thèmes. */
+  function shown(seed: number): Array<{ hex: string; dark: boolean; role: string }> {
+    const out: Array<{ hex: string; dark: boolean; role: string }> = [];
+    for (const family of ['background', 'text'] as const) {
+      const theme = randomTheme(family, 'v', 'V', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
       for (const dark of [false, true]) {
-        for (let column = 0; column < 8; column++) pire = Math.max(pire, oklch(paletteFor(theme, column, dark).cell).c);
+        for (let column = 0; column < 8; column++) {
+          const p = paletteFor(theme, column, dark);
+          out.push({ hex: p.cell, dark, role: 'fond' }, { hex: p.accent, dark, role: 'accent' }, { hex: p.text, dark, role: 'texte' });
+        }
       }
     }
-    assert.ok(pire <= 0.07, `chroma maximale d'un fond : ${pire.toFixed(3)}`);
+    return out;
+  }
+
+  it('ne montre jamais de brun ni d’olive', () => {
+    // Le reproche répété à l'essai : « tous les tons marrons, obscurs, ne sont
+    // pas agréables ». Brun et olive, c'est un orange, un jaune ou un
+    // vert-jaune à la fois foncé et coloré — le minimum de préférence chez
+    // Palmer & Schloss (2010). Fonds, accents et textes, dans les deux thèmes.
+    const bruns: string[] = [];
+    for (let seed = 1; seed <= 200; seed++) {
+      for (const colour of shown(seed)) {
+        const { l, c, h } = oklch(colour.hex);
+        // Un grand aplat rouge foncé se lit aussi comme du brun (bordeaux).
+        const debut = colour.role === 'fond' ? 15 : 40;
+        if (h >= debut && h <= 145 && c >= 0.03 && l < 0.6) bruns.push(`${colour.hex} (${colour.role}, ${colour.dark ? 'sombre' : 'clair'})`);
+      }
+    }
+    assert.deepEqual(bruns.slice(0, 5), [], `${bruns.length} couleurs brunes ou olive`);
   });
 
-  it('ne produit ni olive ni brun en thème sombre', () => {
-    // Jaune foncé et orange foncé sont les couleurs les moins aimées (Palmer
-    // & Schloss, 2010). Un fond sombre y conduit toute teinte orange, jaune
-    // ou vert-jaune.
+  it('ne tire jamais de fond criard', () => {
+    // Les fonds trop saturés ont été le premier reproche : le style le plus vif
+    // d'avant montait à une chroma de 0,18. Un fond reste pastel.
     let pire = 0;
     for (let seed = 1; seed <= 200; seed++) {
-      const theme = randomTheme('background', 'o', 'O', seeded(seed * 7));
-      for (let column = 0; column < 8; column++) {
-        const cell = oklch(paletteFor(theme, column, true).cell);
-        if (cell.h >= 50 && cell.h <= 145) pire = Math.max(pire, cell.c);
-      }
+      for (const colour of shown(seed)) if (colour.role === 'fond') pire = Math.max(pire, oklch(colour.hex).c);
     }
-    assert.ok(pire <= 0.025, `chroma maximale d'un fond sombre jaune ou orange : ${pire.toFixed(3)}`);
+    assert.ok(pire <= 0.08, `chroma maximale d'un fond : ${pire.toFixed(3)}`);
   });
 
-  it('garde les teintes d’une même famille, le plus souvent', () => {
-    // L'harmonie décroît avec l'écart de teinte (Schloss & Palmer ; Ou &
-    // Luo, 2006). Une palette sur un arc de moins de 90° doit être la règle.
-    let resserrees = 0;
-    for (let seed = 1; seed <= 200; seed++) {
-      const ordered = [...randomTheme('background', 'f', 'F', seeded(seed * 7)).hues].sort((a, b) => a - b);
-      let arcVide = 360 - ordered[ordered.length - 1] + ordered[0];
-      for (let i = 1; i < ordered.length; i++) arcVide = Math.max(arcVide, ordered[i] - ordered[i - 1]);
-      if (360 - arcVide <= 90) resserrees++;
+  it('range ses teintes dans l’ordre de l’arc-en-ciel', () => {
+    // Le modèle retenu est Prism : un pas constant d'une teinte à la suivante,
+    // dans un sens ou dans l'autre, recommencement compris.
+    for (let seed = 1; seed <= 100; seed++) {
+      const { hues } = randomTheme('text', 'p', 'P', seeded(seed));
+      const steps = hues.map((hue, index) => (((hues[(index + 1) % hues.length] - hue) % 360) + 360) % 360);
+      const pas = 360 / hues.length;
+      assert.ok(
+        steps.every((step) => Math.abs(step - pas) <= 1) || steps.every((step) => Math.abs(360 - step - pas) <= 1),
+        `teintes hors de l'ordre du spectre : ${hues.join(', ')}`,
+      );
     }
-    assert.ok(resserrees >= 100, `tirages sur un arc de 90° au plus : ${resserrees} sur 200`);
   });
 });
 

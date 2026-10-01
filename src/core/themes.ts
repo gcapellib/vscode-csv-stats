@@ -55,13 +55,16 @@ export interface CsvTheme {
   tone?: Tone;
 }
 
-/** Le caractère d'une palette tirée : sa saturation et sa clarté communes. */
+/**
+ * Le caractère d'une palette tirée : sa chroma et sa clarté, communes à
+ * toutes les colonnes. Elles portent sur le fond quand le fond est coloré,
+ * sur le texte quand c'est lui qui l'est.
+ */
 export interface Tone {
-  /** Chroma OKLCH des fonds, la même pour toutes les colonnes. */
   chroma: number;
-  /** Clarté OKLCH des fonds en thème clair. */
+  /** Clarté OKLCH en thème clair. */
   light: number;
-  /** Clarté OKLCH des fonds en thème sombre. */
+  /** Clarté OKLCH en thème sombre. */
   dark: number;
 }
 
@@ -249,47 +252,42 @@ export function themeById(id: string | undefined): CsvTheme {
 export type RandomFamily = 'background' | 'text';
 
 /**
- * Les tirages au sort suivent ce que les études mesurent de l'harmonie, et non
- * plus une répartition sur tout le cercle :
- *
- * - **teintes proches** : l'harmonie d'une paire croît avec la ressemblance
- *   des teintes, et décroît avec leur écart (Schloss & Palmer, 2011, sur 992
- *   paires ; Ou & Luo, 2006, sur 1 431) ;
- * - **couleurs désaturées** : les paires harmonieuses sont « plus
- *   désaturées » ; le rouge saturé, surtout en fond, donne les combinaisons
- *   les plus disharmonieuses (Schloss & Palmer) ;
- * - **même chroma, clarté différente** : deux couleurs qui ne diffèrent que
- *   par la clarté s'accordent ; plus elles sont claires, mieux elles
- *   s'accordent (Ou & Luo) ;
- * - **teintes froides** de préférence (Schloss & Palmer) ;
- * - **ni olive ni brun** : jaune foncé et orange foncé sont les couleurs les
- *   moins aimées (Palmer & Schloss, 2010). Un fond sombre assombrit toute
- *   teinte jaune ou orange jusqu'à elles ; il les désature donc.
+ * Les tirages au sort prennent modèle sur Prism, la palette livrée la plus
+ * appréciée à l'usage : un arc-en-ciel complet, dans l'ordre du spectre, clair
+ * et lumineux. Deux tentatives fondées sur les études d'harmonie (teintes
+ * proches, couleurs désaturées) ont été essayées puis rejetées : jugées ternes
+ * et brunâtres. Ce qui déplaisait n'était pas la variété des teintes, mais le
+ * sombre et le brun.
  *
  * Tout se calcule en OKLCH, où une même clarté se perçoit comme telle quelle
  * que soit la teinte — en HSB, un jaune paraît bien plus clair qu'un bleu au
  * même réglage.
  */
-const TONES: Tone[] = [
-  { chroma: 0.025, light: 0.965, dark: 0.27 }, // brume
-  { chroma: 0.035, light: 0.955, dark: 0.29 }, // poudré
-  { chroma: 0.05, light: 0.94, dark: 0.31 }, // pastel
-  { chroma: 0.065, light: 0.925, dark: 0.33 }, // tendre
+
+/** Texte coloré : de l'encre claire et vive en sombre, soutenue en clair. */
+const INK_TONES: Tone[] = [
+  { chroma: 0.11, light: 0.52, dark: 0.84 },
+  { chroma: 0.13, light: 0.5, dark: 0.8 },
+  { chroma: 0.15, light: 0.48, dark: 0.77 },
 ];
 
-/** Familles de teintes : une seule, le plus souvent ; deux ou trois, rarement. */
-type Harmony = 'analogous' | 'complementary' | 'split';
-const HARMONIES: Harmony[] = ['analogous', 'analogous', 'analogous', 'analogous', 'complementary', 'split'];
+/** Fond coloré : pastel en clair, sans être délavé ; jamais terne en sombre. */
+// Pas de chroma sous 0,055 : en thème sombre, le fond évite la zone qui
+// brunit et ses teintes se resserrent sur ce qui reste du cercle ; plus doux,
+// deux colonnes voisines tombaient sous le seuil de distinction (écart 9).
+const CELL_TONES: Tone[] = [
+  { chroma: 0.055, light: 0.955, dark: 0.33 },
+  { chroma: 0.065, light: 0.94, dark: 0.345 },
+  { chroma: 0.075, light: 0.925, dark: 0.36 },
+];
 
 /** Encres et fonds éprouvés : seules les teintes sont tirées au sort. */
 const RANDOM_INKS: Array<[string, string]> = [
-  ['#1B1B1F', '#E8E8EC'],
-  ['#14301C', '#D3EBD8'],
-  ['#0E2A3A', '#CFE8F5'],
-  ['#241A38', '#E4D9F5'],
-  ['#2A2118', '#F3E7D8'],
-  ['#1C2620', '#DCE8DE'],
-  ['#191C28', '#DEE2F0'],
+  ['#1B1B1F', '#F2F2F5'],
+  ['#14301C', '#E6F5EA'],
+  ['#0E2A3A', '#E3F2FA'],
+  ['#241A38', '#EFE8FA'],
+  ['#191C28', '#E9ECF5'],
 ];
 
 const RANDOM_GROUNDS: Array<[string, string]> = [
@@ -298,52 +296,39 @@ const RANDOM_GROUNDS: Array<[string, string]> = [
   ['#EFF1F5', '#1E1E2E'],
   ['#FBF7FF', '#282A36'],
   ['#ECEFF4', '#2E3440'],
-  ['#FDF6E3', '#002B36'],
-  ['#F4F7F2', '#16211A'],
-  ['#F7F3FA', '#1E1728'],
   ['#F2F6F9', '#141E28'],
+  ['#F7F3FA', '#1E1728'],
 ];
 
 /**
- * Les teintes d'un tirage, dans l'ordre des colonnes.
+ * Replie le cercle chromatique pour qu'il évite l'arc [from, to].
  *
- * Une famille seule se parcourt en aller-retour : la teinte glisse d'un bout
- * de l'arc à l'autre puis revient, sans jamais sauter quand elle recommence.
- * Deux ou trois familles alternent d'une colonne à l'autre ; elles ne sont
- * tirées qu'avec une chroma réduite, là où des teintes opposées cessent de
- * se heurter.
+ * Un orange ou un jaune foncé devient brun, un vert-jaune foncé devient olive :
+ * les couleurs les moins aimées (Palmer & Schloss, 2010), et les premières
+ * rejetées à l'essai. Plutôt que de retirer une teinte, ce qui casserait
+ * l'arc-en-ciel, on comprime le cercle sur ce qui reste : les teintes gardent
+ * leur ordre et leurs écarts relatifs, et sautent la zone qui brunit.
  */
-function harmonyHues(harmony: Harmony, count: number, random: () => number): number[] {
-  // Teintes froides deux fois sur trois : du cyan au violet, en OKLCH. Sinon
-  // n'importe où, sauf dans la bande orange–jaune–vert-jaune (50° à 145°) :
-  // une famille centrée là n'aurait, en thème sombre, que des gris chauds à
-  // offrir une fois désaturée. Elle peut y déborder, protégée par ailleurs.
-  const start = random() < 0.66 ? 190 + random() * 110 : 145 + random() * 265;
-  const wrap = (hue: number) => Math.round(((hue % 360) + 360) % 360);
-
-  if (harmony === 'analogous') {
-    const arc = 30 + random() * 50;
-    const half = count / 2;
-    return Array.from({ length: count }, (_, column) => {
-      const level = Math.min(column, count - column);
-      return wrap(start - arc / 2 + (arc * level) / half);
-    });
-  }
-  const centres = harmony === 'complementary' ? [0, 180] : [0, 150, 210];
-  const width = 20;
-  return Array.from({ length: count }, (_, column) => {
-    const family = column % centres.length;
-    const rank = Math.floor(column / centres.length);
-    return wrap(start + centres[family] + (rank % 2 === 0 ? -width / 2 : width / 2));
-  });
+function avoiding(hue: number, from: number, to: number): number {
+  const kept = 360 - (to - from);
+  return (to + ((((hue - to) % 360) + 360) % 360) * (kept / 360)) % 360;
 }
+
+/**
+ * Où le brun guette : le texte foncé du thème clair, le fond du thème sombre.
+ * Le fond sombre évite aussi le rouge, qui y vire au bordeaux — un brun de
+ * plus à l'œil, vu sur la planche de contrôle. Le texte rouge, lui, reste
+ * rouge.
+ */
+const DARK_INK_BAND: [number, number] = [35, 150];
+const DARK_CELL_BAND: [number, number] = [0, 150];
 
 /**
  * Tire une palette au sort.
  *
- * Le hasard choisit une famille de teintes, son départ, un ton, une encre et
- * un fond — jamais la lisibilité : deux cents tirages sont soumis aux mêmes
- * seuils que les palettes livrées.
+ * Le hasard choisit le nombre de teintes, leur point de départ, le sens du
+ * parcours, un ton et un fond ou une encre — jamais la lisibilité : deux cents
+ * tirages sont soumis aux mêmes seuils que les palettes livrées.
  */
 export function randomTheme(
   family: RandomFamily,
@@ -351,51 +336,48 @@ export function randomTheme(
   label: string,
   random: () => number = Math.random,
 ): CsvTheme {
-  const harmony = HARMONIES[Math.floor(random() * HARMONIES.length)];
-  // Toujours pair : l'aller-retour des teintes culmine sur une seule colonne.
-  const count = harmony === 'split' ? 6 : random() < 0.5 ? 6 : 8;
-  const hues = harmonyHues(harmony, count, random);
-  const base = TONES[Math.floor(random() * TONES.length)];
-  // Des teintes opposées ne s'accordent qu'adoucies.
-  const tone = harmony === 'analogous' ? base : { ...base, chroma: base.chroma * 0.75 };
+  const count = 6 + Math.floor(random() * 3); // 6, 7 ou 8 teintes
+  const start = random() * 360;
+  const direction = random() < 0.5 ? 1 : -1;
+  // L'ordre du spectre, à intervalle régulier : la dernière teinte rejoint la
+  // première aussi doucement que les autres s'enchaînent.
+  const hues = Array.from({ length: count }, (_, index) =>
+    Math.round((((start + (direction * index * 360) / count) % 360) + 360) % 360),
+  );
 
   if (family === 'text') {
     const [light, dark] = RANDOM_GROUNDS[Math.floor(random() * RANDOM_GROUNDS.length)];
+    const tone = INK_TONES[Math.floor(random() * INK_TONES.length)];
     return { ...inked(id, label, hues, light, dark), tone };
   }
   const [inkLight, inkDark] = RANDOM_INKS[Math.floor(random() * RANDOM_INKS.length)];
+  const tone = CELL_TONES[Math.floor(random() * CELL_TONES.length)];
   return { ...tinted(id, label, hues, VIVID, inkLight, inkDark, 0), tone };
 }
 
-/**
- * Couleurs d'une colonne pour une palette en OKLCH.
- *
- * Les colonnes voisines alternent légèrement de clarté : c'est ce qui les
- * distingue quand leurs teintes sont proches, et c'est la seule différence
- * qu'Ou & Luo trouvent harmonieuse en soi. L'alternance porte sur le rang de
- * la colonne, pas sur celui de la teinte : aucun saut au recommencement.
- */
+/** Couleurs d'une colonne pour une palette tirée, décrite en OKLCH. */
 function tonePalette(theme: CsvTheme, tone: Tone, column: number, dark: boolean): Palette {
   const hue = theme.hues[column % theme.hues.length];
-  const swing = column % 2 === 0 ? 1 : -1;
-  // Un orange, un jaune ou un vert-jaune assombri devient brun ou olive —
-  // le minimum de préférence, « greenish brown or olive » chez Palmer &
-  // Schloss : désaturé en thème sombre. Bande élargie après avoir vu passer un
-  // vert-jaune à 140° qui, laissé tel quel, virait au kaki.
-  const muddy = dark && hue >= 50 && hue <= 145;
-  const chroma = muddy ? tone.chroma * 0.3 : tone.chroma;
 
   if (theme.neutral) {
     const ground = dark ? theme.neutral.dark : theme.neutral.light;
-    const ink = dark ? oklch(0.82 + 0.03 * swing, 0.075, hue) : oklch(0.5 - 0.035 * swing, 0.09, hue);
+    // En sombre, l'encre est claire : son jaune reste un jaune, comme dans
+    // Prism. En clair, elle doit être foncée, et c'est là qu'elle brunirait.
+    const ink = dark
+      ? oklch(tone.dark, tone.chroma, hue)
+      : oklch(tone.light, tone.chroma, avoiding(hue, ...DARK_INK_BAND));
     return { cell: ground, band: shiftBrightness(ground, dark ? 0.1 : -0.05), accent: ink, text: ink };
   }
 
-  const lightness = dark ? tone.dark + 0.022 * swing : tone.light - 0.02 * swing;
+  // Le fond clair est pâle : un jaune pâle y est un jaune. Le fond sombre l'est
+  // assez pour brunir tout orange et tout jaune ; l'accent, lui, est l'inverse.
+  const cellHue = dark ? avoiding(hue, ...DARK_CELL_BAND) : hue;
+  const accentHue = dark ? hue : avoiding(hue, ...DARK_INK_BAND);
+  const lightness = dark ? tone.dark : tone.light;
   return {
-    cell: oklch(lightness, chroma, hue),
-    band: oklch(lightness + (dark ? 0.035 : -0.025), chroma * 1.15, hue),
-    accent: dark ? oklch(0.76, 0.09, hue) : oklch(0.6, 0.1, hue),
+    cell: oklch(lightness, tone.chroma, cellHue),
+    band: oklch(lightness + (dark ? 0.04 : -0.025), tone.chroma * 1.15, cellHue),
+    accent: dark ? oklch(0.8, 0.12, accentHue) : oklch(0.58, 0.13, accentHue),
     text: dark ? theme.uniformInk!.dark : theme.uniformInk!.light,
   };
 }

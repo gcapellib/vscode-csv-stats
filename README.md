@@ -208,21 +208,18 @@ it to your own list, which survives restarts. Drawn palettes and kept ones both
 carry a cross; the ones shipped with the extension do not, and cannot be
 removed.
 
-The draw follows what colour research measures of harmony, rather than spreading
-hues over the whole wheel. Pairs read as harmonious when their hues are close,
-their colours desaturated and their lightness similar, and cool hues fare better
-([Schloss & Palmer, 2011](https://palmerlab.berkeley.edu/pdf/Schloss&Palmer(2011).pdf));
-two colours differing only in lightness agree, and the lighter the better
-([Ou & Luo, 2006](https://onlinelibrary.wiley.com/doi/abs/10.1002/col.20208));
-dark yellow and dark orange — olive and brown — are the least liked colours of
-all ([Palmer & Schloss, 2010](https://www.pnas.org/doi/10.1073/pnas.0906172107)).
-So a draw mostly stays within one family of hues, two thirds of the time a cool
-one; every column shares one chroma and one perceived lightness, computed in
-OKLCH; neighbouring columns differ by a slight alternation of lightness; and in
-dark mode orange, yellow and yellow-green backgrounds are desaturated before
-they turn to mud. Two hundred draws are put through the same thresholds as the
-shipped palettes — neighbouring columns distinguishable, text never confused
-with its ground.
+A draw takes after **Prism**: a full rainbow, hues in spectral order at even
+steps, light and luminous — only its starting hue, direction, number of hues,
+intensity and ground change from one draw to the next. Everything is computed
+in OKLCH, where equal lightness looks equal whatever the hue. Brown and olive
+never appear: wherever a hue would darken into them — dark text on a light
+ground, a dark background — the colour wheel is folded so the hues skip that
+stretch while keeping their order, rather than dropping a colour from the
+rainbow. Dark backgrounds skip red as well, which turns burgundy there. Two
+hundred draws are put through the same thresholds as the shipped palettes —
+neighbouring columns distinguishable, text never confused with its ground —
+and through a test that finds no brown or olive among the 38,400 colours they
+show.
 
 ## How files are read
 
