@@ -23,16 +23,7 @@ export interface Style {
 const PASTEL: Style = { cellSaturation: 0.13, cellBrightness: 0.99, cellSaturationDark: 0.4, cellBrightnessDark: 0.22, accentSaturation: 0.68, accentBrightness: 0.62, accentBrightnessDark: 0.78 };
 const VIVID: Style = { cellSaturation: 0.24, cellBrightness: 1.0, cellSaturationDark: 0.55, cellBrightnessDark: 0.26, accentSaturation: 0.85, accentBrightness: 0.66, accentBrightnessDark: 0.84 };
 const MUTED: Style = { cellSaturation: 0.1, cellBrightness: 0.97, cellSaturationDark: 0.28, cellBrightnessDark: 0.24, accentSaturation: 0.45, accentBrightness: 0.54, accentBrightnessDark: 0.7 };
-const DEEP: Style = { cellSaturation: 0.18, cellBrightness: 0.95, cellSaturationDark: 0.62, cellBrightnessDark: 0.2, accentSaturation: 0.75, accentBrightness: 0.5, accentBrightnessDark: 0.74 };
-/**
- * Trois styles ajoutés parce que les tirages se ressemblaient tous : ils ne
- * faisaient varier que la teinte, tandis que saturation et luminosité venaient
- * toujours des quatre mêmes réglages. C'est le style qui donne son caractère à
- * une palette, pas la teinte.
- */
 const WASHED: Style = { cellSaturation: 0.07, cellBrightness: 1.0, cellSaturationDark: 0.2, cellBrightnessDark: 0.28, accentSaturation: 0.34, accentBrightness: 0.58, accentBrightnessDark: 0.72 };
-const EARTH: Style = { cellSaturation: 0.17, cellBrightness: 0.93, cellSaturationDark: 0.34, cellBrightnessDark: 0.21, accentSaturation: 0.52, accentBrightness: 0.46, accentBrightnessDark: 0.66 };
-const ELECTRIC: Style = { cellSaturation: 0.3, cellBrightness: 0.98, cellSaturationDark: 0.68, cellBrightnessDark: 0.3, accentSaturation: 0.95, accentBrightness: 0.68, accentBrightnessDark: 0.9 };
 
 
 export interface CsvTheme {
@@ -56,12 +47,22 @@ export interface CsvTheme {
   /** Amplitude de la rampe de luminosité sur l'ensemble des teintes. */
   spread: number;
   /**
-   * Rampe en aller-retour plutôt qu'en dents de scie : la luminosité descend
-   * puis remonte, au lieu de retomber d'un coup quand les teintes recommencent.
-   * Absent sur les palettes livrées et sur celles gardées avant son
-   * introduction, qui conservent ainsi exactement leur apparence.
+   * Palette décrite en clarté et chroma perçues (OKLCH) plutôt qu'en HSB :
+   * toutes ses colonnes partagent la même chroma et la même clarté de base,
+   * seules la teinte et une légère alternance de clarté les distinguent.
+   * Réservé aux tirages ; les palettes livrées ne le portent pas.
    */
-  wave?: boolean;
+  tone?: Tone;
+}
+
+/** Le caractère d'une palette tirée : sa saturation et sa clarté communes. */
+export interface Tone {
+  /** Chroma OKLCH des fonds, la même pour toutes les colonnes. */
+  chroma: number;
+  /** Clarté OKLCH des fonds en thème clair. */
+  light: number;
+  /** Clarté OKLCH des fonds en thème sombre. */
+  dark: number;
 }
 
 export interface Palette {
@@ -247,10 +248,38 @@ export function themeById(id: string | undefined): CsvTheme {
 /** Les deux familles qu'un tirage peut produire. */
 export type RandomFamily = 'background' | 'text';
 
-// Sept styles plutôt que quatre : c'est ce qui sépare deux tirages, bien plus
-// que leurs teintes. Avec quatre, toutes les palettes tirées finissaient par
-// se ressembler quelle que soit la couleur.
-const RANDOM_STYLES: Style[] = [PASTEL, VIVID, MUTED, DEEP, WASHED, EARTH, ELECTRIC];
+/**
+ * Les tirages au sort suivent ce que les études mesurent de l'harmonie, et non
+ * plus une répartition sur tout le cercle :
+ *
+ * - **teintes proches** : l'harmonie d'une paire croît avec la ressemblance
+ *   des teintes, et décroît avec leur écart (Schloss & Palmer, 2011, sur 992
+ *   paires ; Ou & Luo, 2006, sur 1 431) ;
+ * - **couleurs désaturées** : les paires harmonieuses sont « plus
+ *   désaturées » ; le rouge saturé, surtout en fond, donne les combinaisons
+ *   les plus disharmonieuses (Schloss & Palmer) ;
+ * - **même chroma, clarté différente** : deux couleurs qui ne diffèrent que
+ *   par la clarté s'accordent ; plus elles sont claires, mieux elles
+ *   s'accordent (Ou & Luo) ;
+ * - **teintes froides** de préférence (Schloss & Palmer) ;
+ * - **ni olive ni brun** : jaune foncé et orange foncé sont les couleurs les
+ *   moins aimées (Palmer & Schloss, 2010). Un fond sombre assombrit toute
+ *   teinte jaune ou orange jusqu'à elles ; il les désature donc.
+ *
+ * Tout se calcule en OKLCH, où une même clarté se perçoit comme telle quelle
+ * que soit la teinte — en HSB, un jaune paraît bien plus clair qu'un bleu au
+ * même réglage.
+ */
+const TONES: Tone[] = [
+  { chroma: 0.025, light: 0.965, dark: 0.27 }, // brume
+  { chroma: 0.035, light: 0.955, dark: 0.29 }, // poudré
+  { chroma: 0.05, light: 0.94, dark: 0.31 }, // pastel
+  { chroma: 0.065, light: 0.925, dark: 0.33 }, // tendre
+];
+
+/** Familles de teintes : une seule, le plus souvent ; deux ou trois, rarement. */
+type Harmony = 'analogous' | 'complementary' | 'split';
+const HARMONIES: Harmony[] = ['analogous', 'analogous', 'analogous', 'analogous', 'complementary', 'split'];
 
 /** Encres et fonds éprouvés : seules les teintes sont tirées au sort. */
 const RANDOM_INKS: Array<[string, string]> = [
@@ -258,6 +287,9 @@ const RANDOM_INKS: Array<[string, string]> = [
   ['#14301C', '#D3EBD8'],
   ['#0E2A3A', '#CFE8F5'],
   ['#241A38', '#E4D9F5'],
+  ['#2A2118', '#F3E7D8'],
+  ['#1C2620', '#DCE8DE'],
+  ['#191C28', '#DEE2F0'],
 ];
 
 const RANDOM_GROUNDS: Array<[string, string]> = [
@@ -266,88 +298,52 @@ const RANDOM_GROUNDS: Array<[string, string]> = [
   ['#EFF1F5', '#1E1E2E'],
   ['#FBF7FF', '#282A36'],
   ['#ECEFF4', '#2E3440'],
-  // Fonds franchement teintés : un gris presque noir à chaque tirage donnait
-  // le même décor à toutes les palettes.
-  ['#FBF1C7', '#282828'],
   ['#FDF6E3', '#002B36'],
   ['#F4F7F2', '#16211A'],
   ['#F7F3FA', '#1E1728'],
   ['#F2F6F9', '#141E28'],
 ];
 
-const RANDOM_INKS_EXTRA: Array<[string, string]> = [
-  ['#2A2118', '#F3E7D8'],
-  ['#1C2620', '#DCE8DE'],
-  ['#191C28', '#DEE2F0'],
-];
-
 /**
- * Les schémas d'harmonie entre lesquels un tirage choisit.
+ * Les teintes d'un tirage, dans l'ordre des colonnes.
  *
- * Le tirage répartissait autrefois ses teintes à intervalle régulier sur tout
- * le cercle : chaque palette était un arc-en-ciel complet, simplement tourné,
- * d'où l'impression que tous les tirages se ressemblaient. Mesuré sur deux
- * cents tirages, l'arc laissé vide ne dépassait jamais 80°. Une palette
- * harmonieuse fait l'inverse : elle n'occupe qu'une partie du cercle — une
- * famille de teintes voisines, ou deux ou trois familles qui se répondent.
- */
-type Harmony = 'analogous' | 'complementary' | 'split' | 'spectrum';
-
-/** L'arc-en-ciel reste possible, mais devient l'exception. */
-const HARMONIES: Harmony[] = ['analogous', 'analogous', 'complementary', 'complementary', 'split', 'split', 'spectrum'];
-
-/** Écart minimal entre deux teintes d'une même palette, en degrés. */
-const MIN_HUE_STEP = 15;
-
-/**
- * Les teintes d'un schéma, dans l'ordre des colonnes.
- *
- * L'ordre importe autant que les teintes : dans une famille resserrée, deux
- * teintes voisines sur le cercle ne se distinguent presque pas. Les colonnes
- * voisines reçoivent donc des teintes éloignées — on alterne entre familles,
- * ou, dans une famille seule, entre ses deux moitiés.
+ * Une famille seule se parcourt en aller-retour : la teinte glisse d'un bout
+ * de l'arc à l'autre puis revient, sans jamais sauter quand elle recommence.
+ * Deux ou trois familles alternent d'une colonne à l'autre ; elles ne sont
+ * tirées qu'avec une chroma réduite, là où des teintes opposées cessent de
+ * se heurter.
  */
 function harmonyHues(harmony: Harmony, count: number, random: () => number): number[] {
-  const start = random() * 360;
+  // Teintes froides deux fois sur trois : du cyan au violet, en OKLCH. Sinon
+  // n'importe où, sauf dans la bande orange–jaune–vert-jaune (50° à 145°) :
+  // une famille centrée là n'aurait, en thème sombre, que des gris chauds à
+  // offrir une fois désaturée. Elle peut y déborder, protégée par ailleurs.
+  const start = random() < 0.66 ? 190 + random() * 110 : 145 + random() * 265;
   const wrap = (hue: number) => Math.round(((hue % 360) + 360) % 360);
 
-  if (harmony === 'spectrum') {
-    // Secousse limitée au sixième de l'intervalle : au-delà, deux teintes
-    // pouvaient se rapprocher à 15°, indiscernables sur un style discret.
-    const step = 360 / count;
-    return Array.from({ length: count }, (_, index) => wrap(start + index * step + (random() - 0.5) * (step / 3)));
-  }
-
   if (harmony === 'analogous') {
-    // Un seul arc, élargi avec le nombre de teintes pour qu'aucune ne se
-    // rapproche de sa voisine à moins de MIN_HUE_STEP.
-    const arc = MIN_HUE_STEP * (count - 1) + random() * 30;
-    const along = Array.from({ length: count }, (_, index) => start + (arc * index) / (count - 1));
+    const arc = 30 + random() * 50;
     const half = count / 2;
-    return Array.from({ length: count }, (_, column) =>
-      wrap(along[column % 2 === 0 ? column / 2 : half + (column - 1) / 2]),
-    );
+    return Array.from({ length: count }, (_, column) => {
+      const level = Math.min(column, count - column);
+      return wrap(start - arc / 2 + (arc * level) / half);
+    });
   }
-
-  // Deux familles opposées, ou trois : la base et les deux voisines de son
-  // complément, à ±30° de celui-ci.
   const centres = harmony === 'complementary' ? [0, 180] : [0, 150, 210];
-  const perFamily = count / centres.length;
-  const width = MIN_HUE_STEP * (perFamily - 1) + random() * 15;
+  const width = 20;
   return Array.from({ length: count }, (_, column) => {
     const family = column % centres.length;
     const rank = Math.floor(column / centres.length);
-    const along = perFamily === 1 ? 0 : (width * rank) / (perFamily - 1) - width / 2;
-    return wrap(start + centres[family] + along);
+    return wrap(start + centres[family] + (rank % 2 === 0 ? -width / 2 : width / 2));
   });
 }
 
 /**
  * Tire une palette au sort.
  *
- * Le hasard choisit un schéma d'harmonie, un angle de départ, un style, une
- * encre et un fond ; tout le reste est puisé dans des valeurs déjà éprouvées.
- * Le hasard porte sur la couleur, jamais sur la lisibilité.
+ * Le hasard choisit une famille de teintes, son départ, un ton, une encre et
+ * un fond — jamais la lisibilité : deux cents tirages sont soumis aux mêmes
+ * seuils que les palettes livrées.
  */
 export function randomTheme(
   family: RandomFamily,
@@ -356,27 +352,52 @@ export function randomTheme(
   random: () => number = Math.random,
 ): CsvTheme {
   const harmony = HARMONIES[Math.floor(random() * HARMONIES.length)];
-  // Toujours un nombre pair : la rampe en aller-retour culmine sur une seule
-  // colonne. Avec un nombre impair, les deux colonnes du sommet auraient la
-  // même luminosité, et ne se distingueraient plus que par la teinte. Six
-  // seulement pour trois familles, qui doivent se partager les teintes.
+  // Toujours pair : l'aller-retour des teintes culmine sur une seule colonne.
   const count = harmony === 'split' ? 6 : random() < 0.5 ? 6 : 8;
   const hues = harmonyHues(harmony, count, random);
+  const base = TONES[Math.floor(random() * TONES.length)];
+  // Des teintes opposées ne s'accordent qu'adoucies.
+  const tone = harmony === 'analogous' ? base : { ...base, chroma: base.chroma * 0.75 };
 
   if (family === 'text') {
     const [light, dark] = RANDOM_GROUNDS[Math.floor(random() * RANDOM_GROUNDS.length)];
-    return inked(id, label, hues, light, dark);
+    return { ...inked(id, label, hues, light, dark), tone };
   }
-  const style = RANDOM_STYLES[Math.floor(random() * RANDOM_STYLES.length)];
-  const inks = [...RANDOM_INKS, ...RANDOM_INKS_EXTRA];
-  const [inkLight, inkDark] = inks[Math.floor(random() * inks.length)];
-  // La rampe de luminosité n'est pas décorative : c'est elle qui distingue deux
-  // colonnes voisines quand le fond est peu saturé — sans elle, avec le style
-  // MUTED, un écart de 5 pour un seuil de 10, à 36° de teinte d'écart. C'est
-  // le pas entre deux colonnes qui doit rester constant (0,05), pas
-  // l'amplitude totale : d'où une amplitude proportionnelle au nombre de marches.
-  const theme = tinted(id, label, hues, style, inkLight, inkDark, 0.05 * (count / 2));
-  return { ...theme, wave: true };
+  const [inkLight, inkDark] = RANDOM_INKS[Math.floor(random() * RANDOM_INKS.length)];
+  return { ...tinted(id, label, hues, VIVID, inkLight, inkDark, 0), tone };
+}
+
+/**
+ * Couleurs d'une colonne pour une palette en OKLCH.
+ *
+ * Les colonnes voisines alternent légèrement de clarté : c'est ce qui les
+ * distingue quand leurs teintes sont proches, et c'est la seule différence
+ * qu'Ou & Luo trouvent harmonieuse en soi. L'alternance porte sur le rang de
+ * la colonne, pas sur celui de la teinte : aucun saut au recommencement.
+ */
+function tonePalette(theme: CsvTheme, tone: Tone, column: number, dark: boolean): Palette {
+  const hue = theme.hues[column % theme.hues.length];
+  const swing = column % 2 === 0 ? 1 : -1;
+  // Un orange, un jaune ou un vert-jaune assombri devient brun ou olive —
+  // le minimum de préférence, « greenish brown or olive » chez Palmer &
+  // Schloss : désaturé en thème sombre. Bande élargie après avoir vu passer un
+  // vert-jaune à 140° qui, laissé tel quel, virait au kaki.
+  const muddy = dark && hue >= 50 && hue <= 145;
+  const chroma = muddy ? tone.chroma * 0.3 : tone.chroma;
+
+  if (theme.neutral) {
+    const ground = dark ? theme.neutral.dark : theme.neutral.light;
+    const ink = dark ? oklch(0.82 + 0.03 * swing, 0.075, hue) : oklch(0.5 - 0.035 * swing, 0.09, hue);
+    return { cell: ground, band: shiftBrightness(ground, dark ? 0.1 : -0.05), accent: ink, text: ink };
+  }
+
+  const lightness = dark ? tone.dark + 0.022 * swing : tone.light - 0.02 * swing;
+  return {
+    cell: oklch(lightness, chroma, hue),
+    band: oklch(lightness + (dark ? 0.035 : -0.025), chroma * 1.15, hue),
+    accent: dark ? oklch(0.76, 0.09, hue) : oklch(0.6, 0.1, hue),
+    text: dark ? theme.uniformInk!.dark : theme.uniformInk!.light,
+  };
 }
 
 /**
@@ -387,20 +408,13 @@ export function randomTheme(
  */
 function offset(theme: CsvTheme, column: number, dark: boolean): number {
   if (theme.spread === 0) return 0;
-  const count = theme.hues.length;
-  const position = column % count;
-  // En dents de scie, la dernière teinte est la plus éloignée de la première :
-  // au recommencement, la luminosité sautait de toute l'amplitude d'un coup —
-  // mesuré entre 51 et 81 points, contre 4 à 21 entre deux colonnes ordinaires.
-  // En aller-retour, deux colonnes voisines ne diffèrent jamais que d'une
-  // marche, recommencement compris, et l'amplitude est deux fois moindre.
-  const level = theme.wave ? Math.min(position, count - position) : position;
-  const levels = theme.wave ? Math.floor(count / 2) : count - 1;
-  const distance = (theme.spread * level) / Math.max(1, levels);
+  const steps = Math.max(1, theme.hues.length - 1);
+  const distance = (theme.spread * (column % theme.hues.length)) / steps;
   return dark ? distance : -distance;
 }
 
 export function paletteFor(theme: CsvTheme, column: number, dark: boolean): Palette {
+  if (theme.tone) return tonePalette(theme, theme.tone, column, dark);
   const hue = theme.hues[column % theme.hues.length];
   const style = theme.style;
   const shift = offset(theme, column, dark);
@@ -431,22 +445,12 @@ export function paletteFor(theme: CsvTheme, column: number, dark: boolean): Pale
     };
   }
 
-  const cellAt = (h: number) =>
-    dark
-      ? hsb(h, style.cellSaturationDark, style.cellBrightnessDark + shift)
-      : hsb(h, style.cellSaturation, style.cellBrightness + shift);
-  const bandAt = (h: number) =>
-    dark
-      ? hsb(h, style.cellSaturationDark * 1.1, style.cellBrightnessDark + 0.08 + shift)
-      : hsb(h, style.cellSaturation * 2, style.cellBrightness - 0.03 + shift);
-  // La luminosité HSB n'est pas la clarté perçue : à réglage égal, une case
-  // jaune paraît bien plus claire qu'une case bleue. Une palette qui alterne
-  // les deux faisait sauter la clarté d'une colonne à l'autre — jusqu'à 57
-  // points de luminance entre deux voisines. Les palettes en aller-retour
-  // reçoivent donc toutes, à marche égale, la même clarté perçue : celle de la
-  // moyenne de leurs teintes. Seules la teinte et la rampe les distinguent.
-  const cell = theme.wave ? atLightness(cellAt(hue), meanLightness(theme.hues, cellAt)) : cellAt(hue);
-  const band = theme.wave ? atLightness(bandAt(hue), meanLightness(theme.hues, bandAt)) : bandAt(hue);
+  const cell = dark
+    ? hsb(hue, style.cellSaturationDark, style.cellBrightnessDark + shift)
+    : hsb(hue, style.cellSaturation, style.cellBrightness + shift);
+  const band = dark
+    ? hsb(hue, style.cellSaturationDark * 1.1, style.cellBrightnessDark + 0.08 + shift)
+    : hsb(hue, style.cellSaturation * 2, style.cellBrightness - 0.03 + shift);
   const text = theme.uniformInk
     ? dark
       ? theme.uniformInk.dark
@@ -483,29 +487,12 @@ export function gradientFor(theme: CsvTheme, dark: boolean, alpha = 0.3): string
   return `linear-gradient(90deg, ${steps.join(', ')})`;
 }
 
-// ------------------------------------------------------------------ OKLab
-// Espace où une même valeur de L se perçoit comme une même clarté, quelle que
-// soit la teinte (Björn Ottosson, 2020). Sert uniquement à égaliser la clarté
-// des palettes en aller-retour.
-
-function toLinear(channel: number): number {
-  return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
-}
+// ------------------------------------------------------------------ OKLCH
+// Espace où une même clarté L se perçoit comme telle, quelle que soit la
+// teinte (Björn Ottosson, 2020).
 
 function fromLinear(channel: number): number {
   return channel <= 0.0031308 ? 12.92 * channel : 1.055 * channel ** (1 / 2.4) - 0.055;
-}
-
-function toOklab(hex: string): [number, number, number] {
-  const [red, green, blue] = [1, 3, 5].map((at) => toLinear(parseInt(hex.slice(at, at + 2), 16) / 255));
-  const l = Math.cbrt(0.4122214708 * red + 0.5363325363 * green + 0.0514459929 * blue);
-  const m = Math.cbrt(0.2119034982 * red + 0.6806995451 * green + 0.1073969566 * blue);
-  const s = Math.cbrt(0.0883024619 * red + 0.2817188376 * green + 0.6299787005 * blue);
-  return [
-    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
-    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
-    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
-  ];
 }
 
 function fromOklab(lightness: number, a: number, b: number): [number, number, number] {
@@ -519,22 +506,15 @@ function fromOklab(lightness: number, a: number, b: number): [number, number, nu
   ];
 }
 
-/** Clarté perçue moyenne d'une palette, pour un réglage donné. */
-function meanLightness(hues: number[], colourAt: (hue: number) => string): number {
-  return hues.reduce((sum, hue) => sum + toOklab(colourAt(hue))[0], 0) / hues.length;
-}
-
 /**
- * La même couleur, ramenée à la clarté perçue demandée.
- *
- * Changer la clarté peut faire sortir la couleur de ce qu'un écran affiche :
- * on réduit alors sa saturation, par paliers, jusqu'à ce qu'elle y rentre —
- * jamais la clarté, qui est précisément ce qu'on veut garantir.
+ * Couleur OKLCH vers « #rrggbb ». Hors de ce qu'un écran affiche, la chroma
+ * est réduite par paliers jusqu'à y rentrer — jamais la clarté, que la
+ * palette garantit.
  */
-function atLightness(hex: string, lightness: number): string {
-  const [, a, b] = toOklab(hex);
+export function oklch(lightness: number, chroma: number, hueDegrees: number): string {
+  const angle = (hueDegrees * Math.PI) / 180;
   for (let keep = 1; keep >= 0; keep -= 0.05) {
-    const rgb = fromOklab(lightness, a * keep, b * keep);
+    const rgb = fromOklab(lightness, chroma * keep * Math.cos(angle), chroma * keep * Math.sin(angle));
     if (rgb.every((channel) => channel >= -0.001 && channel <= 1.001)) return toHex(rgb[0], rgb[1], rgb[2]);
   }
   const grey = fromOklab(lightness, 0, 0);

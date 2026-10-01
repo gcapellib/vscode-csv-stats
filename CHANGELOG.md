@@ -9,17 +9,23 @@ file exists so that jump has an explanation.
 Random palettes only — the shipped ones render byte for byte as before, and so
 do palettes you already kept.
 
-- **No more abrupt switch between bright and dark columns.** The lightness ramp
-  fell back by its whole amplitude when the hues started over: 100 points of
-  luminance between two neighbouring columns, against about 20 elsewhere. It
-  now goes down and back up. Columns also share one *perceived* lightness
-  (OKLab): at the same setting a yellow cell reads far lighter than a blue one,
-  which alone produced jumps of 57.
-- **Draws that differ.** Hues were spread evenly over the whole wheel, so every
-  draw was a rainbow turned a few degrees. A draw now picks a harmony —
-  neighbouring hues, two opposite families, or a base and the two neighbours of
-  its complement; the full rainbow remains, as the exception. Measured over 200
-  draws: 172 leave at least a third of the wheel empty, against none before.
+Draws were garish: saturated backgrounds, opposite hues side by side, olive and
+brown columns in dark mode, and an abrupt fall from bright to dark columns
+whenever the hues started over. They are now built on what colour-harmony
+studies measure — close hues, desaturated colours, similar lightness, cool hues
+preferred ([Schloss & Palmer, 2011](https://palmerlab.berkeley.edu/pdf/Schloss&Palmer(2011).pdf);
+[Ou & Luo, 2006](https://onlinelibrary.wiley.com/doi/abs/10.1002/col.20208)),
+no olive or brown ([Palmer & Schloss, 2010](https://www.pnas.org/doi/10.1073/pnas.0906172107))
+— and computed in OKLCH, where equal lightness looks equal whatever the hue.
+
+Measured over 200 draws, 0.20.0 against 0.21.0:
+
+| | 0.20.0 | 0.21.0 |
+|---|---|---|
+| Highest background chroma | 0.184 | 0.066 |
+| Olive or brown in dark mode (chroma) | 0.175 | 0.021 |
+| Largest lightness jump between neighbouring columns | 100 | 19 |
+| Lowest text/background contrast (threshold 60) | 66 | 128 |
 
 ## 0.20.0
 

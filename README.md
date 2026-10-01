@@ -208,18 +208,21 @@ it to your own list, which survives restarts. Drawn palettes and kept ones both
 carry a cross; the ones shipped with the extension do not, and cannot be
 removed.
 
-The draw is random in colour, never in legibility. Each draw picks a harmony —
-neighbouring hues, two opposite families, or three — rather than spreading hues
-over the whole wheel, which made every draw a rotated rainbow. Columns share one
-perceived lightness, measured in OKLab, so a yellow column no longer glares next
-to a blue one, and the lightness ramp goes down and back up instead of falling
-back all at once when the hues start over. The styles, inks and grounds come
-from values already proven. Two hundred draws are put through the same two
-thresholds the shipped palettes must meet — neighbouring columns distinguishable,
-text never confused with its ground — which is how two defects were caught before
-they shipped: a jitter that let two hues fall 15° apart, invisible on a saturated
-style and fatal on a quiet one, and a brightness ramp that flattened out once
-spread over eight hues instead of six.
+The draw follows what colour research measures of harmony, rather than spreading
+hues over the whole wheel. Pairs read as harmonious when their hues are close,
+their colours desaturated and their lightness similar, and cool hues fare better
+([Schloss & Palmer, 2011](https://palmerlab.berkeley.edu/pdf/Schloss&Palmer(2011).pdf));
+two colours differing only in lightness agree, and the lighter the better
+([Ou & Luo, 2006](https://onlinelibrary.wiley.com/doi/abs/10.1002/col.20208));
+dark yellow and dark orange — olive and brown — are the least liked colours of
+all ([Palmer & Schloss, 2010](https://www.pnas.org/doi/10.1073/pnas.0906172107)).
+So a draw mostly stays within one family of hues, two thirds of the time a cool
+one; every column shares one chroma and one perceived lightness, computed in
+OKLCH; neighbouring columns differ by a slight alternation of lightness; and in
+dark mode orange, yellow and yellow-green backgrounds are desaturated before
+they turn to mud. Two hundred draws are put through the same thresholds as the
+shipped palettes — neighbouring columns distinguishable, text never confused
+with its ground.
 
 ## How files are read
 

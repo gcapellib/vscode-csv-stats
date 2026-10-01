@@ -52,10 +52,10 @@ describe('palettes', () => {
     assert.deepEqual(familles, { fond: 10, encre: 14, duo: 5 });
   });
 
-  it('gardent leur rampe d’origine', () => {
-    // La rampe en aller-retour est réservée aux tirages : les palettes livrées
-    // ne doivent pas changer d'apparence à la mise à jour.
-    assert.ok(THEMES.every((theme) => !theme.wave));
+  it('gardent leur modèle d’origine', () => {
+    // Le modèle OKLCH est réservé aux tirages : les palettes livrées ne
+    // doivent pas changer d'apparence à la mise à jour.
+    assert.ok(THEMES.every((theme) => !theme.tone));
   });
 
   it('retombe sur la palette par défaut pour un identifiant inconnu', () => {
@@ -266,16 +266,59 @@ describe('palettes tirées au sort', () => {
     assert.ok(resserrees > 100, `tirages laissant au moins 120° vides : ${resserrees} sur 200`);
   });
 
-  it('écarte les teintes plutôt que de les tirer indépendamment', () => {
-    // Le vrai risque d'un tirage naïf : deux teintes voisines à quelques
-    // degrés, donc deux colonnes de la même couleur.
-    for (let seed = 1; seed <= 50; seed++) {
-      const theme = randomTheme('background', 'z', 'Z', seeded(seed));
-      const ordered = [...theme.hues].sort((a, b) => a - b);
-      for (let i = 1; i < ordered.length; i++) {
-        assert.ok(ordered[i] - ordered[i - 1] >= 15, `teintes trop proches : ${ordered.join(', ')}`);
+  /** Clarté et chroma OKLab, calculées ici indépendamment du code testé. */
+  function oklch(hex: string): { l: number; c: number; h: number } {
+    const lin = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    const [r, g, b] = channels(hex).map((v) => lin(v / 255));
+    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+    const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+    const L = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s;
+    const A = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
+    const B = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+    return { l: L, c: Math.hypot(A, B), h: ((Math.atan2(B, A) * 180) / Math.PI + 360) % 360 };
+  }
+
+  it('ne tire jamais de fond saturé', () => {
+    // Les paires harmonieuses sont « plus désaturées » (Schloss & Palmer,
+    // 2011) ; le style le plus vif d'avant montait à des fonds de chroma 0,18
+    // en thème sombre — les colonnes rouge vif et vert acide signalées.
+    let pire = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      const theme = randomTheme('background', 's', 'S', seeded(seed * 7));
+      for (const dark of [false, true]) {
+        for (let column = 0; column < 8; column++) pire = Math.max(pire, oklch(paletteFor(theme, column, dark).cell).c);
       }
     }
+    assert.ok(pire <= 0.07, `chroma maximale d'un fond : ${pire.toFixed(3)}`);
+  });
+
+  it('ne produit ni olive ni brun en thème sombre', () => {
+    // Jaune foncé et orange foncé sont les couleurs les moins aimées (Palmer
+    // & Schloss, 2010). Un fond sombre y conduit toute teinte orange, jaune
+    // ou vert-jaune.
+    let pire = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      const theme = randomTheme('background', 'o', 'O', seeded(seed * 7));
+      for (let column = 0; column < 8; column++) {
+        const cell = oklch(paletteFor(theme, column, true).cell);
+        if (cell.h >= 50 && cell.h <= 145) pire = Math.max(pire, cell.c);
+      }
+    }
+    assert.ok(pire <= 0.025, `chroma maximale d'un fond sombre jaune ou orange : ${pire.toFixed(3)}`);
+  });
+
+  it('garde les teintes d’une même famille, le plus souvent', () => {
+    // L'harmonie décroît avec l'écart de teinte (Schloss & Palmer ; Ou &
+    // Luo, 2006). Une palette sur un arc de moins de 90° doit être la règle.
+    let resserrees = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      const ordered = [...randomTheme('background', 'f', 'F', seeded(seed * 7)).hues].sort((a, b) => a - b);
+      let arcVide = 360 - ordered[ordered.length - 1] + ordered[0];
+      for (let i = 1; i < ordered.length; i++) arcVide = Math.max(arcVide, ordered[i] - ordered[i - 1]);
+      if (360 - arcVide <= 90) resserrees++;
+    }
+    assert.ok(resserrees >= 100, `tirages sur un arc de 90° au plus : ${resserrees} sur 200`);
   });
 });
 
