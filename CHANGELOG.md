@@ -11,10 +11,12 @@ file exists so that jump has an explanation.
 Draws were garish, brownish, and all alike: every column held the same
 lightness while the hue jumped from one to the next. A draw now traces a
 gradient — lightness and hue moving together, step by step — in one of six
-shapes taken from palettes judged harmonious, and the table walks it back and
-forth rather than jumping when the colours start over. Background colours are
-softened to about half their saturation. Brown, ochre, tan, taupe, terracotta,
-khaki, mustard, olive and burgundy are kept out.
+shapes — including citrus and sunshine, for yellows, oranges and greens — and
+the table walks it back and forth rather than jumping when the colours start
+over. Background colours are paled halfway to white, with text in each
+column's own hue; coloured text spans a wider range so its gradient shows.
+Brown, ochre, tan, taupe, terracotta, khaki, mustard, olive and burgundy are
+kept out by a minimum lightness per hue rather than by rejection.
 
 Measured over 200 draws (38,400 colours shown), 0.20.0 against 0.21.0:
 

@@ -274,8 +274,10 @@ export type RandomFamily = 'background' | 'text';
  * choisit la forme, le départ, le sens et l'amplitude. Tout se calcule en
  * OKLCH, où une même clarté se perçoit comme telle quelle que soit la teinte.
  */
-type PathKind = 'rise' | 'fade' | 'pastel' | 'diverging' | 'vivid' | 'saturate';
-const PATH_KINDS: PathKind[] = ['rise', 'rise', 'fade', 'pastel', 'pastel', 'diverging', 'vivid', 'vivid', 'saturate'];
+type PathKind = 'rise' | 'fade' | 'pastel' | 'diverging' | 'vivid' | 'saturate' | 'citrus' | 'sunny';
+const PATH_KINDS: PathKind[] = [
+  'rise', 'rise', 'fade', 'pastel', 'pastel', 'diverging', 'vivid', 'vivid', 'saturate', 'citrus', 'citrus', 'sunny', 'sunny',
+];
 
 interface Point {
   l: number;
@@ -288,8 +290,41 @@ const MIN_APART = 12;
 
 const NEUTRAL_GROUNDS = { light: '#FBFBFC', dark: '#1E1F22' };
 
-/** Part de la saturation gardée au fond des cellules. */
-const CELL_SOFTNESS = 0.55;
+/**
+ * Part du chemin vers le blanc parcourue par un fond de cellule. Pleine, la
+ * couleur couvrait l'écran d'un aplat trop intense ; mêlée au fond sombre,
+ * elle s'assombrissait. Éclaircie à mi-chemin, elle reste un pastel.
+ */
+const PALENESS = 0.5;
+
+/**
+ * Clarté minimale d'un fond, selon sa teinte : un jaune ne se lit jaune que
+ * très clair, un orange ou un citron vert un peu moins, un bleu à toute
+ * clarté. Le plancher suit la teinte en douceur : le long d'un dégradé, il
+ * monte et descend sans bond, là où éclaircir une seule couleur, ou rejeter
+ * le chemin, privait les tirages de leurs jaunes, oranges et verts.
+ */
+const HUE_FLOOR: Array<[number, number]> = [
+  [0, 0], [12, 0], [25, 0.72], [40, 0.75], [60, 0.79], [75, 0.86], [100, 0.88], [120, 0.85], [140, 0.82], [155, 0.74], [170, 0], [360, 0],
+];
+
+function hueFloor(hue: number): number {
+  const h = ((hue % 360) + 360) % 360;
+  for (let i = 1; i < HUE_FLOOR.length; i++) {
+    const [h1, l1] = HUE_FLOOR[i];
+    if (h <= h1) {
+      const [h0, l0] = HUE_FLOOR[i - 1];
+      return l0 + ((l1 - l0) * (h - h0)) / (h1 - h0);
+    }
+  }
+  return 0;
+}
+
+/** Un point du chemin en fond de cellule : pâli, au-dessus de son plancher. */
+function paleCell(point: Point): string {
+  const lightness = Math.max(point.l + (0.97 - point.l) * PALENESS, hueFloor(point.h));
+  return clean({ l: lightness, c: point.c * (1 - PALENESS * 0.7), h: point.h }, true);
+}
 
 function between(low: number, high: number, random: () => number): number {
   return low + (high - low) * random();
@@ -302,7 +337,9 @@ function sweep(from: number, span: number, t: number): number {
 
 /** Les points d'un chemin, de cinq à sept. */
 function tracePath(kind: PathKind, random: () => number): Point[] {
-  const count = 5 + Math.floor(random() * 3);
+  // Le soleil s'en tient à cinq couleurs : pâlis, ses oranges et ses jaunes
+  // sont si proches qu'à sept, deux voisines se confondaient (écart 8 à 10).
+  const count = kind === 'sunny' ? 5 : 5 + Math.floor(random() * 3);
   const start = random() * 360;
   const direction = random() < 0.5 ? -1 : 1;
   const at = (build: (t: number) => Point) => Array.from({ length: count }, (_, i) => build(i / (count - 1)));
@@ -341,6 +378,20 @@ function tracePath(kind: PathKind, random: () => number): Point[] {
       // bond de clarté que le reste du chemin ne faisait jamais.
       const span = direction * between(150, 260, random);
       return at((t) => ({ l: 0.6 + 0.18 * Math.sin(Math.PI * t), c: between(0.13, 0.17, random), h: sweep(start, span, t) }));
+    }
+    case 'citrus': {
+      // Citron, citron vert, vert tendre : très clair, très frais.
+      const [top, bottom] = [between(0.94, 0.97, random), between(0.76, 0.84, random)];
+      const points = at((t) => ({ l: top + (bottom - top) * t, c: 0.12 + 0.05 * t, h: sweep(between(92, 102, random), between(45, 70, random), t) }));
+      return random() < 0.5 ? points : points.reverse();
+    }
+    case 'sunny': {
+      // Orange, ambre, citron : le soleil, de la fin d'après-midi à midi.
+      // Assez d'amplitude pour rester distinct une fois pâli : à 50°, avec un
+      // plancher de clarté qui rapproche oranges et jaunes, deux colonnes
+      // voisines se confondaient et le chemin n'était jamais retenu en fond.
+      const points = at((t) => ({ l: 0.8 + 0.16 * t, c: 0.18 - 0.03 * t, h: sweep(between(28, 36, random), between(75, 88, random), t) }));
+      return random() < 0.5 ? points : points.reverse();
     }
     case 'saturate': {
       // Une seule famille, du gris pâle à la couleur pleine puis au sombre.
@@ -420,12 +471,13 @@ function asInk(points: Point[], dark: boolean): string[] {
   const [low, high] = [Math.min(...lightness), Math.max(...lightness)];
   return points.map((point) => {
     const t = high > low ? (point.l - low) / (high - low) : 0.5;
-    const l = dark ? 0.68 + 0.22 * t : 0.38 + 0.22 * t;
+    // Une plage large, pour que le dégradé se voie d'une colonne à l'autre.
+    const l = dark ? 0.62 + 0.3 * t : 0.34 + 0.28 * t;
     // Sur fond clair, un texte jaune assez clair pour ne pas virer moutarde
     // ne se lirait plus : il glisse vers l'orange ou le vert, ses voisins.
     const hue = !dark && point.h >= 75 && point.h < 145 ? (point.h < 110 ? 65 : 150) : point.h;
     // Une encre peu saturée se lit grise, ou kaki dans les teintes chaudes.
-    return clean({ l, c: Math.max(point.c, 0.1), h: hue }, false);
+    return clean({ l, c: Math.max(point.c, 0.12), h: hue }, false);
   });
 }
 
@@ -447,18 +499,7 @@ export function randomTheme(
   for (let attempt = 0; attempt < 40; attempt++) {
     kind = PATH_KINDS[Math.floor(random() * PATH_KINDS.length)];
     const points = tracePath(kind, random);
-    // Un fond sombre reste sourd, comme l'indigo nuit des palettes de
-    // référence : sombre et saturé à la fois, c'était le premier rejet.
-    // Au fond des cellules, la couleur est adoucie : à pleine intensité, un
-    // grand aplat est trop fort (médiane de chroma 0,084, jusqu'à 0,171),
-    // jugé tel à l'essai. La clarté ne bouge pas : le dégradé reste le même.
-    const cells = points.map((point) => ({ ...point, c: Math.min(point.c * CELL_SOFTNESS, point.l < 0.5 ? 0.06 : 1) }));
-    // Un fond qu'il faudrait trop éclaircir pour ne pas brunir déformerait le
-    // dégradé — un bond au milieu du chemin : on retrace plutôt. Jamais à la
-    // dernière tentative, qui doit toujours livrer une palette.
-    const last = attempt === 39;
-    if (!last && tint && cells.some((point) => cleanLightness(point, true) - point.l > 0.08)) continue;
-    light = tint ? cells.map((point) => clean(point, true)) : asInk(points, false);
+    light = tint ? points.map(paleCell) : asInk(points, false);
     darkColours = tint ? light : asInk(points, true);
     const steps = [light, darkColours].flatMap((list) => list.slice(1).map((colour, i) => apart(list[i], colour)));
     if (Math.min(...steps) >= MIN_APART) break;
@@ -480,10 +521,6 @@ function pingPong(column: number, count: number): number {
   return step < count ? step : period - step;
 }
 
-/** Texte noir ou blanc, selon ce qui se lit le mieux sur ce fond. */
-function inkFor(cell: string): string {
-  return toOklab(cell)[0] > 0.66 ? '#1B1B1F' : '#F4F4F6';
-}
 
 /** Couleurs d'une colonne pour une palette tirée. */
 function samplePalette(sample: Sample, column: number, dark: boolean): Palette {
@@ -492,12 +529,13 @@ function samplePalette(sample: Sample, column: number, dark: boolean): Palette {
   if (!sample.tint) {
     return { cell: mode.ground, band: shiftBrightness(mode.ground, dark ? 0.1 : -0.05), accent: colour, text: colour };
   }
-  // La couleur telle quelle au fond, comme dans un nuancier ; le bandeau et
-  // l'histogramme en reprennent la teinte, l'un un peu plus soutenu, l'autre
-  // assez contrasté pour se lire dessus.
-  const text = inkFor(colour);
+  // Le fond pastel ; le texte en reprend la teinte, foncé, si bien que le
+  // dégradé se lit aussi dans le texte. Sauf de l'orangé au vert-jaune, où
+  // la même teinte foncée serait un brun : texte presque noir.
   const [l, a, b] = toOklab(colour);
   const hue = (Math.atan2(b, a) * 180) / Math.PI;
+  const turn = ((hue % 360) + 360) % 360;
+  const text = turn >= 15 && turn <= 150 ? oklch(0.3, 0.01, hue) : oklch(0.33, 0.09, hue);
   const contrasted = l > 0.66 ? l - 0.38 : l + 0.32;
   // Sur un fond jaune ou orange, la même teinte assombrie serait un brun ou
   // un olive : l'histogramme passe alors au gris foncé, à peine teinté.

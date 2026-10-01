@@ -336,9 +336,9 @@ describe('palettes tirées au sort', () => {
   });
 
   it('varie vraiment d’un tirage à l’autre', () => {
-    // Le reproche constant : « les thèmes se ressemblent ». Les six formes
-    // de chemin doivent toutes sortir, dans les deux familles, et aucune ne
-    // doit écraser les autres.
+    // Le reproche constant : « les thèmes se ressemblent ». Les huit formes
+    // de chemin — dont agrumes et soleil, ajoutées parce que jaunes, oranges
+    // et verts manquaient — doivent toutes sortir, dans les deux familles.
     const vues = new Map<string, number>();
     for (let seed = 1; seed <= 200; seed++) {
       for (const family of ['background', 'text'] as const) {
@@ -347,8 +347,8 @@ describe('palettes tirées au sort', () => {
         vues.set(key, (vues.get(key) ?? 0) + 1);
       }
     }
-    assert.equal(vues.size, 12, [...vues.keys()].sort().join(', '));
-    assert.ok(Math.max(...vues.values()) <= (400 / 12) * 3, `combinaison la plus fréquente : ${Math.max(...vues.values())} sur 400`);
+    assert.equal(vues.size, 16, [...vues.keys()].sort().join(', '));
+    assert.ok(Math.max(...vues.values()) <= (400 / 16) * 3, `combinaison la plus fréquente : ${Math.max(...vues.values())} sur 400`);
   });
 
   it('trace un dégradé, pas une juxtaposition', () => {

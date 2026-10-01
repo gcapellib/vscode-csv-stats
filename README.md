@@ -210,23 +210,28 @@ removed.
 
 A draw traces a **gradient**: a path through colour space where lightness and
 hue move together, step by step — cream, mint, sea green; indigo, lavender,
-pink; navy, red, amber, beige. Six shapes of path, taken from thirteen palettes
-judged harmonious: dark to light, light to medium, a pastel walk, two ramps
-meeting in a light centre, a vivid walk, and a rise in saturation. As it lightens
+pink; navy, red, amber, beige. Eight shapes of path, mostly taken from thirteen
+palettes judged harmonious: dark to light, light to medium, a pastel walk, two
+ramps meeting in a light centre, a vivid walk, a rise in saturation, citrus
+(lemon, lime, fresh green) and sunshine (orange, amber, lemon). As it lightens
 a colour drifts warm, as it darkens it drifts cool — what illustrators call hue
 shifting. Earlier versions did the opposite, holding every column at the same
 lightness and jumping from hue to hue: colours side by side, never a gradient.
 
 When the columns outnumber the colours, the table walks the gradient back
 (a b c d e d c b a…) instead of jumping from its last colour to its first.
-Coloured background and coloured text still alternate: the colours either fill
-the cells, softened to about half their saturation so a large area stays gentle,
-with black or white text, or colour the text on a plain ground.
+Coloured background and coloured text still alternate. Background colours are
+paled halfway to white, so a large area stays gentle, and the text takes each
+column's hue in a deep shade, so the gradient reads in the text too — near-black
+on yellows and oranges, where a deep shade of their own hue would be brown. Or
+the gradient colours the text itself, on a plain ground, across a wide enough
+range of lightness to be seen from one column to the next.
 
-Brown never appears, nor its relatives: ochre, tan, khaki, mustard, olive and
-burgundy. They are not only a matter of darkness — a yellow reads yellow only
-when very light, a dull orange reads tan even when fairly light — and the test
-encodes each case. Two hundred draws are put through the same thresholds as the
+Brown never appears, nor its relatives: ochre, tan, taupe, terracotta, khaki,
+mustard, olive and burgundy. They are not only a matter of darkness — a yellow
+reads yellow only when very light, a dull orange reads tan even when fairly
+light — so each hue has a minimum lightness, which rises and falls smoothly
+along a gradient instead of rejecting yellows, oranges and greens. Two hundred draws are put through the same thresholds as the
 shipped palettes, and must show every path shape in both families.
 
 ## How files are read
