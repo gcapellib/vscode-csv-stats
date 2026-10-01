@@ -288,6 +288,9 @@ const MIN_APART = 12;
 
 const NEUTRAL_GROUNDS = { light: '#FBFBFC', dark: '#1E1F22' };
 
+/** Part de la saturation gardée au fond des cellules. */
+const CELL_SOFTNESS = 0.55;
+
 function between(low: number, high: number, random: () => number): number {
   return low + (high - low) * random();
 }
@@ -364,10 +367,18 @@ function muddy(hex: string, large: boolean): boolean {
   const chroma = Math.hypot(a, b);
   if (chroma < 0.015) return false;
   const hue = (((Math.atan2(b, a) * 180) / Math.PI) % 360 + 360) % 360;
-  // Rouge foncé : bordeaux, sur un grand aplat surtout.
-  if (hue >= 15 && hue < 30) return lightness < (large ? 0.6 : 0.45);
+  // Vieux rose sombre et terne : taupe, apparu dès que les fonds ont été
+  // adoucis (#C59CA4, clarté 0,73). Plus clair, il reste un rose poudré —
+  // celui d'une palette de référence, vers 0,79.
+  if (hue < 30 && lightness < 0.76 && chroma < 0.06) return true;
+  // Rouge-orangé : bordeaux s'il est foncé ; en aplat, terracotta jusqu'à une
+  // clarté de 0,7, au-delà de laquelle il se lit saumon.
+  if (hue >= 15 && hue < 30) return lightness < (large ? 0.7 : 0.45);
   // Orange : brun s'il est sombre, tan s'il est terne.
-  if (hue >= 30 && hue < 75) return lightness < (large ? 0.72 : 0.68) || (lightness < 0.8 && chroma < 0.1);
+  // Beige rosé (#D7B9AC, clarté 0,81) : un orange presque gris doit être très clair.
+  if (hue >= 30 && hue < 75) {
+    return lightness < (large ? 0.72 : 0.68) || (lightness < 0.8 && chroma < 0.1) || (lightness < 0.86 && chroma < 0.05);
+  }
   // Jaune : il ne se lit jaune — citron, ambre — que très clair ; plus bas, il
   // vire moutarde, vu sur la planche de contrôle à une clarté de 0,72.
   if (hue >= 75 && hue < 110) return lightness < 0.84;
@@ -438,7 +449,10 @@ export function randomTheme(
     const points = tracePath(kind, random);
     // Un fond sombre reste sourd, comme l'indigo nuit des palettes de
     // référence : sombre et saturé à la fois, c'était le premier rejet.
-    const cells = points.map((point) => ({ ...point, c: point.l < 0.5 ? Math.min(point.c, 0.1) : point.c }));
+    // Au fond des cellules, la couleur est adoucie : à pleine intensité, un
+    // grand aplat est trop fort (médiane de chroma 0,084, jusqu'à 0,171),
+    // jugé tel à l'essai. La clarté ne bouge pas : le dégradé reste le même.
+    const cells = points.map((point) => ({ ...point, c: Math.min(point.c * CELL_SOFTNESS, point.l < 0.5 ? 0.06 : 1) }));
     // Un fond qu'il faudrait trop éclaircir pour ne pas brunir déformerait le
     // dégradé — un bond au milieu du chemin : on retrace plutôt. Jamais à la
     // dernière tentative, qui doit toujours livrer une palette.

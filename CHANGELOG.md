@@ -12,7 +12,8 @@ Draws were garish, brownish, and all alike: every column held the same
 lightness while the hue jumped from one to the next. A draw now traces a
 gradient — lightness and hue moving together, step by step — in one of six
 shapes taken from palettes judged harmonious, and the table walks it back and
-forth rather than jumping when the colours start over. Brown, ochre, tan,
+forth rather than jumping when the colours start over. Background colours are
+softened to about half their saturation. Brown, ochre, tan, taupe, terracotta,
 khaki, mustard, olive and burgundy are kept out.
 
 Measured over 200 draws (38,400 colours shown), 0.20.0 against 0.21.0:

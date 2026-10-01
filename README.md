@@ -220,8 +220,8 @@ lightness and jumping from hue to hue: colours side by side, never a gradient.
 When the columns outnumber the colours, the table walks the gradient back
 (a b c d e d c b a…) instead of jumping from its last colour to its first.
 Coloured background and coloured text still alternate: the colours either fill
-the cells as they are, with black or white text, or colour the text on a plain
-ground.
+the cells, softened to about half their saturation so a large area stays gentle,
+with black or white text, or colour the text on a plain ground.
 
 Brown never appears, nor its relatives: ochre, tan, khaki, mustard, olive and
 burgundy. They are not only a matter of darkness — a yellow reads yellow only

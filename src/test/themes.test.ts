@@ -306,11 +306,11 @@ describe('palettes tirées au sort', () => {
         // tan ou kaki s'il est terne, moutarde pour un jaune pas assez clair, olive s'il est soutenu sans être
         // clair, bordeaux pour un grand aplat rouge foncé.
         const fond = colour.role === 'fond';
-        const orange = c >= 0.015 && h >= 30 && h < 75 && (l < (fond ? 0.72 : 0.68) || (l < 0.8 && c < 0.1));
+        const orange = c >= 0.015 && h >= 30 && h < 75 && (l < (fond ? 0.72 : 0.68) || (l < 0.8 && c < 0.1) || (l < 0.86 && c < 0.05));
         const moutarde = c >= 0.015 && h >= 75 && h < 110 && l < 0.84;
         const chaud = orange || moutarde;
         const vertJaune = c >= 0.015 && h >= 110 && h <= 145 && (l < 0.6 || (c >= 0.1 && l < 0.8) || (l < 0.78 && c < 0.1));
-        const bordeaux = c >= 0.015 && h >= 15 && h < 30 && l < (fond ? 0.6 : 0.45);
+        const bordeaux = c >= 0.015 && ((h >= 15 && h < 30 && l < (fond ? 0.7 : 0.45)) || (h < 30 && l < 0.76 && c < 0.06));
         const brun = chaud || bordeaux;
         const olive = vertJaune;
         if (brun || olive) bruns.push(`${colour.hex} (${colour.role}, ${colour.dark ? 'sombre' : 'clair'})`);
