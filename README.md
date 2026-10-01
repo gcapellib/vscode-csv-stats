@@ -208,25 +208,26 @@ it to your own list, which survives restarts. Drawn palettes and kept ones both
 carry a cross; the ones shipped with the extension do not, and cannot be
 removed.
 
-A draw no longer invents its colours: it takes them from palettes people
-already love. Four versions generated colours by formula, and every one looked
-generated; the editor themes people adopt are picked by hand by designers and
-proven by thousands of users. Each draw takes one source — **Catppuccin**
-(Mocha / Latte), **One Dark / One Light** or **Everforest**, each with its
-official light and dark versions, or a **cosine palette** after
-[Inigo Quilez](https://iquilezles.org/articles/palettes/) — then six to eight of
-its colours, in an order that keeps neighbouring columns apart in both modes.
-The colours are copied exactly as their authors defined them. Coloured
-background and coloured text still alternate.
+A draw traces a **gradient**: a path through colour space where lightness and
+hue move together, step by step — cream, mint, sea green; indigo, lavender,
+pink; navy, red, amber, beige. Six shapes of path, taken from thirteen palettes
+judged harmonious: dark to light, light to medium, a pastel walk, two ramps
+meeting in a light centre, a vivid walk, and a rise in saturation. As it lightens
+a colour drifts warm, as it darkens it drifts cool — what illustrators call hue
+shifting. Earlier versions did the opposite, holding every column at the same
+lightness and jumping from hue to hue: colours side by side, never a gradient.
 
-Colours that would read as brown or olive in either mode are left out: the
-orange of One Light (#B76B01), the green of Everforest light (#8DA101), and on
-dark tinted backgrounds every warm tint that turns khaki or burgundy. Two
-hundred draws are put through the same thresholds as the shipped palettes,
-must use all four sources in both families, and show no brown among the 38,400
-colours they display.
+When the columns outnumber the colours, the table walks the gradient back
+(a b c d e d c b a…) instead of jumping from its last colour to its first.
+Coloured background and coloured text still alternate: the colours either fill
+the cells as they are, with black or white text, or colour the text on a plain
+ground.
 
-Catppuccin, One Dark / One Light (Atom) and Everforest are MIT-licensed.
+Brown never appears, nor its relatives: ochre, tan, khaki, mustard, olive and
+burgundy. They are not only a matter of darkness — a yellow reads yellow only
+when very light, a dull orange reads tan even when fairly light — and the test
+encodes each case. Two hundred draws are put through the same thresholds as the
+shipped palettes, and must show every path shape in both families.
 
 ## How files are read
 

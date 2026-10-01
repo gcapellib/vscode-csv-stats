@@ -242,25 +242,27 @@ describe('palettes tirées au sort', () => {
     assert.ok(pireContraste > 60, `contraste minimal texte/fond : ${pireContraste}`);
   });
 
-  it('ne fait jamais sauter la clarté d’une colonne à la suivante', () => {
-    // Le défaut signalé : des colonnes vives suivies d'un coup de colonnes
-    // sombres. Deux causes, mesurées : la rampe retombait de toute son
-    // amplitude au recommencement des teintes (100 points de luminance), et
-    // une case jaune paraissait bien plus claire qu'une case bleue au même
-    // réglage (57). Après correction, le pire saut mesuré est de 21.
-    let pireSaut = 0;
+  it('ne saute jamais quand les couleurs recommencent', () => {
+    // Le premier défaut signalé : des colonnes vives suivies d'un coup de
+    // colonnes sombres, au moment où la palette recommençait. Le tableau
+    // parcourt désormais le dégradé en aller-retour : deux colonnes voisines,
+    // sur seize, ne s'écartent jamais plus qu'un pas du chemin lui-même.
     for (let seed = 1; seed <= 200; seed++) {
-      const theme = randomTheme('background', 'c', 'C', seeded(seed * 7));
-      for (const dark of [false, true]) {
-        for (let column = 0; column < 16; column++) {
-          const saut = Math.abs(
-            luminance(paletteFor(theme, column, dark).cell) - luminance(paletteFor(theme, column + 1, dark).cell),
-          );
-          pireSaut = Math.max(pireSaut, saut);
+      for (const family of ['background', 'text'] as const) {
+        const theme = randomTheme(family, 'c', 'C', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
+        for (const dark of [false, true]) {
+          const colours = (dark ? theme.sample?.dark : theme.sample?.light)?.colours ?? [];
+          const pas = Math.max(...colours.slice(1).map((colour, i) => Math.abs(luminance(colour) - luminance(colours[i]))));
+          for (let column = 0; column < 16; column++) {
+            const left = paletteFor(theme, column, dark);
+            const right = paletteFor(theme, column + 1, dark);
+            const shown = family === 'background' ? [left.cell, right.cell] : [left.text, right.text];
+            const saut = Math.abs(luminance(shown[0]) - luminance(shown[1]));
+            assert.ok(saut <= pas + 0.5, `saut de ${saut.toFixed(0)} entre les colonnes ${column} et ${column + 1}, pour un pas de ${pas.toFixed(0)}`);
+          }
         }
       }
     }
-    assert.ok(pireSaut <= 25, `pire saut de clarté entre colonnes voisines : ${pireSaut.toFixed(0)}`);
   });
 
   /** Clarté et chroma OKLab, calculées ici indépendamment du code testé. */
@@ -300,31 +302,43 @@ describe('palettes tirées au sort', () => {
     for (let seed = 1; seed <= 200; seed++) {
       for (const colour of shown(seed)) {
         const { l, c, h } = oklch(colour.hex);
-        // Un grand aplat se lit brun dès une faible chroma, et le rouge foncé
-        // y vire au bordeaux ; une encre olive se voit même assez claire.
+        // Définition indépendante de celle du code : brun s'il est sombre,
+        // tan ou kaki s'il est terne, moutarde pour un jaune pas assez clair, olive s'il est soutenu sans être
+        // clair, bordeaux pour un grand aplat rouge foncé.
         const fond = colour.role === 'fond';
-        const brun = fond ? h >= 15 && h <= 145 && c >= 0.015 && l < 0.6 : h >= 40 && h <= 145 && c >= 0.03 && l < 0.6;
-        const olive = !fond && h >= 95 && h <= 135 && c >= 0.1 && l < 0.72;
+        const orange = c >= 0.015 && h >= 30 && h < 75 && (l < (fond ? 0.72 : 0.68) || (l < 0.8 && c < 0.1));
+        const moutarde = c >= 0.015 && h >= 75 && h < 110 && l < 0.84;
+        const chaud = orange || moutarde;
+        const vertJaune = c >= 0.015 && h >= 110 && h <= 145 && (l < 0.6 || (c >= 0.1 && l < 0.8) || (l < 0.78 && c < 0.1));
+        const bordeaux = c >= 0.015 && h >= 15 && h < 30 && l < (fond ? 0.6 : 0.45);
+        const brun = chaud || bordeaux;
+        const olive = vertJaune;
         if (brun || olive) bruns.push(`${colour.hex} (${colour.role}, ${colour.dark ? 'sombre' : 'clair'})`);
       }
     }
     assert.deepEqual(bruns.slice(0, 5), [], `${bruns.length} couleurs brunes ou olive`);
   });
 
-  it('ne tire jamais de fond criard', () => {
-    // Les fonds trop saturés ont été le premier reproche : le style le plus vif
-    // d'avant montait à une chroma de 0,18. Un fond reste pastel.
+  it('ne tire jamais de fond à la fois sombre et saturé', () => {
+    // Le premier rejet visait des fonds sombres et saturés sur toute la
+    // largeur (chroma 0,18). Les palettes de référence admettent des fonds
+    // francs — framboise, cramoisi — mais clairs ou moyens ; sombres, ils
+    // restent sourds, comme l'indigo nuit ou l'ardoise.
     let pire = 0;
     for (let seed = 1; seed <= 200; seed++) {
-      for (const colour of shown(seed)) if (colour.role === 'fond') pire = Math.max(pire, oklch(colour.hex).c);
+      for (const colour of shown(seed)) {
+        if (colour.role !== 'fond') continue;
+        const { l, c } = oklch(colour.hex);
+        if (l < 0.45) pire = Math.max(pire, c);
+      }
     }
-    assert.ok(pire <= 0.08, `chroma maximale d'un fond : ${pire.toFixed(3)}`);
+    assert.ok(pire <= 0.12, `chroma maximale d'un fond sombre : ${pire.toFixed(3)}`);
   });
 
   it('varie vraiment d’un tirage à l’autre', () => {
-    // Le reproche constant : « les thèmes se ressemblent ». Les quatre
-    // sources retenues au nuancier doivent toutes sortir, dans les deux
-    // familles, et aucune ne doit écraser les autres.
+    // Le reproche constant : « les thèmes se ressemblent ». Les six formes
+    // de chemin doivent toutes sortir, dans les deux familles, et aucune ne
+    // doit écraser les autres.
     const vues = new Map<string, number>();
     for (let seed = 1; seed <= 200; seed++) {
       for (const family of ['background', 'text'] as const) {
@@ -333,30 +347,27 @@ describe('palettes tirées au sort', () => {
         vues.set(key, (vues.get(key) ?? 0) + 1);
       }
     }
-    assert.equal(vues.size, 8, [...vues.keys()].sort().join(', '));
-    assert.ok(Math.max(...vues.values()) <= (400 / 8) * 2, `combinaison la plus fréquente : ${Math.max(...vues.values())} sur 400`);
+    assert.equal(vues.size, 12, [...vues.keys()].sort().join(', '));
+    assert.ok(Math.max(...vues.values()) <= (400 / 12) * 3, `combinaison la plus fréquente : ${Math.max(...vues.values())} sur 400`);
   });
 
-  it('reprend les couleurs officielles des thèmes, sans les retoucher', () => {
-    // L'harmonie vient du travail de leurs auteurs : une couleur recalculée
-    // ne serait plus la leur. Mocha et Latte, selon catppuccin/palette.
-    const mocha = ['#F5E0DC', '#F2CDCD', '#F5C2E7', '#CBA6F7', '#F38BA8', '#EBA0AC', '#FAB387', '#F9E2AF', '#A6E3A1', '#94E2D5', '#89DCEB', '#74C7EC', '#89B4FA', '#B4BEFE'];
-    const latte = ['#DC8A78', '#DD7878', '#EA76CB', '#8839EF', '#D20F39', '#E64553', '#FE640B', '#DF8E1D', '#40A02B', '#179299', '#04A5E5', '#209FB5', '#1E66F5', '#7287FD'];
-    let vus = 0;
+  it('trace un dégradé, pas une juxtaposition', () => {
+    // Le principe des palettes de référence : d'une couleur à la suivante,
+    // la clarté ou la teinte avance un peu, jamais d'un bond. Mesuré en
+    // distance perçue (ΔE OKLab), où une teinte ne pèse qu'à proportion de sa
+    // saturation — au centre presque blanc d'une rampe divergente, changer de
+    // teinte ne se voit pas : aucun pas ne dépasse la moitié du chemin total.
+    const lab = (hex: string) => {
+      const { l, c, h } = oklch(hex);
+      return [l, c * Math.cos((h * Math.PI) / 180), c * Math.sin((h * Math.PI) / 180)];
+    };
     for (let seed = 1; seed <= 200; seed++) {
-      const { sample } = randomTheme('text', 'c', 'C', seeded(seed));
-      if (sample?.source !== 'Catppuccin') continue;
-      vus++;
-      assert.equal(sample.dark.ground, '#1E1E2E');
-      assert.equal(sample.light.ground, '#EFF1F5');
-      sample.dark.colours.forEach((colour, i) => {
-        const role = mocha.indexOf(colour);
-        assert.ok(role >= 0, `${colour} n'est pas une couleur Mocha`);
-        // Même rôle dans les deux thèmes : le rose sombre reste le rose clair.
-        assert.equal(sample.light.colours[i], latte[role]);
-      });
+      const { sample } = randomTheme('background', 'g', 'G', seeded(seed));
+      const points = (sample?.light.colours ?? []).map(lab);
+      const pas = points.slice(1).map((p, i) => Math.hypot(p[0] - points[i][0], p[1] - points[i][1], p[2] - points[i][2]));
+      const total = pas.reduce((sum, step) => sum + step, 0);
+      assert.ok(Math.max(...pas) <= total / 2 + 1e-9, `${sample?.source} : un pas de ${Math.max(...pas).toFixed(2)} sur ${total.toFixed(2)}`);
     }
-    assert.ok(vus > 20, `tirages Catppuccin observés : ${vus}`);
   });
 });
 

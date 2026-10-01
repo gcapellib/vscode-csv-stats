@@ -6,25 +6,22 @@ file exists so that jump has an explanation.
 
 ## 0.21.0
 
-**Random palette** only — the shipped palettes render byte for byte as before,
-and so do palettes you already kept.
+**Random palette** only — the shipped palettes render byte for byte as before.
 
-Draws were garish, brownish, and all alike. They now take their colours from
-palettes made by hand — Catppuccin, One Dark / One Light and Everforest, with
-their official light and dark versions — or from a cosine palette after Inigo
-Quilez, all four picked by eye from a swatch book of fourteen. Colours are
-copied exactly; those that turn brown or olive in either mode are left out, and
-an order is chosen that keeps neighbouring columns apart.
+Draws were garish, brownish, and all alike: every column held the same
+lightness while the hue jumped from one to the next. A draw now traces a
+gradient — lightness and hue moving together, step by step — in one of six
+shapes taken from palettes judged harmonious, and the table walks it back and
+forth rather than jumping when the colours start over. Brown, ochre, tan,
+khaki, mustard, olive and burgundy are kept out.
 
 Measured over 200 draws (38,400 colours shown), 0.20.0 against 0.21.0:
 
 | | 0.20.0 | 0.21.0 |
 |---|---|---|
 | Brown or olive colours | 2,452 | 0 |
-| Highest background chroma | 0.184 | 0.074 |
-| Lowest text/background contrast (threshold 60) | 66 | 78 |
-
-Catppuccin, One Dark / One Light (Atom) and Everforest are MIT-licensed.
+| Lowest text/background contrast (threshold 60) | 66 | 71 |
+| Path shapes, in both families | 1 | 6 |
 
 ## 0.20.0
 
