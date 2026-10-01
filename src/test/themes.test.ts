@@ -250,6 +250,13 @@ describe('palettes tirées au sort', () => {
     for (let seed = 1; seed <= 200; seed++) {
       for (const family of ['background', 'text'] as const) {
         const theme = randomTheme(family, 'c', 'C', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
+        if (theme.blend) {
+          // Une palette mélangée garde le style de la liste : c'est l'ordre de
+          // ses teintes qui doit faire l'aller-retour, a b c d e d c b.
+          const { hues } = theme;
+          for (let k = 1; k < hues.length; k++) assert.equal(hues[k], hues[hues.length - k] ?? hues[0], `teintes ${hues.join(', ')}`);
+          continue;
+        }
         for (const dark of [false, true]) {
           const colours = (dark ? theme.sample?.dark : theme.sample?.light)?.colours ?? [];
           const pas = Math.max(...colours.slice(1).map((colour, i) => Math.abs(luminance(colour) - luminance(colours[i]))));
@@ -338,17 +345,18 @@ describe('palettes tirées au sort', () => {
   it('varie vraiment d’un tirage à l’autre', () => {
     // Le reproche constant : « les thèmes se ressemblent ». Les huit formes
     // de chemin — dont agrumes et soleil, ajoutées parce que jaunes, oranges
-    // et verts manquaient — doivent toutes sortir, dans les deux familles.
+    // et verts manquaient — doivent toutes sortir, dans les deux familles, et
+    // les mélanges avec le style d'une palette de la liste aussi.
     const vues = new Map<string, number>();
     for (let seed = 1; seed <= 200; seed++) {
       for (const family of ['background', 'text'] as const) {
-        const { sample } = randomTheme(family, 'd', 'D', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
-        const key = `${sample?.source}/${sample?.tint ? 'fond' : 'texte'}`;
+        const { sample, blend } = randomTheme(family, 'd', 'D', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
+        const key = blend ? `liste/${family === 'background' ? 'fond' : 'texte'}` : `${sample?.source}/${sample?.tint ? 'fond' : 'texte'}`;
         vues.set(key, (vues.get(key) ?? 0) + 1);
       }
     }
-    assert.equal(vues.size, 16, [...vues.keys()].sort().join(', '));
-    assert.ok(Math.max(...vues.values()) <= (400 / 16) * 3, `combinaison la plus fréquente : ${Math.max(...vues.values())} sur 400`);
+    assert.equal(vues.size, 18, [...vues.keys()].sort().join(', '));
+    assert.ok(Math.max(...vues.values()) <= 400 * 0.4, `combinaison la plus fréquente : ${Math.max(...vues.values())} sur 400`);
   });
 
   it('trace un dégradé, pas une juxtaposition', () => {

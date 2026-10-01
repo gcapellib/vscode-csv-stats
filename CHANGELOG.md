@@ -18,6 +18,11 @@ in each column's own hue; coloured text spans a wider range so its gradient show
 Brown, ochre, tan, taupe, terracotta, khaki, mustard, olive and burgundy are
 kept out by a minimum lightness per hue rather than by rejection.
 
+Half the draws blend a palette from the list with a random gradient: the list
+palette keeps its style and takes the gradient's hues. Every palette in the
+list takes part, except Okabe-Ito and Tol Bright, whose inks are given one by
+one.
+
 Measured over 200 draws (38,400 colours shown), 0.20.0 against 0.21.0:
 
 | | 0.20.0 | 0.21.0 |

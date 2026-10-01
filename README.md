@@ -218,6 +218,12 @@ a colour drifts warm, as it darkens it drifts cool — what illustrators call hu
 shifting. Earlier versions did the opposite, holding every column at the same
 lightness and jumping from hue to hue: colours side by side, never a gradient.
 
+Half the draws blend the two worlds: a palette from the list keeps its style —
+its ground, its ink, its saturation — and takes the hues of a random gradient.
+Its colours are worked out once and repaired rather than discarded: any that
+would turn brown is lightened, and coloured backgrounds get a gentle lightness
+ramp along the gradient so neighbouring columns stay apart.
+
 When the columns outnumber the colours, the table walks the gradient back
 (a b c d e d c b a…) instead of jumping from its last colour to its first.
 Coloured background and coloured text still alternate. Background colours are

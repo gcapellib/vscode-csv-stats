@@ -53,6 +53,16 @@ export interface CsvTheme {
    * Réservé aux tirages ; les palettes livrées ne le portent pas.
    */
   sample?: Sample;
+  /**
+   * Palette tirée qui emprunte son style à une palette de la liste — son
+   * nom ici — en ne remplaçant que ses teintes par un dégradé tiré au sort.
+   */
+  blend?: string;
+  /**
+   * Couleurs d'une palette mélangée, colonne par colonne, déjà calculées et
+   * réparées — un cycle complet, aller-retour compris.
+   */
+  frozen?: { light: Palette[]; dark: Palette[] };
 }
 
 /** Ce qu'un tirage affiche dans un thème, clair ou sombre. */
@@ -504,6 +514,108 @@ function asInk(points: Point[], dark: boolean): string[] {
   });
 }
 
+/** Part des tirages qui empruntent le style d'une palette de la liste. */
+const BLEND_SHARE = 0.5;
+
+/** Les teintes d'un chemin en aller-retour : a b c d e d c b, puis on recommence. */
+function pingPongHues(points: Point[]): number[] {
+  const hues = points.map((point) => hueOf(oklch(point.l, point.c, point.h)));
+  return [...hues, ...hues.slice(1, -1).reverse()];
+}
+
+/** Luminance perçue, de 0 à 255 : l'instrument du seuil de contraste texte/fond. */
+function luma(hex: string): number {
+  const [r, g, b] = [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16));
+  return (299 * r + 587 * g + 114 * b) / 1000;
+}
+
+/** Une couleur donnée, éclaircie juste ce qu'il faut pour ne pas brunir. */
+function cleanHex(hex: string, large: boolean): string {
+  const [l, a, b] = toOklab(hex);
+  return clean({ l, c: Math.hypot(a, b), h: (Math.atan2(b, a) * 180) / Math.PI }, large);
+}
+
+/** La même couleur, plus claire ou plus foncée d'un écart de clarté perçue. */
+function shiftLightness(hex: string, delta: number): string {
+  const [l, a, b] = toOklab(hex);
+  return oklch(Math.min(0.97, Math.max(0.2, l + delta)), Math.hypot(a, b), (Math.atan2(b, a) * 180) / Math.PI);
+}
+
+/**
+ * Sur fond clair, un texte jaune assez clair pour ne pas virer moutarde ne se
+ * lirait plus : il glisse vers l'orange ou le vert, comme dans les dégradés.
+ */
+function lightGroundInk(hex: string): string {
+  const [l, a, b] = toOklab(hex);
+  const hue = (((Math.atan2(b, a) * 180) / Math.PI) % 360 + 360) % 360;
+  if (hue < 75 || hue >= 145 || Math.hypot(a, b) < 0.015) return hex;
+  return oklch(l, Math.hypot(a, b), hue < 110 ? 65 : 150);
+}
+
+/**
+ * Amplitude de la rampe de clarté posée sur les fonds d'un mélange, à sens
+ * unique : vers le foncé en thème clair, vers le clair en thème sombre. Les
+ * fonds pastel de la liste sont presque blancs en thème clair (clarté 0,97) :
+ * une rampe centrée butait contre ce plafond sur sa moitié montante, et
+ * plusieurs colonnes devenaient identiques. Mesuré : à 0,12 centrée, aucun
+ * mélange avec Ocean, Lavender ou Nordic ne passait ; à 0,24 à sens unique,
+ * un sur six, assez pour que les trente essais aboutissent.
+ */
+const BLEND_RAMP = 0.24;
+
+/**
+ * Le style d'une palette de la liste, avec les teintes d'un dégradé.
+ *
+ * La palette garde ce qui fait son allure — son style, son fond, son encre —
+ * et ne reçoit du tirage que ses teintes. Ses couleurs sont calculées une
+ * fois, puis réparées plutôt que rejetées :
+ * - les styles de la liste brunissent les jaunes et les oranges en thème
+ *   sombre ; rejetés, ils ne laissaient passer que des bleus et des violets.
+ *   Ils sont éclaircis, comme dans les dégradés ;
+ * - les palettes à fond coloré distinguaient leurs colonnes par une rampe de
+ *   clarté qui, en dents de scie, sautait au recommencement ; coupée, leurs
+ *   fonds pastel se confondaient et aucune ne passait. La rampe suit ici le
+ *   dégradé, parcouru en aller-retour : aucun saut.
+ * Okabe-Ito et Tol Bright, dont les encres sont données une à une, ne s'y
+ * prêtent pas.
+ */
+function blendTheme(family: RandomFamily, id: string, label: string, random: () => number): CsvTheme | null {
+  const bases = THEMES.filter((theme) => !theme.inks && (family === 'text' ? theme.neutral : !theme.neutral));
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const base = bases[Math.floor(random() * bases.length)];
+    const points = tracePath(PATH_KINDS[Math.floor(random() * PATH_KINDS.length)], random);
+    const hues = points.map((point) => hueOf(oklch(point.l, point.c, point.h)));
+    const raw: CsvTheme = { ...base, hues, spread: 0 };
+    const cycle = (dark: boolean): Palette[] => {
+      const along = hues.map((_, i) => {
+        const colours = paletteFor(raw, i, dark);
+        // La rampe ne porte que sur les fonds colorés : un fond uni reste uni.
+        const ramp = base.neutral ? 0 : (i / Math.max(1, hues.length - 1)) * BLEND_RAMP * (dark ? 1 : -1);
+        const cell = cleanHex(shiftLightness(colours.cell, ramp), true);
+        return {
+          cell,
+          band: cleanHex(shiftLightness(colours.band, ramp), true),
+          accent: cleanHex(dark ? colours.accent : lightGroundInk(colours.accent), false),
+          text: cleanHex(dark || !base.neutral ? colours.text : lightGroundInk(colours.text), false),
+        };
+      });
+      return [...along, ...along.slice(1, -1).reverse()];
+    };
+    const frozen = { light: cycle(false), dark: cycle(true) };
+    const readable = [frozen.light, frozen.dark].every((list) =>
+      list.every((here, i) => {
+        const next = list[(i + 1) % list.length];
+        return (
+          Math.abs(luma(here.text) - luma(here.cell)) > 60 &&
+          Math.max(apart(here.cell, next.cell), apart(here.text, next.text)) >= MIN_APART
+        );
+      }),
+    );
+    if (readable) return { ...base, id, label, hues: pingPongHues(points), spread: 0, blend: base.label, frozen };
+  }
+  return null;
+}
+
 /**
  * Tire une palette au sort. Un chemin dont deux couleurs successives se
  * confondent — il arrive qu'une promenade pastel soit trop courte — est
@@ -515,6 +627,10 @@ export function randomTheme(
   label: string,
   random: () => number = Math.random,
 ): CsvTheme {
+  if (random() < BLEND_SHARE) {
+    const blended = blendTheme(family, id, label, random);
+    if (blended) return blended;
+  }
   const tint = family === 'background';
   let kind: PathKind = 'rise';
   let light: string[] = [];
@@ -581,6 +697,10 @@ function offset(theme: CsvTheme, column: number, dark: boolean): number {
 }
 
 export function paletteFor(theme: CsvTheme, column: number, dark: boolean): Palette {
+  if (theme.frozen) {
+    const list = dark ? theme.frozen.dark : theme.frozen.light;
+    return list[column % list.length];
+  }
   if (theme.sample) return samplePalette(theme.sample, column, dark);
   const hue = theme.hues[column % theme.hues.length];
   const style = theme.style;
