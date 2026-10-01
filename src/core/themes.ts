@@ -291,11 +291,13 @@ const MIN_APART = 12;
 const NEUTRAL_GROUNDS = { light: '#FBFBFC', dark: '#1E1F22' };
 
 /**
- * Part du chemin vers le blanc parcourue par un fond de cellule. Pleine, la
- * couleur couvrait l'écran d'un aplat trop intense ; mêlée au fond sombre,
- * elle s'assombrissait. Éclaircie à mi-chemin, elle reste un pastel.
+ * Où se tiennent les fonds de cellule : leur clarté est ramenée vers une
+ * clarté cible, et leur saturation réduite. À pleine intensité, l'aplat était
+ * trop fort (clarté jusqu'à 0,3, saturation 0,17) ; éclairci à mi-chemin vers
+ * le blanc, trop lumineux (clarté médiane 0,87). Entre les deux, un ton
+ * moyen-clair et sourd.
  */
-const PALENESS = 0.5;
+const CELL_TONE = { target: 0.72, pull: 0.65, chroma: 0.42 };
 
 /**
  * Clarté minimale d'un fond, selon sa teinte : un jaune ne se lit jaune que
@@ -320,10 +322,31 @@ function hueFloor(hue: number): number {
   return 0;
 }
 
-/** Un point du chemin en fond de cellule : pâli, au-dessus de son plancher. */
-function paleCell(point: Point): string {
-  const lightness = Math.max(point.l + (0.97 - point.l) * PALENESS, hueFloor(point.h));
-  return clean({ l: lightness, c: point.c * (1 - PALENESS * 0.7), h: point.h }, true);
+/** Pente maximale imposée autour d'un plancher de clarté, d'une colonne à l'autre. */
+const FLOOR_SLOPE = 0.025;
+
+/**
+ * Les points du chemin en fonds de cellule : adoucis, et au-dessus du
+ * plancher de leur teinte.
+ *
+ * Relever un jaune seul faisait une bosse dans le dégradé — sa clarté
+ * minimale, 0,88, dépasse de loin celle de fonds ramenés vers 0,76. Ses
+ * voisins sont donc relevés eux aussi, de moins en moins à mesure qu'ils
+ * s'en éloignent : la bosse devient une colline.
+ */
+function paleCells(points: Point[]): string[] {
+  const toned = points.map((point) => ({
+    l: point.l + (CELL_TONE.target - point.l) * CELL_TONE.pull,
+    c: point.c * CELL_TONE.chroma,
+    h: point.h,
+  }));
+  // Ce qu'il faut à chaque point : le plancher de sa teinte, et toutes les
+  // règles contre le brun — un orange terne doit être plus clair qu'un vif.
+  const needs = toned.map((point) => Math.max(0, hueFloor(point.h) - point.l, cleanLightness(point, true) - point.l));
+  return toned.map((point, i) => {
+    const lift = Math.max(...needs.map((need, j) => need - FLOOR_SLOPE * Math.abs(i - j)));
+    return clean({ ...point, l: point.l + Math.max(0, lift) }, true);
+  });
 }
 
 function between(low: number, high: number, random: () => number): number {
@@ -499,7 +522,7 @@ export function randomTheme(
   for (let attempt = 0; attempt < 40; attempt++) {
     kind = PATH_KINDS[Math.floor(random() * PATH_KINDS.length)];
     const points = tracePath(kind, random);
-    light = tint ? points.map(paleCell) : asInk(points, false);
+    light = tint ? paleCells(points) : asInk(points, false);
     darkColours = tint ? light : asInk(points, true);
     const steps = [light, darkColours].flatMap((list) => list.slice(1).map((colour, i) => apart(list[i], colour)));
     if (Math.min(...steps) >= MIN_APART) break;

@@ -221,7 +221,8 @@ lightness and jumping from hue to hue: colours side by side, never a gradient.
 When the columns outnumber the colours, the table walks the gradient back
 (a b c d e d c b a…) instead of jumping from its last colour to its first.
 Coloured background and coloured text still alternate. Background colours are
-paled halfway to white, so a large area stays gentle, and the text takes each
+drawn towards a muted mid-light tone with reduced saturation, so a large area
+stays gentle without glaring, and the text takes each
 column's hue in a deep shade, so the gradient reads in the text too — near-black
 on yellows and oranges, where a deep shade of their own hue would be brown. Or
 the gradient colours the text itself, on a plain ground, across a wide enough

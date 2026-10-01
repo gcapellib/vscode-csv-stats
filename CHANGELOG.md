@@ -13,8 +13,8 @@ lightness while the hue jumped from one to the next. A draw now traces a
 gradient — lightness and hue moving together, step by step — in one of six
 shapes — including citrus and sunshine, for yellows, oranges and greens — and
 the table walks it back and forth rather than jumping when the colours start
-over. Background colours are paled halfway to white, with text in each
-column's own hue; coloured text spans a wider range so its gradient shows.
+over. Background colours are drawn towards a muted mid-light tone, with text
+in each column's own hue; coloured text spans a wider range so its gradient shows.
 Brown, ochre, tan, taupe, terracotta, khaki, mustard, olive and burgundy are
 kept out by a minimum lightness per hue rather than by rejection.
 
