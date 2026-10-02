@@ -58,6 +58,8 @@ export interface CsvTheme {
    * nom ici — en ne remplaçant que ses teintes par un dégradé tiré au sort.
    */
   blend?: string;
+  /** Mélange dont les teintes font le tour du cercle, comme Prism : pas d'aller-retour. */
+  spectrum?: boolean;
   /**
    * Couleurs d'une palette mélangée, colonne par colonne, déjà calculées et
    * réparées — un cycle complet, aller-retour compris.
@@ -81,6 +83,12 @@ export interface Sample {
   source: string;
   /** Couleur au fond des cellules (vrai) ou au texte (faux). */
   tint: boolean;
+  /**
+   * Les couleurs se suivent en boucle plutôt qu'en aller-retour : un
+   * arc-en-ciel fait le tour du cercle, sa dernière couleur rejoint la
+   * première d'un pas ordinaire.
+   */
+  loop?: boolean;
   light: SampleMode;
   dark: SampleMode;
 }
@@ -517,6 +525,56 @@ function asInk(points: Point[], dark: boolean): string[] {
 /** Part des tirages qui empruntent le style d'une palette de la liste. */
 const BLEND_SHARE = 0.5;
 
+/**
+ * Part des tirages en arc-en-ciel, à la manière de Prism et Prism duo —
+ * demandés à l'essai. Pris sur la part des mélanges et des dégradés.
+ */
+const SPECTRUM_SHARE = 0.3;
+
+/** Les palettes de la liste dont l'arc-en-ciel en texte coloré emprunte le style. */
+const SPECTRUM_BASES = { text: ['prism', 'syntax'], background: [] as string[] };
+
+/**
+ * Un arc-en-ciel en fonds colorés, à la manière de Prism duo.
+ *
+ * Il ne reprend pas le style de Prism duo : en thème sombre, celui-ci pose
+ * chaque teinte sur un fond sombre, et un arc-en-ciel complet contient
+ * toujours un jaune et un orange — bruns sur fond sombre, ou, éclaircis,
+ * une colonne claire parmi des sombres. Aucun ne passait. Il prend donc les
+ * fonds sourds des dégradés, chaque teinte au-dessus de son plancher de
+ * clarté, et le texte de sa colonne en alternance.
+ */
+function spectrumCells(id: string, label: string, random: () => number): CsvTheme {
+  let hues: number[] = [];
+  let cells: string[] = [];
+  for (let attempt = 0; attempt < 20; attempt++) {
+    hues = spectrumHues(random);
+    cells = paleCells(hues.map((h) => ({ l: 0.84, c: 0.14, h })));
+    const looped = [...cells, cells[0]];
+    if (looped.slice(1).every((cell, i) => apart(looped[i], cell) >= MIN_APART)) break;
+  }
+  const sample: Sample = {
+    source: 'spectrum',
+    tint: true,
+    loop: true,
+    light: { ground: NEUTRAL_GROUNDS.light, colours: cells },
+    dark: { ground: NEUTRAL_GROUNDS.dark, colours: cells },
+  };
+  return { id, label, hues, style: VIVID, spread: 0, spectrum: true, sample };
+}
+
+/**
+ * Un arc-en-ciel : six à huit teintes à pas régulier, départ et sens au
+ * hasard. Il fait le tour complet du cercle : la dernière teinte rejoint la
+ * première d'un pas ordinaire, sans aller-retour.
+ */
+function spectrumHues(random: () => number): number[] {
+  const count = 6 + Math.floor(random() * 3);
+  const start = random() * 360;
+  const direction = random() < 0.5 ? 1 : -1;
+  return Array.from({ length: count }, (_, i) => Math.round((((start + (direction * i * 360) / count) % 360) + 360) % 360));
+}
+
 /** Les teintes d'un chemin en aller-retour : a b c d e d c b, puis on recommence. */
 function pingPongHues(points: Point[]): number[] {
   const hues = points.map((point) => hueOf(oklch(point.l, point.c, point.h)));
@@ -632,18 +690,23 @@ const BLEND_RAMP = 0.24;
  * Okabe-Ito et Tol Bright, dont les encres sont données une à une, ne s'y
  * prêtent pas.
  */
-function blendTheme(family: RandomFamily, id: string, label: string, random: () => number): CsvTheme | null {
-  const bases = THEMES.filter((theme) => !theme.inks && (family === 'text' ? theme.neutral : !theme.neutral));
+function blendTheme(family: RandomFamily, id: string, label: string, random: () => number, spectrum = false): CsvTheme | null {
+  const bases = spectrum
+    ? THEMES.filter((theme) => SPECTRUM_BASES[family].includes(theme.id))
+    : THEMES.filter((theme) => !theme.inks && (family === 'text' ? theme.neutral : !theme.neutral));
   for (let attempt = 0; attempt < 30; attempt++) {
     const base = bases[Math.floor(random() * bases.length)];
-    const points = tracePath(PATH_KINDS[Math.floor(random() * PATH_KINDS.length)], random);
-    const hues = points.map((point) => hueOf(oklch(point.l, point.c, point.h)));
+    const points = spectrum ? [] : tracePath(PATH_KINDS[Math.floor(random() * PATH_KINDS.length)], random);
+    const hues = spectrum ? spectrumHues(random) : points.map((point) => hueOf(oklch(point.l, point.c, point.h)));
     const raw: CsvTheme = { ...base, hues, spread: 0 };
     const cycle = (dark: boolean): Palette[] => {
       const along = hues.map((_, i) => {
         const colours = paletteFor(raw, i, dark);
         // La rampe ne porte que sur les fonds colorés : un fond uni reste uni.
-        const ramp = base.neutral ? 0 : (i / Math.max(1, hues.length - 1)) * BLEND_RAMP * (dark ? 1 : -1);
+        // Pas de rampe dans un arc-en-ciel : sans aller-retour, elle sauterait
+        // au recommencement — et ses teintes, à 45° l'une de l'autre, se
+        // distinguent sans elle.
+        const ramp = base.neutral || spectrum ? 0 : (i / Math.max(1, hues.length - 1)) * BLEND_RAMP * (dark ? 1 : -1);
         const cell = cleanHex(shiftLightness(colours.cell, ramp), true);
         return {
           cell,
@@ -652,7 +715,7 @@ function blendTheme(family: RandomFamily, id: string, label: string, random: () 
           text: cleanHex(dark || !base.neutral ? colours.text : lightGroundInk(colours.text), false),
         };
       });
-      const looped = [...along, ...along.slice(1, -1).reverse()];
+      const looped = spectrum ? along : [...along, ...along.slice(1, -1).reverse()];
       // Sur un fond coloré, le texte suit la règle commune : une colonne sur
       // deux plus marquée, pour que deux voisines ne se confondent jamais.
       return base.neutral ? looped : looped.map((colours, i) => ({ ...colours, text: textOn(colours.cell, i) }));
@@ -679,7 +742,10 @@ function blendTheme(family: RandomFamily, id: string, label: string, random: () 
           );
         }),
     );
-    if (readable) return { ...base, id, label, hues: pingPongHues(points), spread: 0, blend: base.label, frozen };
+    if (readable) {
+      const loopHues = spectrum ? hues : pingPongHues(points);
+      return { ...base, id, label, hues: loopHues, spread: 0, blend: base.label, frozen, ...(spectrum ? { spectrum: true } : {}) };
+    }
   }
   return null;
 }
@@ -695,7 +761,12 @@ export function randomTheme(
   label: string,
   random: () => number = Math.random,
 ): CsvTheme {
-  if (random() < BLEND_SHARE) {
+  const roll = random();
+  if (roll < SPECTRUM_SHARE) {
+    if (family === 'background') return spectrumCells(id, label, random);
+    const rainbow = blendTheme(family, id, label, random, true);
+    if (rainbow) return rainbow;
+  } else if (roll < SPECTRUM_SHARE + (1 - SPECTRUM_SHARE) * BLEND_SHARE) {
     const blended = blendTheme(family, id, label, random);
     if (blended) return blended;
   }
@@ -749,7 +820,7 @@ function pingPong(column: number, count: number): number {
 /** Couleurs d'une colonne pour une palette tirée. */
 function samplePalette(sample: Sample, column: number, dark: boolean): Palette {
   const mode = dark ? sample.dark : sample.light;
-  const colour = mode.colours[pingPong(column, mode.colours.length)];
+  const colour = mode.colours[sample.loop ? column % mode.colours.length : pingPong(column, mode.colours.length)];
   if (!sample.tint) {
     return { cell: mode.ground, band: shiftBrightness(mode.ground, dark ? 0.1 : -0.05), accent: colour, text: colour };
   }

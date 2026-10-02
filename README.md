@@ -218,7 +218,9 @@ a colour drifts warm, as it darkens it drifts cool — what illustrators call hu
 shifting. Earlier versions did the opposite, holding every column at the same
 lightness and jumping from hue to hue: colours side by side, never a gradient.
 
-Half the draws blend the two worlds: a palette from the list keeps its style —
+About a third of the draws are full rainbows in the manner of Prism and Prism
+duo — six to eight hues at even steps around the wheel, from a random start.
+Many of the others blend the two worlds: a palette from the list keeps its style —
 its ground, its ink, its saturation — and takes the hues of a random gradient.
 Its colours are worked out once and repaired rather than discarded: any that
 would turn brown is lightened, and coloured backgrounds get a gentle lightness

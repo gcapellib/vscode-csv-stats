@@ -250,6 +250,18 @@ describe('palettes tirées au sort', () => {
     for (let seed = 1; seed <= 200; seed++) {
       for (const family of ['background', 'text'] as const) {
         const theme = randomTheme(family, 'c', 'C', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
+        if (theme.spectrum) {
+          // Un arc-en-ciel fait le tour du cercle à pas régulier : la dernière
+          // teinte rejoint la première d'un pas ordinaire, comme Prism.
+          const { hues } = theme;
+          const steps = hues.map((hue, k) => (((hues[(k + 1) % hues.length] - hue) % 360) + 360) % 360);
+          const pas = 360 / hues.length;
+          assert.ok(
+            steps.every((step) => Math.abs(step - pas) <= 1) || steps.every((step) => Math.abs(360 - step - pas) <= 1),
+            `arc-en-ciel irrégulier : ${hues.join(', ')}`,
+          );
+          continue;
+        }
         if (theme.blend) {
           // Une palette mélangée garde le style de la liste : c'est l'ordre de
           // ses teintes qui doit faire l'aller-retour, a b c d e d c b.
@@ -350,15 +362,18 @@ describe('palettes tirées au sort', () => {
     const vues = new Map<string, number>();
     for (let seed = 1; seed <= 200; seed++) {
       for (const family of ['background', 'text'] as const) {
-        const { sample, blend } = randomTheme(family, 'd', 'D', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
-        const key = blend ? `liste/${family === 'background' ? 'fond' : 'texte'}` : `${sample?.source}/${sample?.tint ? 'fond' : 'texte'}`;
+        const { sample, blend, spectrum } = randomTheme(family, 'd', 'D', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
+        const side = family === 'background' ? 'fond' : 'texte';
+        const key = spectrum ? `arc-en-ciel/${side}` : blend ? `liste/${side}` : `${sample?.source}/${sample?.tint ? 'fond' : 'texte'}`;
         vues.set(key, (vues.get(key) ?? 0) + 1);
       }
     }
     // Soleil et agrumes ne sortent qu'en fond coloré : en texte, leurs encres
     // se confondent.
     assert.ok(!vues.has('sunny/texte') && !vues.has('citrus/texte'));
-    assert.equal(vues.size, 16, [...vues.keys()].sort().join(', '));
+    // Les arcs-en-ciel à la manière de Prism et Prism duo, dans les deux familles.
+    assert.ok(vues.has('arc-en-ciel/fond') && vues.has('arc-en-ciel/texte'));
+    assert.equal(vues.size, 18, [...vues.keys()].sort().join(', '));
     assert.ok(Math.max(...vues.values()) <= 400 * 0.4, `combinaison la plus fréquente : ${Math.max(...vues.values())} sur 400`);
   });
 

@@ -17,6 +17,13 @@ redrawn; the sunshine and citrus gradients no longer colour text, since their
 yellows and limes, lightened or shifted to avoid mustard and olive, ended up
 alike.
 
+**More rainbows, after Prism and Prism duo.** About a third of the draws are
+now full rainbows — six to eight hues at even steps around the wheel, random
+start and direction, the last hue meeting the first at an ordinary step. As
+coloured text they borrow Prism's or Syntax's style; as coloured backgrounds
+they use the muted cells of the gradients, since Prism duo's dark cells turn
+every rainbow's yellow and orange brown in dark mode.
+
 **The header band stays legible.** Histogram bars and ranking percentages are
 drawn on the band, not the cell, and nothing checked them there: in palettes
 blending a list style with a gradient, 74 % fell below the contrast threshold,
