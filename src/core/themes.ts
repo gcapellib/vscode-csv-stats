@@ -523,6 +523,40 @@ function pingPongHues(points: Point[]): number[] {
   return [...hues, ...hues.slice(1, -1).reverse()];
 }
 
+/**
+ * Écart perçu minimal entre les textes de deux colonnes voisines (distance
+ * OKLab). Le critère qui compte le plus à l'usage : sur les fonds colorés, le
+ * texte prenait la teinte de sa colonne en foncé, et quand le dégradé restait
+ * dans une famille, tous ces foncés se ressemblaient — 49 % des paires
+ * voisines avaient un texte identique (écart médian 0,006, contre 0,096 en
+ * texte coloré, jugé correct).
+ */
+const MIN_TEXT_APART = 0.05;
+
+/** Distance perçue entre deux couleurs, en OKLab. */
+function perceived(first: string, second: string): number {
+  const [l1, a1, b1] = toOklab(first);
+  const [l2, a2, b2] = toOklab(second);
+  return Math.hypot(l1 - l2, a1 - a2, b1 - b2);
+}
+
+/**
+ * Le texte d'une cellule colorée : la teinte de la colonne, une colonne sur
+ * deux plus marquée que sa voisine. Même quand deux teintes voisines se
+ * ressemblent, leurs textes se distinguent par la clarté. Foncé sur un fond
+ * clair, clair sur un fond sombre ; presque neutre de l'orangé au vert-jaune,
+ * où la même teinte foncée serait un brun.
+ */
+function textOn(cell: string, column: number): string {
+  const [l, a, b] = toOklab(cell);
+  const hue = (Math.atan2(b, a) * 180) / Math.PI;
+  const turn = ((hue % 360) + 360) % 360;
+  const warm = turn >= 15 && turn <= 150;
+  const strong = column % 2 === 0;
+  if (l > 0.55) return oklch(strong ? 0.22 : 0.36, warm ? 0.01 : 0.12, hue);
+  return oklch(strong ? 0.95 : 0.8, warm ? 0.01 : 0.07, hue);
+}
+
 /** Luminance perçue, de 0 à 255 : l'instrument du seuil de contraste texte/fond. */
 function luma(hex: string): number {
   const [r, g, b] = [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16));
@@ -599,17 +633,30 @@ function blendTheme(family: RandomFamily, id: string, label: string, random: () 
           text: cleanHex(dark || !base.neutral ? colours.text : lightGroundInk(colours.text), false),
         };
       });
-      return [...along, ...along.slice(1, -1).reverse()];
+      const looped = [...along, ...along.slice(1, -1).reverse()];
+      // Sur un fond coloré, le texte suit la règle commune : une colonne sur
+      // deux plus marquée, pour que deux voisines ne se confondent jamais.
+      return base.neutral ? looped : looped.map((colours, i) => ({ ...colours, text: textOn(colours.cell, i) }));
     };
     const frozen = { light: cycle(false), dark: cycle(true) };
-    const readable = [frozen.light, frozen.dark].every((list) =>
-      list.every((here, i) => {
-        const next = list[(i + 1) % list.length];
-        return (
-          Math.abs(luma(here.text) - luma(here.cell)) > 60 &&
-          Math.max(apart(here.cell, next.cell), apart(here.text, next.text)) >= MIN_APART
-        );
-      }),
+    // Une colonne éclaircie pour ne pas brunir peut ressortir, très claire,
+    // parmi des fonds sombres : le saut rejeté au tout début. L'écart de
+    // clarté entre fonds reste donc borné à la rampe, plus une marge.
+    const even = (list: Palette[]) => {
+      const lightness = list.map((colours) => toOklab(colours.cell)[0]);
+      return Math.max(...lightness) - Math.min(...lightness) <= BLEND_RAMP + 0.08;
+    };
+    const readable = [frozen.light, frozen.dark].every(
+      (list) =>
+        even(list) &&
+        list.every((here, i) => {
+          const next = list[(i + 1) % list.length];
+          return (
+            Math.abs(luma(here.text) - luma(here.cell)) > 60 &&
+            Math.max(apart(here.cell, next.cell), apart(here.text, next.text)) >= MIN_APART &&
+            perceived(here.text, next.text) >= MIN_TEXT_APART
+          );
+        }),
     );
     if (readable) return { ...base, id, label, hues: pingPongHues(points), spread: 0, blend: base.label, frozen };
   }
@@ -635,13 +682,21 @@ export function randomTheme(
   let kind: PathKind = 'rise';
   let light: string[] = [];
   let darkColours: string[] = [];
+  // Le soleil ne se prête pas au texte coloré : sur fond clair, ses oranges
+  // et ses jaunes, éclaircis pour ne pas brunir, finissaient tous du même
+  // orange — deux colonnes voisines indiscernables, à chaque tirage.
+  const kinds = tint ? PATH_KINDS : PATH_KINDS.filter((candidate) => candidate !== 'sunny');
   for (let attempt = 0; attempt < 40; attempt++) {
-    kind = PATH_KINDS[Math.floor(random() * PATH_KINDS.length)];
+    kind = kinds[Math.floor(random() * kinds.length)];
     const points = tracePath(kind, random);
     light = tint ? paleCells(points) : asInk(points, false);
     darkColours = tint ? light : asInk(points, true);
     const steps = [light, darkColours].flatMap((list) => list.slice(1).map((colour, i) => apart(list[i], colour)));
-    if (Math.min(...steps) >= MIN_APART) break;
+    // En texte coloré, ce sont les encres elles-mêmes qui doivent se
+    // distinguer nettement d'une colonne à l'autre ; sur fond coloré, le
+    // texte alterne déjà sa clarté.
+    const inks = tint ? [] : [light, darkColours].flatMap((list) => list.slice(1).map((colour, i) => perceived(list[i], colour)));
+    if (Math.min(...steps) >= MIN_APART && inks.every((gap) => gap >= MIN_TEXT_APART)) break;
   }
   const sample: Sample = {
     source: kind,
@@ -668,13 +723,11 @@ function samplePalette(sample: Sample, column: number, dark: boolean): Palette {
   if (!sample.tint) {
     return { cell: mode.ground, band: shiftBrightness(mode.ground, dark ? 0.1 : -0.05), accent: colour, text: colour };
   }
-  // Le fond pastel ; le texte en reprend la teinte, foncé, si bien que le
-  // dégradé se lit aussi dans le texte. Sauf de l'orangé au vert-jaune, où
-  // la même teinte foncée serait un brun : texte presque noir.
+  // Le fond pastel ; le texte en reprend la teinte, si bien que le dégradé
+  // se lit aussi dans le texte — une colonne sur deux plus foncée.
   const [l, a, b] = toOklab(colour);
   const hue = (Math.atan2(b, a) * 180) / Math.PI;
-  const turn = ((hue % 360) + 360) % 360;
-  const text = turn >= 15 && turn <= 150 ? oklch(0.3, 0.01, hue) : oklch(0.33, 0.09, hue);
+  const text = textOn(colour, column);
   const contrasted = l > 0.66 ? l - 0.38 : l + 0.32;
   // Sur un fond jaune ou orange, la même teinte assombrie serait un brun ou
   // un olive : l'histogramme passe alors au gris foncé, à peine teinté.

@@ -2,7 +2,7 @@
   "name": "csv-stats",
   "displayName": "CSV Stats",
   "description": "Explore CSV files in VS Code: column stats, filtering, colour palettes, and ready-to-use pandas code.",
-  "version": "0.21.0",
+  "version": "0.21.1",
   "publisher": "GabrielCapelli",
   "icon": "media/icon.png",
   "galleryBanner": {

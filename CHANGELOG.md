@@ -4,6 +4,18 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.21.1
+
+**Neighbouring columns never share a text colour.** On coloured backgrounds the
+text took each column's hue in a deep shade, and when a gradient stayed within
+one family those shades all looked alike: 49 % of neighbouring pairs had
+identical text. The text now keeps its column's hue but alternates depth from
+one column to the next — measured as perceived difference (OKLab), the median
+gap between neighbouring texts goes from 0.006 to 0.142, and no pair is
+identical any more. Draws whose coloured text cannot be told apart are
+redrawn; the sunshine gradient no longer colours text, since its oranges and
+yellows, lightened to avoid brown, all ended up the same orange.
+
 ## 0.21.0
 
 **Random palette** only — the shipped palettes render byte for byte as before.

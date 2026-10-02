@@ -355,8 +355,33 @@ describe('palettes tirées au sort', () => {
         vues.set(key, (vues.get(key) ?? 0) + 1);
       }
     }
-    assert.equal(vues.size, 18, [...vues.keys()].sort().join(', '));
+    // Le soleil ne sort qu'en fond coloré : en texte, ses encres se confondent.
+    assert.ok(!vues.has('sunny/texte'));
+    assert.equal(vues.size, 17, [...vues.keys()].sort().join(', '));
     assert.ok(Math.max(...vues.values()) <= 400 * 0.4, `combinaison la plus fréquente : ${Math.max(...vues.values())} sur 400`);
+  });
+
+  it('distingue le texte de deux colonnes voisines', () => {
+    // Le critère jugé le plus important à l'usage. Sur les fonds colorés, le
+    // texte prenait la teinte de sa colonne en foncé : 49 % des paires
+    // voisines avaient un texte identique. Distance perçue OKLab, calculée ici
+    // indépendamment du code, sur seize colonnes et dans les deux thèmes.
+    const lab = (hex: string) => {
+      const { l, c, h } = oklch(hex);
+      return [l, c * Math.cos((h * Math.PI) / 180), c * Math.sin((h * Math.PI) / 180)];
+    };
+    for (let seed = 1; seed <= 200; seed++) {
+      for (const family of ['background', 'text'] as const) {
+        const theme = randomTheme(family, 't', 'T', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
+        for (const dark of [false, true]) {
+          for (let column = 0; column < 16; column++) {
+            const [p, q] = [paletteFor(theme, column, dark).text, paletteFor(theme, column + 1, dark).text].map(lab);
+            const ecart = Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+            assert.ok(ecart >= 0.05, `${theme.blend ?? theme.sample?.source} (${family}, ${dark ? 'sombre' : 'clair'}) colonnes ${column}/${column + 1} : écart ${ecart.toFixed(3)}`);
+          }
+        }
+      }
+    }
   });
 
   it('trace un dégradé, pas une juxtaposition', () => {

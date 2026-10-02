@@ -285,7 +285,7 @@ of the above on every push and pull request.
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.21.0.vsix
+code --install-extension csv-stats-0.21.1.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**
