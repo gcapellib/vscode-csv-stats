@@ -557,6 +557,25 @@ function textOn(cell: string, column: number): string {
   return oklch(strong ? 0.95 : 0.8, warm ? 0.01 : 0.07, hue);
 }
 
+/**
+ * L'accent — barres de l'histogramme, pourcentages du classement — se lit sur
+ * le bandeau. Dans un mélange, il venait du style de la liste, pensé pour son
+ * fond d'origine : un fond éclairci contre le brun le noyait (contraste 0,
+ * jaune pâle sur jaune pâle ; 74 % des mélanges à fond coloré sous le seuil).
+ * Trop proche du bandeau, il est refait dans la même teinte, assez foncé ou
+ * assez clair pour se lire — gris s'il risquait de brunir.
+ */
+function legibleAccent(colours: Palette): Palette {
+  if (Math.abs(luma(colours.accent) - luma(colours.band)) >= 60) return colours;
+  const [band] = toOklab(colours.band);
+  const [, a, b] = toOklab(colours.accent);
+  const hue = (Math.atan2(b, a) * 180) / Math.PI;
+  const lightness = band > 0.6 ? band - 0.42 : band + 0.4;
+  let accent = oklch(lightness, Math.max(Math.hypot(a, b), 0.08), hue);
+  if (muddy(accent, false)) accent = oklch(lightness, 0, hue);
+  return { ...colours, accent };
+}
+
 /** Luminance perçue, de 0 à 255 : l'instrument du seuil de contraste texte/fond. */
 function luma(hex: string): number {
   const [r, g, b] = [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16));
@@ -653,6 +672,8 @@ function blendTheme(family: RandomFamily, id: string, label: string, random: () 
           const next = list[(i + 1) % list.length];
           return (
             Math.abs(luma(here.text) - luma(here.cell)) > 60 &&
+            // Le texte se lit aussi sur le bandeau : Missing, Distinct, classement.
+            Math.abs(luma(here.text) - luma(here.band)) >= 60 &&
             Math.max(apart(here.cell, next.cell), apart(here.text, next.text)) >= MIN_APART &&
             perceived(here.text, next.text) >= MIN_TEXT_APART
           );
@@ -682,10 +703,12 @@ export function randomTheme(
   let kind: PathKind = 'rise';
   let light: string[] = [];
   let darkColours: string[] = [];
-  // Le soleil ne se prête pas au texte coloré : sur fond clair, ses oranges
-  // et ses jaunes, éclaircis pour ne pas brunir, finissaient tous du même
-  // orange — deux colonnes voisines indiscernables, à chaque tirage.
-  const kinds = tint ? PATH_KINDS : PATH_KINDS.filter((candidate) => candidate !== 'sunny');
+  // Le soleil et les agrumes ne se prêtent pas au texte coloré : leurs jaunes
+  // et leurs citrons verts, éclaircis ou décalés pour ne pas virer moutarde
+  // ou olive, finissaient par se ressembler — deux colonnes voisines
+  // indiscernables (mesuré : 1 agrume sur 400 passait). Ils restent aux fonds.
+  const TEXT_UNFIT: PathKind[] = ['sunny', 'citrus'];
+  const kinds = tint ? PATH_KINDS : PATH_KINDS.filter((candidate) => !TEXT_UNFIT.includes(candidate));
   for (let attempt = 0; attempt < 40; attempt++) {
     kind = kinds[Math.floor(random() * kinds.length)];
     const points = tracePath(kind, random);
@@ -696,7 +719,14 @@ export function randomTheme(
     // distinguer nettement d'une colonne à l'autre ; sur fond coloré, le
     // texte alterne déjà sa clarté.
     const inks = tint ? [] : [light, darkColours].flatMap((list) => list.slice(1).map((colour, i) => perceived(list[i], colour)));
-    if (Math.min(...steps) >= MIN_APART && inks.every((gap) => gap >= MIN_TEXT_APART)) break;
+    // Une encre doit aussi se lire sur le bandeau, un peu plus contrasté que
+    // le fond : Missing, Distinct et le classement y sont écrits.
+    const onBand = tint || [false, true].every((dark) => {
+      const ground = dark ? NEUTRAL_GROUNDS.dark : NEUTRAL_GROUNDS.light;
+      const band = shiftBrightness(ground, dark ? 0.1 : -0.05);
+      return (dark ? darkColours : light).every((ink) => Math.abs(luma(ink) - luma(band)) >= 60);
+    });
+    if (Math.min(...steps) >= MIN_APART && inks.every((gap) => gap >= MIN_TEXT_APART) && onBand) break;
   }
   const sample: Sample = {
     source: kind,
@@ -752,9 +782,9 @@ function offset(theme: CsvTheme, column: number, dark: boolean): number {
 export function paletteFor(theme: CsvTheme, column: number, dark: boolean): Palette {
   if (theme.frozen) {
     const list = dark ? theme.frozen.dark : theme.frozen.light;
-    return list[column % list.length];
+    return legibleAccent(list[column % list.length]);
   }
-  if (theme.sample) return samplePalette(theme.sample, column, dark);
+  if (theme.sample) return legibleAccent(samplePalette(theme.sample, column, dark));
   const hue = theme.hues[column % theme.hues.length];
   const style = theme.style;
   const shift = offset(theme, column, dark);

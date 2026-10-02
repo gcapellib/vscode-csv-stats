@@ -13,8 +13,16 @@ identical text. The text now keeps its column's hue but alternates depth from
 one column to the next — measured as perceived difference (OKLab), the median
 gap between neighbouring texts goes from 0.006 to 0.142, and no pair is
 identical any more. Draws whose coloured text cannot be told apart are
-redrawn; the sunshine gradient no longer colours text, since its oranges and
-yellows, lightened to avoid brown, all ended up the same orange.
+redrawn; the sunshine and citrus gradients no longer colour text, since their
+yellows and limes, lightened or shifted to avoid mustard and olive, ended up
+alike.
+
+**The header band stays legible.** Histogram bars and ranking percentages are
+drawn on the band, not the cell, and nothing checked them there: in palettes
+blending a list style with a gradient, 74 % fell below the contrast threshold,
+down to pale yellow on pale yellow. An accent too close to its band is now
+redrawn in the same hue, dark or light enough to read, and the text written on
+the band (Missing, Distinct, the ranking) is held to the same threshold.
 
 ## 0.21.0
 

@@ -355,10 +355,34 @@ describe('palettes tirées au sort', () => {
         vues.set(key, (vues.get(key) ?? 0) + 1);
       }
     }
-    // Le soleil ne sort qu'en fond coloré : en texte, ses encres se confondent.
-    assert.ok(!vues.has('sunny/texte'));
-    assert.equal(vues.size, 17, [...vues.keys()].sort().join(', '));
+    // Soleil et agrumes ne sortent qu'en fond coloré : en texte, leurs encres
+    // se confondent.
+    assert.ok(!vues.has('sunny/texte') && !vues.has('citrus/texte'));
+    assert.equal(vues.size, 16, [...vues.keys()].sort().join(', '));
     assert.ok(Math.max(...vues.values()) <= 400 * 0.4, `combinaison la plus fréquente : ${Math.max(...vues.values())} sur 400`);
+  });
+
+  it('garde le bandeau lisible : histogramme, pourcentages et texte', () => {
+    // L'accent se lit sur le bandeau, pas sur la cellule : un contrôle qui ne
+    // regardait que le texte sur le fond laissait passer des pourcentages
+    // jaune pâle sur fond jaune pâle — 74 % des mélanges à fond coloré.
+    let pire = Infinity;
+    for (let seed = 1; seed <= 200; seed++) {
+      for (const family of ['background', 'text'] as const) {
+        const theme = randomTheme(family, 'a', 'A', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
+        for (const dark of [false, true]) {
+          for (let column = 0; column < 8; column++) {
+            const colours = paletteFor(theme, column, dark);
+            pire = Math.min(
+              pire,
+              Math.abs(luminance(colours.accent) - luminance(colours.band)),
+              Math.abs(luminance(colours.text) - luminance(colours.band)),
+            );
+          }
+        }
+      }
+    }
+    assert.ok(pire >= 60, `contraste minimal sur le bandeau : ${pire.toFixed(0)}`);
   });
 
   it('distingue le texte de deux colonnes voisines', () => {
