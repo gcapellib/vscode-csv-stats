@@ -532,7 +532,7 @@ const BLEND_SHARE = 0.5;
 const SPECTRUM_SHARE = 0.3;
 
 /** Les palettes de la liste dont l'arc-en-ciel en texte coloré emprunte le style. */
-const SPECTRUM_BASES = { text: ['prism', 'syntax'], background: [] as string[] };
+const SPECTRUM_BASES = { text: ['prism', 'syntax'], background: ['prism-duo', 'rainbow-duo'] };
 
 /**
  * Un arc-en-ciel en fonds colorés, à la manière de Prism duo.
@@ -640,6 +640,25 @@ function luma(hex: string): number {
   return (299 * r + 587 * g + 114 * b) / 1000;
 }
 
+/**
+ * Une couleur donnée, désaturée juste ce qu'il faut pour ne pas brunir — sans
+ * changer sa clarté. Pour les fonds sombres de Prism duo : un jaune ou un
+ * orange sombre y est brun ; l'éclaircir ferait une colonne claire parmi des
+ * sombres. Ramené vers un gris sombre, il laisse le texte, vivement coloré,
+ * porter la couleur de la colonne.
+ */
+function quiet(hex: string, large: boolean): string {
+  const [l, a, b] = toOklab(hex);
+  const hue = (Math.atan2(b, a) * 180) / Math.PI;
+  let chroma = Math.hypot(a, b);
+  let colour = hex;
+  while (muddy(colour, large) && chroma > 0) {
+    chroma = Math.max(0, chroma - 0.005);
+    colour = oklch(l, chroma, hue);
+  }
+  return colour;
+}
+
 /** Une couleur donnée, éclaircie juste ce qu'il faut pour ne pas brunir. */
 function cleanHex(hex: string, large: boolean): string {
   const [l, a, b] = toOklab(hex);
@@ -707,18 +726,30 @@ function blendTheme(family: RandomFamily, id: string, label: string, random: () 
         // au recommencement — et ses teintes, à 45° l'une de l'autre, se
         // distinguent sans elle.
         const ramp = base.neutral || spectrum ? 0 : (i / Math.max(1, hues.length - 1)) * BLEND_RAMP * (dark ? 1 : -1);
-        const cell = cleanHex(shiftLightness(colours.cell, ramp), true);
+        // Un arc-en-ciel à fonds colorés garde les fonds sombres de Prism duo
+        // et son texte vif : un fond qui brunirait est désaturé, pas éclairci.
+        const duoRainbow = spectrum && !base.neutral;
+        const settle = (hex: string) => (duoRainbow ? quiet(hex, true) : cleanHex(hex, true));
+        const cell = settle(shiftLightness(colours.cell, ramp));
+        // Sur fond clair, une encre jaune assez claire pour ne pas virer
+        // moutarde ne se lirait plus : elle glisse vers l'orange ou le vert.
+        const foldInk = !dark && (base.neutral || duoRainbow);
         return {
           cell,
-          band: cleanHex(shiftLightness(colours.band, ramp), true),
+          band: settle(shiftLightness(colours.band, ramp)),
           accent: cleanHex(dark ? colours.accent : lightGroundInk(colours.accent), false),
-          text: cleanHex(dark || !base.neutral ? colours.text : lightGroundInk(colours.text), false),
+          text: cleanHex(foldInk ? lightGroundInk(colours.text) : colours.text, false),
         };
       });
       const looped = spectrum ? along : [...along, ...along.slice(1, -1).reverse()];
       // Sur un fond coloré, le texte suit la règle commune : une colonne sur
       // deux plus marquée, pour que deux voisines ne se confondent jamais.
-      return base.neutral ? looped : looped.map((colours, i) => ({ ...colours, text: textOn(colours.cell, i) }));
+      // Prism duo, lui, garde en thème sombre son texte vif de la couleur de
+      // la colonne : c'est ce qui le rend reconnaissable. En thème clair, ses
+      // encres foncées orange et jaune, éclaircies contre le brun, finissaient
+      // du même orange que leur voisine : il y suit la règle commune.
+      const keepInk = base.neutral || (spectrum && dark);
+      return keepInk ? looped : looped.map((colours, i) => ({ ...colours, text: textOn(colours.cell, i) }));
     };
     const frozen = { light: cycle(false), dark: cycle(true) };
     // Une colonne éclaircie pour ne pas brunir peut ressortir, très claire,
@@ -763,9 +794,9 @@ export function randomTheme(
 ): CsvTheme {
   const roll = random();
   if (roll < SPECTRUM_SHARE) {
-    if (family === 'background') return spectrumCells(id, label, random);
     const rainbow = blendTheme(family, id, label, random, true);
     if (rainbow) return rainbow;
+    if (family === 'background') return spectrumCells(id, label, random);
   } else if (roll < SPECTRUM_SHARE + (1 - SPECTRUM_SHARE) * BLEND_SHARE) {
     const blended = blendTheme(family, id, label, random);
     if (blended) return blended;

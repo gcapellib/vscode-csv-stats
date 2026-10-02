@@ -20,9 +20,11 @@ alike.
 **More rainbows, after Prism and Prism duo.** About a third of the draws are
 now full rainbows — six to eight hues at even steps around the wheel, random
 start and direction, the last hue meeting the first at an ordinary step. As
-coloured text they borrow Prism's or Syntax's style; as coloured backgrounds
-they use the muted cells of the gradients, since Prism duo's dark cells turn
-every rainbow's yellow and orange brown in dark mode.
+coloured text they borrow Prism's or Syntax's style; as coloured backgrounds,
+Prism duo's or Rainbow duo's — dark tinted cells with vivid text in dark mode.
+A rainbow always has a yellow and an orange, whose dark cells would be brown:
+they are desaturated to a dark neutral instead of lightened, so no column
+jumps out, and the text carries the colour.
 
 **The header band stays legible.** Histogram bars and ranking percentages are
 drawn on the band, not the cell, and nothing checked them there: in palettes
