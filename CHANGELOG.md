@@ -7,18 +7,22 @@ file exists so that jump has an explanation.
 ## 0.22.0
 
 **Column widths by hand.** Every width used to be fixed by the automatic
-calculation. Drag the right edge of a header to resize a column, from 48 to
-1,600 pixels. Double-click the edge to widen the column until nothing is cut,
-values and band alike, past the automatic width's own ceiling; double-click
-again to shrink it to its title, read in full with its two buttons beside it.
-A width set by hand survives folding the insights band, which recomputes the
-others.
+calculation. Drag the right edge of a header to resize a column, up to 1,600
+pixels; double-click the edge to widen it until nothing is cut, past the
+automatic width's own ceiling, and again to shrink it back.
 
-Checked with real mouse gestures in a real browser: the first attempt at the
-double-click never reset anything. The header is rebuilt on every repaint, so
-the edge under the cursor was replaced between the two clicks, and the browser
-only reports a double-click when both land on the same element. It is now read
-from the click count of the second press.
+With the insights band open, the default width is a floor: a column can be
+widened but not squeezed below what its histogram and bounds need — shrinking
+to the title alone crushed them. With the band folded, a column narrows freely
+and the double-click shrinks it to its title, read in full beside its two
+buttons; reopening the band brings it back to its default width.
+
+Checked with real mouse gestures in a real browser, which caught three bugs
+before release: the double-click never registered, because the header is
+rebuilt on every repaint and the edge under the cursor was replaced between
+the two clicks; Chromium's pointer events carry no click count, so the gesture
+moved to mouse events; and a gesture made while the fold animation ran was
+overwritten by its next frame.
 
 ## 0.21.1
 

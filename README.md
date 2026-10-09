@@ -180,13 +180,18 @@ values, which makes the guess a hundred times cheaper.
 
 ## Column width
 
-Drag the right edge of a column header to make it wider or narrower — down to
-48 pixels, up to 1,600, well past what the automatic width allows, so a long
-text can be read in full. **Double-click** the edge to widen the column until
-nothing in it is cut — values and band alike — and double-click again to shrink
-it to its title, read in full with its two buttons beside it. A width set by hand outlasts folding the insights band, which
-otherwise recomputes every width; like every other view action, it lasts until
-the tab is closed.
+Drag the right edge of a column header to make it wider or narrower, up to
+1,600 pixels — well past what the automatic width allows, so a long text can be
+read in full. **Double-click** the edge to widen the column until nothing in it
+is cut, and double-click again to shrink it back.
+
+With the insights band open, a column never goes narrower than its default
+width, the one that shows its histogram and its bounds properly: it can be
+widened, not squeezed. With the band folded there is no histogram to protect,
+so a column can be narrowed freely and the double-click shrinks it to its title,
+read in full with its two buttons beside it. A column narrowed that way returns
+to its default width when the band is opened again; a widened one keeps its
+width. Like every other view action, widths last until the tab is closed.
 
 ## Palettes
 
