@@ -19,6 +19,12 @@ export interface State {
   /** Index de colonne du modèle, dans l'ordre d'affichage ; « Drop » en retire. */
   order: number[];
   widths: number[];
+  /**
+   * Largeurs choisies à la main, par index du modèle. Elles priment sur le
+   * calcul automatique, qui se refait pourtant — au repli du bandeau par
+   * exemple : sans cette mémoire, le geste serait défait sans prévenir.
+   */
+  manualWidths: Map<number, number>;
   sort: { index: number; ascending: boolean } | null;
   filters: Filter[];
   /** Types imposés depuis le menu, à réappliquer après chaque recalcul. */
@@ -50,6 +56,7 @@ export const state: State = {
   rowCount: 0,
   order: [],
   widths: [],
+  manualWidths: new Map(),
   sort: null,
   filters: [],
   forcedTypes: new Map(),

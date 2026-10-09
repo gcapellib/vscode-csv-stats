@@ -562,6 +562,7 @@ body {
 }
 
 .head-cell {
+  position: relative;
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -1014,4 +1015,30 @@ body {
 
 [hidden] {
   display: none !important;
+}
+
+/* La poignée de redimensionnement : le bord droit de chaque en-tête. Invisible
+   au repos, elle se montre au survol pour dire qu'on peut la saisir. */
+.col-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+}
+
+.col-resizer:hover,
+body.resizing .col-resizer:hover {
+  background: var(--vscode-focusBorder, var(--vscode-textLink-foreground));
+  opacity: 0.6;
+}
+
+/* Pendant le glissé, le curseur reste le même partout et rien ne se
+   sélectionne au passage. */
+body.resizing,
+body.resizing * {
+  cursor: col-resize !important;
+  user-select: none;
 }

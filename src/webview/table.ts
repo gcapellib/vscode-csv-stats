@@ -9,6 +9,7 @@ import { closeMenu } from './menu';
 import { paint } from './paint';
 import { openRangePicker } from './panels/range-picker';
 import { openValuePicker } from './panels/value-picker';
+import { resizeHandle } from './resize';
 import { palette, state } from './state';
 import { hideTooltip } from './tooltip';
 
@@ -59,7 +60,8 @@ export function measureWidths(withBand = state.bandVisible): void {
       );
     }
     const floor = withBand ? MIN_WIDTH : MIN_WIDTH_FOLDED;
-    return Math.round(Math.min(MAX_WIDTH, Math.max(floor, widest + 28)));
+    // Une largeur choisie à la main l'emporte sur tout ce calcul.
+    return state.manualWidths.get(index) ?? Math.round(Math.min(MAX_WIDTH, Math.max(floor, widest + 28)));
   });
 }
 
@@ -183,7 +185,7 @@ export function paintHead(): void {
     );
     sort.classList.toggle('on', sorted);
 
-    cell.append(name, filter, sort);
+    cell.append(name, filter, sort, resizeHandle(modelIndex));
     elements.head.appendChild(cell);
   }
 }

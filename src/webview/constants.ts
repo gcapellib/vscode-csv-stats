@@ -22,6 +22,13 @@ export const MIN_WIDTH_FOLDED = 90;
 export const HEAD_BUTTONS = 46;
 export const MAX_WIDTH = 460;
 /**
+ * Bornes d'une largeur choisie à la main : plus étroite, la colonne ne
+ * laisserait plus voir que ses boutons ; la borne haute laisse lire en entier
+ * un texte long, bien au-delà de ce que le calcul automatique s'autorise.
+ */
+export const RESIZE_MIN = 48;
+export const RESIZE_MAX = 1600;
+/**
  * Hauteur de l'histogramme. Le bandeau peut se replier d'un clic, donc il n'a
  * plus à être avare de sa place : un graphique lisible vaut mieux qu'un
  * graphique qui tient.

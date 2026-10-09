@@ -4,6 +4,19 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.22.0
+
+**Column widths by hand.** Every width used to be fixed by the automatic
+calculation. Drag the right edge of a header to resize a column, from 48 to
+1,600 pixels; double-click the edge to return to the automatic width. A width
+set by hand survives folding the insights band, which recomputes the others.
+
+Checked with real mouse gestures in a real browser: the first attempt at the
+double-click never reset anything. The header is rebuilt on every repaint, so
+the edge under the cursor was replaced between the two clicks, and the browser
+only reports a double-click when both land on the same element. It is now read
+from the click count of the second press.
+
 ## 0.21.1
 
 **Neighbouring columns never share a text colour.** On coloured backgrounds the

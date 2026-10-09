@@ -178,6 +178,15 @@ everything else is text. Types are decided from the **distinct values**, not fro
 every row: a hundred-thousand-row file often holds only a few hundred different
 values, which makes the guess a hundred times cheaper.
 
+## Column width
+
+Drag the right edge of a column header to make it wider or narrower — down to
+48 pixels, up to 1,600, well past what the automatic width allows, so a long
+text can be read in full. **Double-click** the edge to give the column back its
+automatic width. A width set by hand outlasts folding the insights band, which
+otherwise recomputes every width; like every other view action, it lasts until
+the tab is closed.
+
 ## Palettes
 
 **Hovering a palette applies it to the sheet straight away**; only a click
@@ -287,7 +296,7 @@ of the above on every push and pull request.
 ## Install
 
 ```bash
-code --install-extension csv-stats-0.21.1.vsix
+code --install-extension csv-stats-0.22.0.vsix
 ```
 
 Or, in VS Code: **Extensions** view → `…` → **Install from VSIX…**
