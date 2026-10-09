@@ -95,6 +95,18 @@ export function toggleInsights(visible = !state.bandVisible, animate = true): vo
   animateWidths(from, to);
 }
 
+/**
+ * Arrête une animation de largeur en cours et pose les largeurs finales.
+ *
+ * Un geste sur une poignée pendant l'animation du repli était écrasé par
+ * l'image suivante, qui réécrit toutes les largeurs — vu au vrai double-clic
+ * juste après un repli.
+ */
+export function settleWidths(): void {
+  widthRun++;
+  if (state.ready) measureWidths();
+}
+
 /** Fait glisser les colonnes d'une largeur à l'autre. */
 export function animateWidths(from: number[], to: number[]): void {
   const run = ++widthRun;

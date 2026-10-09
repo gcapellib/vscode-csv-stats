@@ -24,10 +24,16 @@ import { hideTooltip } from './tooltip';
  */
 export function measureWidths(withBand = state.bandVisible): void {
   const widthOf = textMeasurer();
-  state.widths = state.headers.map(
-    // Une largeur choisie à la main l'emporte sur tout ce calcul.
-    (_, index) => state.manualWidths.get(index) ?? autoWidth(index, withBand, widthOf),
-  );
+  state.widths = state.headers.map((_, index) => {
+    const auto = autoWidth(index, withBand, widthOf);
+    const manual = state.manualWidths.get(index);
+    if (manual === undefined) return auto;
+    // Une largeur choisie à la main l'emporte sur ce calcul — sauf, bandeau
+    // ouvert, à descendre sous la largeur par défaut : une colonne resserrée
+    // bandeau replié y écrasait ses histogrammes et ses bornes. Elle remonte
+    // alors au plancher ; élargie, elle garde sa largeur.
+    return withBand ? Math.max(manual, auto) : manual;
+  });
 }
 
 /** Mesure un texte dans la police du tableau. */
@@ -86,16 +92,22 @@ function autoWidth(index: number, withBand: boolean, widthOf: (text: string) => 
 }
 
 /**
- * Les deux largeurs entre lesquelles bascule le double-clic : la plus étroite
- * qui laisse lire le titre en entier, boutons compris, et celle qui montre
- * tout — sur un échantillon plus large que le calcul ordinaire, puisqu'il
- * s'agit justement de ne rien couper.
+ * Les deux largeurs entre lesquelles bascule le double-clic.
+ *
+ * `compact` est la plus étroite permise : bandeau ouvert, la largeur par
+ * défaut, qui affiche bien l'histogramme et les bornes — resserrer autour du
+ * seul titre les écrasait ; bandeau replié, le titre lu en entier, boutons
+ * compris. C'est aussi le plancher du glissé. `full` montre tout, sur un
+ * échantillon plus large que le calcul ordinaire, puisqu'il s'agit justement
+ * de ne rien couper.
  */
-export function fitWidths(index: number): { title: number; full: number } {
+export function fitWidths(index: number): { compact: number; full: number } {
   const widthOf = textMeasurer();
-  const title = Math.round(Math.max(RESIZE_MIN, titleWidth(index, widthOf)));
-  const full = Math.max(title, autoWidth(index, state.bandVisible, widthOf, false, WIDTH_SAMPLE_ROWS * 10));
-  return { title, full };
+  const compact = state.bandVisible
+    ? autoWidth(index, true, widthOf)
+    : Math.round(Math.max(RESIZE_MIN, titleWidth(index, widthOf)));
+  const full = Math.max(compact, autoWidth(index, state.bandVisible, widthOf, false, WIDTH_SAMPLE_ROWS * 10));
+  return { compact, full };
 }
 
 export function totalWidth(): number {

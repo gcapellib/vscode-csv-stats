@@ -12,6 +12,20 @@ async function widthOf(page: Page, name: string): Promise<number> {
   return Math.round(box?.width ?? 0);
 }
 
+/** Replie ou déplie le bandeau, et attend la fin de l'animation des largeurs. */
+async function toggleBand(page: Page): Promise<void> {
+  await page.locator('#insights-toggle').click();
+  let last = '';
+  await expect
+    .poll(async () => {
+      const now = (await page.locator('.head-cell').evaluateAll((cells) => cells.map((c) => c.getBoundingClientRect().width))).join(',');
+      const stable = now === last;
+      last = now;
+      return stable;
+    }, { intervals: [120] })
+    .toBe(true);
+}
+
 async function drag(page: Page, name: string, dx: number): Promise<void> {
   const handle = page.locator('.head-cell', { hasText: name }).locator('.col-resizer');
   const box = await handle.boundingBox();
@@ -42,41 +56,62 @@ test.describe('largeur des colonnes à la main', () => {
     await openHarness(page);
     await drag(page, 'region', 90);
     const chosen = await widthOf(page, 'region');
-    await page.locator('#insights-toggle').click();
+    await toggleBand(page);
     // Le repli recalcule toutes les largeurs ; celle choisie à la main reste.
     await expect.poll(() => widthOf(page, 'region')).toBe(chosen);
   });
 
-  test('le double-clic élargit, puis resserre autour du titre', async ({ page }) => {
+  test('bandeau ouvert, le glissé ne descend pas sous la largeur par défaut', async ({ page }) => {
+    // Plus étroite, la colonne écraserait son histogramme et ses bornes.
     await openHarness(page);
-    const name = 'grape_variety';
-    const handle = () => page.locator('.head-cell', { hasText: name }).locator('.col-resizer');
-    const auto = await widthOf(page, name);
+    const auto = await widthOf(page, 'region');
+    await drag(page, 'region', -120);
+    await expect.poll(() => widthOf(page, 'region')).toBe(auto);
+  });
 
-    // Rétrécie à la main, la colonne coupe son contenu : le double-clic
-    // l'élargit jusqu'à tout montrer.
-    await drag(page, name, -100);
-    await expect.poll(() => widthOf(page, name)).toBe(auto - 100);
-    await handle().dblclick();
-    await expect.poll(() => widthOf(page, name)).toBeGreaterThanOrEqual(auto);
-    const wide = await widthOf(page, name);
+  test('bandeau ouvert, le double-clic élargit pour tout montrer, puis revient au défaut', async ({ page }) => {
+    // Une colonne de texte long, que la largeur par défaut coupe à 460.
+    await openHarness(page, 'tests/integration/fixtures/long-text.csv');
+    const handle = page.locator('.head-cell', { hasText: 'ingredients' }).locator('.col-resizer');
+    const auto = await widthOf(page, 'ingredients');
+    await handle.dblclick();
+    await expect.poll(() => widthOf(page, 'ingredients')).toBeGreaterThan(auto);
+    await handle.dblclick();
+    await expect.poll(() => widthOf(page, 'ingredients')).toBe(auto);
+  });
 
-    // Le second la resserre au plus juste autour du titre…
-    await handle().dblclick();
-    await expect.poll(() => widthOf(page, name)).toBeLessThan(wide);
-    // … sans le couper, et sans chasser ses deux boutons de la colonne.
+  test('bandeau replié, le double-clic resserre autour du titre', async ({ page }) => {
+    // Une colonne dont les valeurs sont plus larges que le titre : sinon sa
+    // largeur automatique est déjà celle du titre, et il n'y a rien à
+    // resserrer — le cas de grape_variety, essayé d'abord.
+    await openHarness(page);
+    await toggleBand(page);
+    const name = 'producer';
+    const handle = page.locator('.head-cell', { hasText: name }).locator('.col-resizer');
+    const folded = await widthOf(page, name);
+    await handle.dblclick();
+    await expect.poll(() => widthOf(page, name)).toBeLessThan(folded);
+    // Le titre se lit en entier, et les deux boutons restent dans la colonne.
     const cell = page.locator('.head-cell', { hasText: name });
-    const title = cell.locator('.head-name');
-    expect(await title.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    expect(await cell.locator('.head-name').evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
     const box = await cell.boundingBox();
     for (const button of await cell.locator('.head-button').all()) {
       const inner = await button.boundingBox();
       expect(inner && box && inner.x + inner.width <= box.x + box.width).toBe(true);
     }
+    // Un nouveau double-clic l'élargit pour tout montrer.
+    await handle.dblclick();
+    await expect.poll(() => widthOf(page, name)).toBe(folded);
+  });
 
-    // Et un nouveau double-clic l'élargit à nouveau.
-    await handle().dblclick();
-    await expect.poll(() => widthOf(page, name)).toBe(wide);
+  test('une colonne resserrée bandeau replié retrouve sa largeur par défaut quand il se rouvre', async ({ page }) => {
+    await openHarness(page);
+    const auto = await widthOf(page, 'region');
+    await toggleBand(page);
+    await drag(page, 'region', -60);
+    await expect.poll(() => widthOf(page, 'region')).toBeLessThan(auto);
+    await toggleBand(page);
+    await expect.poll(() => widthOf(page, 'region')).toBe(auto);
   });
 });
 
