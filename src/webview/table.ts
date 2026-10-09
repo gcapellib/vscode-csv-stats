@@ -3,7 +3,7 @@ import { count, num } from '../core/format';
 import { compute } from '../core/stats';
 import { parseNumber } from '../core/types';
 import { closePicker, getOpenPanel, refilter } from './actions';
-import { HEAD_BUTTONS, MAX_WIDTH, MIN_WIDTH, MIN_WIDTH_FOLDED, OVERSCAN, ROW_HEIGHT, WIDTH_SAMPLE_ROWS } from './constants';
+import { HEAD_BUTTONS, MAX_WIDTH, MIN_WIDTH, MIN_WIDTH_FOLDED, OVERSCAN, RESIZE_MAX, RESIZE_MIN, ROW_HEIGHT, WIDTH_SAMPLE_ROWS } from './constants';
 import { elements } from './dom';
 import { closeMenu } from './menu';
 import { paint } from './paint';
@@ -23,46 +23,79 @@ import { hideTooltip } from './tooltip';
  * replier : en voir davantage à l'écran.
  */
 export function measureWidths(withBand = state.bandVisible): void {
+  const widthOf = textMeasurer();
+  state.widths = state.headers.map(
+    // Une largeur choisie à la main l'emporte sur tout ce calcul.
+    (_, index) => state.manualWidths.get(index) ?? autoWidth(index, withBand, widthOf),
+  );
+}
+
+/** Mesure un texte dans la police du tableau. */
+function textMeasurer(): (text: string) => number {
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
   const font = getComputedStyle(document.body).font || '13px sans-serif';
   if (context) context.font = font;
-  const widthOf = (text: string) => (context ? context.measureText(text).width : text.length * 7);
+  return (text: string) => (context ? context.measureText(text).width : text.length * 7);
+}
 
-  const sampled = Math.min(state.rows.length, WIDTH_SAMPLE_ROWS);
-  state.widths = state.headers.map((header, index) => {
-    // Le titre doit tenir en entier : il nomme la colonne, et une colonne dont
-    // on lit « dep… » n'est plus identifiée. Les valeurs, elles, n'ont pas les
-    // boutons au-dessus d'elles.
-    let widest = widthOf(header) + HEAD_BUTTONS;
-    for (let row = 0; row < sampled; row++) {
-      const value = state.rows[row]?.[index];
-      if (value) widest = Math.max(widest, widthOf(value));
-    }
-    const column = state.stats[index];
-    if (withBand && column && column.min !== null) {
-      // La colonne doit loger ce que son bandeau annonce : des bornes tronquées
-      // en « Min 98,… » ne renseignent plus sur rien.
-      // La colonne doit loger les deux lignes de bornes : tronquées, elles ne
-      // renseignent plus sur rien.
-      const pair = (left: string, right: string) => widthOf(left) + widthOf(right) + 24;
-      // Les deux bornes sont mesurees sur la plus longue des deux : un filtre
-      // peut restreindre à « Min 999,999 » là où le fichier entier affichait
-      // « Min 0 », et la largeur ne se rediscute plus apres l'ouverture.
-      const longest = (left: number, right: number) =>
-        widthOf(num(left)) >= widthOf(num(right)) ? num(left) : num(right);
-      const bound = longest(column.min ?? 0, column.max ?? 0);
-      const central = longest(column.mean ?? 0, column.median ?? 0);
-      widest = Math.max(
-        widest,
-        pair(`Min ${bound}`, `Max ${bound}`),
-        column.mean === null ? 0 : pair(`Mean ${central}`, `Median ${central}`),
-      );
-    }
-    const floor = withBand ? MIN_WIDTH : MIN_WIDTH_FOLDED;
-    // Une largeur choisie à la main l'emporte sur tout ce calcul.
-    return state.manualWidths.get(index) ?? Math.round(Math.min(MAX_WIDTH, Math.max(floor, widest + 28)));
-  });
+/** Marge intérieure d'une cellule, bordure comprise. */
+const CELL_PADDING = 28;
+
+/** Ce qu'il faut pour lire le titre en entier, ses deux boutons à côté. */
+function titleWidth(index: number, widthOf: (text: string) => number): number {
+  return widthOf(state.headers[index]) + HEAD_BUTTONS + CELL_PADDING;
+}
+
+/**
+ * Largeur automatique d'une colonne. `capped` borne le résultat à MAX_WIDTH :
+ * sans cette borne, c'est la largeur qui montre tout — valeurs et bandeau —
+ * celle que vise le double-clic quand il élargit.
+ */
+function autoWidth(index: number, withBand: boolean, widthOf: (text: string) => number, capped = true, rows = WIDTH_SAMPLE_ROWS): number {
+  const sampled = Math.min(state.rows.length, rows);
+  // Le titre doit tenir en entier : il nomme la colonne, et une colonne dont
+  // on lit « dep… » n'est plus identifiée. Les valeurs, elles, n'ont pas les
+  // boutons au-dessus d'elles.
+  let widest = widthOf(state.headers[index]) + HEAD_BUTTONS;
+  for (let row = 0; row < sampled; row++) {
+    const value = state.rows[row]?.[index];
+    if (value) widest = Math.max(widest, widthOf(value));
+  }
+  const column = state.stats[index];
+  if (withBand && column && column.min !== null) {
+    // La colonne doit loger les deux lignes de bornes : tronquées, elles ne
+    // renseignent plus sur rien.
+    const pair = (left: string, right: string) => widthOf(left) + widthOf(right) + 24;
+    // Les deux bornes sont mesurées sur la plus longue des deux : un filtre
+    // peut restreindre à « Min 999,999 » là où le fichier entier affichait
+    // « Min 0 », et la largeur ne se rediscute plus après l'ouverture.
+    const longest = (left: number, right: number) =>
+      widthOf(num(left)) >= widthOf(num(right)) ? num(left) : num(right);
+    const bound = longest(column.min ?? 0, column.max ?? 0);
+    const central = longest(column.mean ?? 0, column.median ?? 0);
+    widest = Math.max(
+      widest,
+      pair(`Min ${bound}`, `Max ${bound}`),
+      column.mean === null ? 0 : pair(`Mean ${central}`, `Median ${central}`),
+    );
+  }
+  const floor = withBand ? MIN_WIDTH : MIN_WIDTH_FOLDED;
+  const fitted = Math.max(floor, widest + CELL_PADDING);
+  return Math.round(capped ? Math.min(MAX_WIDTH, fitted) : Math.min(RESIZE_MAX, fitted));
+}
+
+/**
+ * Les deux largeurs entre lesquelles bascule le double-clic : la plus étroite
+ * qui laisse lire le titre en entier, boutons compris, et celle qui montre
+ * tout — sur un échantillon plus large que le calcul ordinaire, puisqu'il
+ * s'agit justement de ne rien couper.
+ */
+export function fitWidths(index: number): { title: number; full: number } {
+  const widthOf = textMeasurer();
+  const title = Math.round(Math.max(RESIZE_MIN, titleWidth(index, widthOf)));
+  const full = Math.max(title, autoWidth(index, state.bandVisible, widthOf, false, WIDTH_SAMPLE_ROWS * 10));
+  return { title, full };
 }
 
 export function totalWidth(): number {

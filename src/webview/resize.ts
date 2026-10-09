@@ -1,26 +1,29 @@
 import { RESIZE_MAX, RESIZE_MIN } from './constants';
 import { paint } from './paint';
 import { state } from './state';
-import { measureWidths } from './table';
+import { fitWidths } from './table';
 
 /**
  * Redimensionner une colonne à la main.
  *
  * La poignée occupe le bord droit de l'en-tête. Le glissé est suivi sur la
- * fenêtre entière, à la souris — VS Code est une application de bureau — et non sur la poignée : l'en-tête est reconstruit à chaque
- * repeint, si bien que la poignée sous le curseur est remplacée en plein
+ * fenêtre entière, à la souris — VS Code est une application de bureau —
+ * et non sur la poignée : l'en-tête est reconstruit à chaque repeint, si bien que la poignée sous le curseur est remplacée en plein
  * geste — des écouteurs posés sur elle se tairaient au premier mouvement.
  */
 export function resizeHandle(modelIndex: number): HTMLDivElement {
   const handle = document.createElement('div');
   handle.className = 'col-resizer';
-  handle.title = 'Drag to resize · double-click to fit';
+  handle.title = 'Drag to resize · double-click to widen, again to shrink to the title';
   handle.addEventListener('mousedown', (event) => startResize(event, modelIndex));
   return handle;
 }
 
 /**
- * Le double-clic rend la colonne au calcul automatique.
+ * Le double-clic bascule entre deux largeurs : élargie jusqu'à tout montrer
+ * — valeurs et bandeau, au-delà du plafond du calcul automatique — puis
+ * resserrée au plus juste autour du titre, ses deux boutons à côté. Une
+ * colonne déjà assez large pour tout montrer se resserre au premier.
  *
  * Reconnu au second appui (event.detail), et non par l'événement dblclick :
  * celui-ci n'est émis que si les deux clics touchent le même élément, or
@@ -30,8 +33,10 @@ export function resizeHandle(modelIndex: number): HTMLDivElement {
  * pointerdown vaut toujours zéro.
  */
 function fit(modelIndex: number): void {
-  state.manualWidths.delete(modelIndex);
-  measureWidths();
+  const { title, full } = fitWidths(modelIndex);
+  const width = state.widths[modelIndex] < full ? full : title;
+  state.widths[modelIndex] = width;
+  state.manualWidths.set(modelIndex, width);
   paint();
 }
 

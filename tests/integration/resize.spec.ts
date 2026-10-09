@@ -47,13 +47,36 @@ test.describe('largeur des colonnes à la main', () => {
     await expect.poll(() => widthOf(page, 'region')).toBe(chosen);
   });
 
-  test('un double-clic sur la poignée rend la largeur automatique', async ({ page }) => {
+  test('le double-clic élargit, puis resserre autour du titre', async ({ page }) => {
     await openHarness(page);
-    const before = await widthOf(page, 'region');
-    await drag(page, 'region', 150);
-    await expect.poll(() => widthOf(page, 'region')).toBe(before + 150);
-    await page.locator('.head-cell', { hasText: 'region' }).locator('.col-resizer').dblclick();
-    await expect.poll(() => widthOf(page, 'region')).toBe(before);
+    const name = 'grape_variety';
+    const handle = () => page.locator('.head-cell', { hasText: name }).locator('.col-resizer');
+    const auto = await widthOf(page, name);
+
+    // Rétrécie à la main, la colonne coupe son contenu : le double-clic
+    // l'élargit jusqu'à tout montrer.
+    await drag(page, name, -100);
+    await expect.poll(() => widthOf(page, name)).toBe(auto - 100);
+    await handle().dblclick();
+    await expect.poll(() => widthOf(page, name)).toBeGreaterThanOrEqual(auto);
+    const wide = await widthOf(page, name);
+
+    // Le second la resserre au plus juste autour du titre…
+    await handle().dblclick();
+    await expect.poll(() => widthOf(page, name)).toBeLessThan(wide);
+    // … sans le couper, et sans chasser ses deux boutons de la colonne.
+    const cell = page.locator('.head-cell', { hasText: name });
+    const title = cell.locator('.head-name');
+    expect(await title.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    const box = await cell.boundingBox();
+    for (const button of await cell.locator('.head-button').all()) {
+      const inner = await button.boundingBox();
+      expect(inner && box && inner.x + inner.width <= box.x + box.width).toBe(true);
+    }
+
+    // Et un nouveau double-clic l'élargit à nouveau.
+    await handle().dblclick();
+    await expect.poll(() => widthOf(page, name)).toBe(wide);
   });
 });
 
