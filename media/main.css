@@ -638,7 +638,10 @@ body {
   text-overflow: ellipsis;
 }
 
-.cell.num {
+/* Toutes les valeurs alignées à droite, texte compris : jusqu'ici seuls les
+   nombres l'étaient, à la manière d'Excel, et une ligne alternait d'une
+   colonne à l'autre entre la gauche et la droite — jugé déroutant à l'usage. */
+.cell {
   text-align: right;
 }
 

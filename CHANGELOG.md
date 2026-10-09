@@ -17,6 +17,9 @@ to the title alone crushed them. With the band folded, a column narrows freely
 and the double-click shrinks it to its title, read in full beside its two
 buttons; reopening the band brings it back to its default width.
 
+**All values right-aligned.** Only numbers were, after Excel, so a row
+switched between left and right from one column to the next.
+
 Checked with real mouse gestures in a real browser, which caught three bugs
 before release: the double-click never registered, because the header is
 rebuilt on every repaint and the edge under the cursor was replaced between
