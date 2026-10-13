@@ -36,7 +36,7 @@ export function harnessHtml(csvPath: string, theme = 'syntax'): string {
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>${css}</style>
 <style>:root{
- --vscode-font-family:system-ui,sans-serif; --vscode-font-size:13px;
+ --vscode-font-family:${process.env.HARNESS_FONT ?? 'system-ui,sans-serif'}; --vscode-font-size:13px;
  --vscode-foreground:#cccccc; --vscode-editor-background:#1f1f1f;
  --vscode-descriptionForeground:#9d9d9d; --vscode-panel-border:#3c3c3c;
  --vscode-dropdown-background:#313131; --vscode-dropdown-foreground:#cccccc; --vscode-dropdown-border:#3c3c3c;

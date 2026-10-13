@@ -4,6 +4,16 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.22.2
+
+"Distinct … (… of filled)" could be cut short where the interface font is
+wider. Column widths made room for it by measuring the line in the regular
+weight and adding a fixed margin for bold: enough on one machine, not on the
+CI runner, whose fonts are wider — six lines cut on `wines.csv`. The line is
+now measured exactly as it is drawn, in a hidden band cell. Reproduced and
+checked locally with Verdana: the former code fails the same three tests as the
+CI, this one passes them.
+
 ## 0.22.1
 
 The same as 0.22.0 as released on GitHub. The Marketplace already held an

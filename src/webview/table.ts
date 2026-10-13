@@ -46,8 +46,25 @@ function textMeasurer(): (text: string) => number {
   return (text: string) => (context ? context.measureText(text).width : text.length * 7);
 }
 
-/** Le gras élargit le texte d'environ un dixième, la mesure se faisant en maigre. */
-const BOLD_FACTOR = 1.1;
+/** Une cellule de bandeau invisible, pour mesurer une ligne comme elle s'affichera. */
+let probe: { cell: HTMLDivElement; line: HTMLDivElement } | null = null;
+
+/** Largeur qu'il faut à une cellule de bandeau pour loger cette ligne entière, marges comprises. */
+function bandLineWidth(text: string): number {
+  if (!probe) {
+    const cell = document.createElement('div');
+    cell.className = 'band-cell';
+    cell.style.cssText = 'position:absolute;visibility:hidden;left:-10000px;top:0;display:inline-block;width:auto';
+    const line = document.createElement('div');
+    line.className = 'stat';
+    line.style.display = 'inline-block';
+    cell.appendChild(line);
+    document.body.appendChild(cell);
+    probe = { cell, line };
+  }
+  probe.line.textContent = text;
+  return Math.ceil(probe.cell.getBoundingClientRect().width);
+}
 
 /** Marge intérieure d'une cellule, bordure comprise. */
 const CELL_PADDING = 28;
@@ -90,13 +107,14 @@ function autoWidth(index: number, withBand: boolean, widthOf: (text: string) => 
       column.mean === null ? 0 : pair(`Mean ${central}`, `Median ${central}`),
     );
   }
-  if (withBand && column) {
-    // La ligne « Distinct … (… of filled) », en gras, plus large que le texte
-    // ordinaire : sans elle, la base de la part se coupait en « of fi… ».
-    widest = Math.max(widest, widthOf(distinctText(column)) * BOLD_FACTOR);
-  }
   const floor = withBand ? MIN_WIDTH : MIN_WIDTH_FOLDED;
-  const fitted = Math.max(floor, widest + CELL_PADDING);
+  // La ligne « Distinct … (… of filled) », en gras : sans elle, la base de la
+  // part se coupait en « of fi… ». Mesurée telle qu'elle s'affiche, marges
+  // comprises, et non devinée : un facteur fixe appliqué à une mesure en
+  // maigre suffisait sur un poste, pas sur la machine de la CI, dont les
+  // polices sont plus larges — six lignes coupées sur wines.csv.
+  const band = withBand && column ? bandLineWidth(distinctText(column)) : 0;
+  const fitted = Math.max(floor, widest + CELL_PADDING, band);
   return Math.round(capped ? Math.min(MAX_WIDTH, fitted) : Math.min(RESIZE_MAX, fitted));
 }
 
