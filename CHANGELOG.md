@@ -4,6 +4,12 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.22.1
+
+The same as 0.22.0 as released on GitHub. The Marketplace already held an
+earlier build numbered 0.22.0 — rebuilt several times under that number before
+release — and refuses to replace a version, so this one carries a new number.
+
 ## 0.22.0
 
 **Column widths by hand.** Every width used to be fixed by the automatic
