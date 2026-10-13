@@ -157,6 +157,23 @@ describe('datasetTransformLines', () => {
   });
 });
 
+describe('une ligne par valeur', () => {
+  it('se traduit en drop_duplicates et passe après les autres conditions', () => {
+    const distinct: Filter = { kind: 'distinct', column: 1, label: '' };
+    assert.equal(filterToPandas(distinct, 'ville'), 'df = df.drop_duplicates(subset=["ville"])');
+    const lines = datasetTransformLines({
+      renamed: [],
+      dropped: [],
+      sort: null,
+      filters: [
+        { filter: distinct, columnName: 'ville' },
+        { filter: { kind: 'values', column: 0, values: ['A'], label: 'x' }, columnName: 'groupe' },
+      ],
+    });
+    assert.ok(lines.findIndex((line) => line.includes('drop_duplicates')) > lines.findIndex((line) => line.includes('== "A"')));
+  });
+});
+
 describe('cellMatches', () => {
   const parse = (raw: string) => parseNumber(raw, false);
   const text = (op: TextOp, value: string, blank?: 'add' | 'exclude') => textFilter(0, 'c', op, value, blank) as Extract<Filter, { kind: 'text' }>;

@@ -143,6 +143,8 @@ export function totalWidth(): number {
 /** Une ligne satisfait-elle la condition ? */
 export function matches(cells: string[], filter: Filter, rowIndex: number): boolean {
   if (filter.kind === 'duplicates') return filter.rows.has(rowIndex);
+  // Jugé sur l'ensemble des lignes retenues : voir filteredRows.
+  if (filter.kind === 'distinct') return true;
   const decimalComma = state.delimiter === ';';
   return cellMatches(cells[filter.column] ?? '', filter, (raw) => parseNumber(raw, decimalComma));
 }
@@ -151,10 +153,23 @@ export function matches(cells: string[], filter: Filter, rowIndex: number): bool
 export function filteredRows(): number[] {
   const rows = state.rows;
   if (state.filters.length === 0) return rows.map((_, index) => index);
-  const kept: number[] = [];
+  let kept: number[] = [];
   for (let row = 0; row < rows.length; row++) {
     const cells = rows[row];
     if (cells && state.filters.every((filter) => matches(cells, filter, row))) kept.push(row);
+  }
+  // « Une ligne par valeur » porte sur ce que les autres conditions ont laissé :
+  // la première ligne retenue de chaque valeur, les vides comptant pour une.
+  for (const filter of state.filters) {
+    if (filter.kind !== 'distinct') continue;
+    const seen = new Set<string>();
+    kept = kept.filter((row) => {
+      const raw = state.rows[row]?.[filter.column] ?? '';
+      const key = raw.trim() === '' ? '' : raw;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
   return kept;
 }

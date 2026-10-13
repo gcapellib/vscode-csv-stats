@@ -97,15 +97,25 @@ test.describe('panneau de filtre', () => {
     await expect(summary(page)).toHaveText('414 of 423 rows');
   });
 
-  test('un clic sur « Distinct » ouvre la liste des valeurs de la colonne', async ({ page }) => {
+  test('un clic sur « Distinct » garde une ligne par valeur, un second clic annule', async ({ page }) => {
     await openHarness(page, 'samples/wines.csv');
     const region = page.locator('.band-cell').nth(2);
     await region.locator('.stat.pickable', { hasText: 'Distinct' }).click();
-    await expect(page.locator('#picker')).toBeVisible();
-    await expect(page.locator('.picker-tab.on')).toHaveText('Values');
-    // Le même clic referme le panneau, comme le bouton de filtre.
-    await region.locator('.stat.pickable', { hasText: 'Distinct' }).click();
-    await expect(page.locator('#picker')).toBeHidden();
+    // 10 régions distinctes : 10 lignes.
+    await expect(summary(page)).toHaveText('10 of 423 rows');
+    await page.locator('.band-cell').nth(2).locator('.stat.pickable', { hasText: 'Distinct' }).click();
+    await expect(page.locator('#filters')).toBeHidden();
+  });
+
+  test('« Distinct » se cumule avec les autres filtres, appliqué en dernier', async ({ page }) => {
+    await openHarness(page, 'samples/wines.csv');
+    await page.locator('.band-cell').nth(2).locator('.value.pickable', { hasText: 'Bordeaux' }).click();
+    await expect(summary(page)).toHaveText('83 of 423 rows');
+    // Parmi les 83 lignes Bordeaux, les producteurs distincts.
+    await page.locator('.band-cell').nth(1).locator('.stat.pickable', { hasText: 'Distinct' }).click();
+    await expect(summary(page)).not.toHaveText('83 of 423 rows');
+    await page.locator('#dataset-button').click();
+    await expect(page.locator('.snippet')).toContainText('df = df.drop_duplicates(subset=["producer"])');
   });
 
   test('le menu « ⋯ » n’a plus qu’une entrée « Filter… »', async ({ page }) => {

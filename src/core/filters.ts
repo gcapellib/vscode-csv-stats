@@ -29,11 +29,20 @@ export type Filter =
   | { kind: 'range'; column: number; low: number; high: number; last: boolean; blank?: boolean; label: string }
   /** Lignes dupliquées, désignées par leur index — seul cas où un ensemble de
    * lignes explicite est nécessaire plutôt qu'une condition sur une colonne. */
-  | { kind: 'duplicates'; column: number; rows: Set<number>; label: string };
+  | { kind: 'duplicates'; column: number; rows: Set<number>; label: string }
+  /**
+   * Une ligne par valeur distincte de la colonne : la première rencontrée.
+   * Se juge sur l'ensemble des lignes déjà retenues, pas sur une cellule.
+   */
+  | { kind: 'distinct'; column: number; label: string };
+
+/** Les conditions qui se jugent sur une seule cellule. */
+export type CellFilter = Exclude<Filter, { kind: 'duplicates' | 'distinct' }>;
 
 /** Traduit une condition de filtrage en une ligne pandas. */
 export function filterToPandas(filter: Filter, columnName: string): string {
   if (filter.kind === 'duplicates') return 'df = df[df.duplicated(keep=False)]';
+  if (filter.kind === 'distinct') return `df = df.drop_duplicates(subset=[${JSON.stringify(columnName)}])`;
   const name = JSON.stringify(columnName);
   switch (filter.kind) {
     case 'text':
@@ -192,7 +201,7 @@ export function compareFilter(
  * Une cellule satisfait-elle la condition ? Pas pour `duplicates`, qui se juge
  * sur l'index de la ligne. `parse` lit un nombre selon la convention du fichier.
  */
-export function cellMatches(raw: string, filter: Exclude<Filter, { kind: 'duplicates' }>, parse: (raw: string) => number | null): boolean {
+export function cellMatches(raw: string, filter: CellFilter, parse: (raw: string) => number | null): boolean {
   const blank = raw.trim() === '';
   switch (filter.kind) {
     case 'text': {
@@ -296,7 +305,9 @@ export function datasetTransformLines(input: DatasetTransformInput): string[] {
 
   if (input.filters.length > 0) {
     lines.push('', '# Matching the filters applied in this session');
-    for (const { filter, columnName } of input.filters) {
+    // « Une ligne par valeur » s'applique après les autres conditions, comme la vue.
+    const ordered = [...input.filters].sort((a, b) => Number(a.filter.kind === 'distinct') - Number(b.filter.kind === 'distinct'));
+    for (const { filter, columnName } of ordered) {
       lines.push(`# ${filter.label}`, filterToPandas(filter, columnName));
     }
   }

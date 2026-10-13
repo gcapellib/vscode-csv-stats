@@ -1,4 +1,4 @@
-import { type Filter } from '../../core/filters';
+import { type CellFilter } from '../../core/filters';
 import { setOpenPanel } from '../actions';
 import { elements } from '../dom';
 import { floating, positionFloating } from '../floating-setup';
@@ -24,8 +24,8 @@ export function openFilterPanel(columnIndex: number, anchor: HTMLElement, prefer
   const column = state.stats[columnIndex];
   const numeric = column?.type === 'numeric';
   const tabs: Tab[] = numeric ? ['number'] : ['values', 'text'];
-  const existing = state.filters.find((filter): filter is Exclude<Filter, { kind: 'duplicates' }> =>
-    filter.kind !== 'duplicates' && filter.column === columnIndex,
+  const existing = state.filters.find(
+    (filter): filter is CellFilter => filter.kind !== 'duplicates' && filter.kind !== 'distinct' && filter.column === columnIndex,
   );
   const fallback: Tab = numeric
     ? 'number'

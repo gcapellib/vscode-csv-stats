@@ -1,8 +1,7 @@
 import { count, num, percent } from '../core/format';
 import { foldRanking, type ColumnStats } from '../core/stats';
 import { type Palette } from '../core/themes';
-import { closePicker, getOpenPanel, toggleFilter } from './actions';
-import { openFilterPanel } from './panels/filter-panel';
+import { toggleFilter } from './actions';
 import { HIST_HEIGHT } from './constants';
 import { elements, textSpan } from './dom';
 import { openMenu } from './menu';
@@ -67,15 +66,17 @@ export function bandCell(modelIndex: number): HTMLElement {
   // comme « Missing » juste au-dessus — la convention de pandas (nunique /
   // count) et de ydata-profiling. Une latitude vide à 49 % et distincte à
   // 99,7 % paraissait contradictoire : la base est désormais écrite.
-  // Cliquer « Distinct » ouvre la liste de ses valeurs distinctes : cochées,
-  // elles filtrent. Même geste que « Missing » — la ligne de statistique est
-  // aussi la porte d'entrée du filtre correspondant.
-  const distinct = line('stat pickable', distinctText(column));
-  distinct.title = 'List the distinct values, and keep the ones you pick';
-  distinct.addEventListener('click', () => {
-    if (getOpenPanel() === `filter:${modelIndex}`) closePicker();
-    else openFilterPanel(modelIndex, distinct, column.type === 'numeric' ? undefined : 'values');
-  });
+  // Cliquer « Distinct » garde une ligne par valeur distincte — le tableau
+  // compte alors autant de lignes que le chiffre affiché. Même geste que
+  // « Missing » : la ligne de statistique est aussi son filtre.
+  const distinct = line('stat', distinctText(column));
+  if (column.distinct > 0) {
+    distinct.classList.add('pickable');
+    distinct.title = 'Keep one row per distinct value (the first one)';
+    distinct.addEventListener('click', () =>
+      toggleFilter({ kind: 'distinct', column: modelIndex, label: `${column.name}: one row per value` }),
+    );
+  }
   cell.appendChild(distinct);
   if (column.allDistinct) cell.appendChild(line('note', 'every value occurs once'));
 

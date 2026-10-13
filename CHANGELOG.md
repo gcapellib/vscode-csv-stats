@@ -4,6 +4,13 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.23.1
+
+Clicking **Distinct** in a column band now filters the table to one row per
+distinct value (the first one), like clicking **Missing** keeps the empty
+cells. Click again to undo. It applies after the other filters, and the pandas
+code is `drop_duplicates(subset=[…])`. (0.23.0 opened the value list instead.)
+
 ## 0.23.0
 
 One filter panel per column, whatever its type — same place, tabs that fit the
@@ -21,7 +28,6 @@ column.
   condition, hide them, keep them too, or only them.
 - "Select all" now covers every value the search matches, not just the 400
   drawn rows.
-- Clicking **Distinct** in a column band opens its list of values.
 - Phone numbers, postal codes and similar identifiers (a leading zero, or a
   column named tel/phone/zip/postal…) are read as text, not as numbers. The
   "Read this column as" menu still overrides it.
