@@ -38,7 +38,12 @@ export function bandCell(modelIndex: number): HTMLElement {
   });
   cell.appendChild(dots);
 
-  cell.appendChild(line('type', column.type));
+  // L'index de la colonne dans le fichier, compté depuis 0 comme pandas : il
+  // ne bouge pas quand une colonne est retirée de la vue, et c'est lui que
+  // demandent df.iloc[:, n] ou read_csv(usecols=[n]).
+  const kind = line('type', `${column.type} \u00b7 #${modelIndex}`);
+  kind.title = `Column ${modelIndex} in the file, counted from 0 as pandas does: df.iloc[:, ${modelIndex}]`;
+  cell.appendChild(kind);
   cell.appendChild(line('stat', `Missing ${count(column.missing)} (${percent(column.missingShare)})`));
   cell.appendChild(line('stat', `Distinct ${count(column.distinct)} (${percent(column.distinctShare)})`));
   if (column.allDistinct) cell.appendChild(line('note', 'every value occurs once'));

@@ -11,3 +11,11 @@ test('toutes les valeurs sont alignées à droite, texte comme nombres', async (
   expect(alignments.length).toBeGreaterThan(5);
   expect(new Set(alignments)).toEqual(new Set(['right']));
 });
+
+test('le bandeau affiche l’index de chaque colonne dans le fichier, depuis 0', async ({ page }) => {
+  // Compté comme pandas : c'est lui que demandent df.iloc[:, n] ou usecols.
+  await openHarness(page);
+  const types = await page.locator('.band-cell .type').allTextContents();
+  expect(types.length).toBeGreaterThan(3);
+  types.forEach((text, index) => expect(text).toContain(`#${index}`));
+});
