@@ -45,3 +45,28 @@ test.describe('filtrer les vides', () => {
     await expect(page.locator('.filter-summary')).toHaveText('8 of 12 rows');
   });
 });
+
+test.describe('lisibilité du bandeau', () => {
+  for (const file of ['samples/wines.csv', 'tests/integration/fixtures/contacts.csv', 'tests/integration/fixtures/distinct.csv', ...(process.env.EXTRA_CSV ? [process.env.EXTRA_CSV] : [])]) {
+    test(`aucune ligne « Missing » ni « Distinct » coupée — ${file.split('/').pop()}`, async ({ page }) => {
+      // « Distinct … (… of filled) », en gras, se coupait en « of fi… »
+      // avant d'entrer dans le calcul de la largeur.
+      await openHarness(page, file);
+      const cut = await page.locator('.band-cell .stat').evaluateAll((lines) =>
+        lines.filter((line) => line.scrollWidth > line.clientWidth + 1).map((line) => line.textContent),
+      );
+      expect(cut).toEqual([]);
+    });
+  }
+
+  test('« Missing 0 » est grisé et inerte, « Missing » avec des vides est cliquable', async ({ page }) => {
+    await openHarness(page, 'samples/wines.csv');
+    const lines = await page.locator('.band-cell .stat').evaluateAll((all) =>
+      all
+        .filter((line) => line.textContent?.startsWith('Missing'))
+        .map((line) => ({ zero: line.textContent?.startsWith('Missing 0 ') ?? false, cls: line.className })),
+    );
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) expect(line.cls).toBe(line.zero ? 'stat none' : 'stat pickable');
+  });
+});

@@ -54,9 +54,19 @@ export function bandCell(modelIndex: number): HTMLElement {
     missing.classList.add('pickable');
     missing.title = 'Keep only the rows where this column is empty';
     missing.addEventListener('click', () => toggleFilter(valuesFilter(modelIndex, [''])));
+  } else {
+    // Rien à filtrer : grisé, pour qu'on voie d'un coup d'œil où sont les
+    // vides. Identique à un « Missing » cliquable, il trompait — on cliquait
+    // « Missing 0 » sans que rien ne se passe.
+    missing.classList.add('none');
+    missing.title = 'No empty cells';
   }
   cell.appendChild(missing);
-  cell.appendChild(line('stat', `Distinct ${count(column.distinct)} (${percent(column.distinctShare)})`));
+  // La part des distinctes se rapporte aux valeurs renseignées, pas au total
+  // comme « Missing » juste au-dessus — la convention de pandas (nunique /
+  // count) et de ydata-profiling. Une latitude vide à 49 % et distincte à
+  // 99,7 % paraissait contradictoire : la base est désormais écrite.
+  cell.appendChild(line('stat', distinctText(column)));
   if (column.allDistinct) cell.appendChild(line('note', 'every value occurs once'));
 
   // Le corps du bandeau — histogramme ou palmarès — est un bloc à part, pour
@@ -113,6 +123,11 @@ export function bandCell(modelIndex: number): HTMLElement {
   });
   cell.addEventListener('mouseleave', hideTooltip);
   return cell;
+}
+
+/** « Distinct 1,547 (99.7% of filled) » : la base de la part est dite. */
+export function distinctText(column: ColumnStats): string {
+  return `Distinct ${count(column.distinct)} (${percent(column.distinctShare)} of filled)`;
 }
 
 export function line(className: string, text: string): HTMLElement {
@@ -219,7 +234,7 @@ export function summaryOf(column: ColumnStats): string {
   return (
     `<b>${escape(column.name)}</b><br>${column.type}<br>` +
     `Missing ${count(column.missing)} (${percent(column.missingShare)})<br>` +
-    `Distinct ${count(column.distinct)} (${percent(column.distinctShare)})`
+    distinctText(column)
   );
 }
 

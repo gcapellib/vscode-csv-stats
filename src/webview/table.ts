@@ -9,6 +9,7 @@ import { closeMenu } from './menu';
 import { paint } from './paint';
 import { openRangePicker } from './panels/range-picker';
 import { openValuePicker } from './panels/value-picker';
+import { distinctText } from './band';
 import { resizeHandle } from './resize';
 import { palette, state } from './state';
 import { hideTooltip } from './tooltip';
@@ -44,6 +45,9 @@ function textMeasurer(): (text: string) => number {
   if (context) context.font = font;
   return (text: string) => (context ? context.measureText(text).width : text.length * 7);
 }
+
+/** Le gras élargit le texte d'environ un dixième, la mesure se faisant en maigre. */
+const BOLD_FACTOR = 1.1;
 
 /** Marge intérieure d'une cellule, bordure comprise. */
 const CELL_PADDING = 28;
@@ -85,6 +89,11 @@ function autoWidth(index: number, withBand: boolean, widthOf: (text: string) => 
       pair(`Min ${bound}`, `Max ${bound}`),
       column.mean === null ? 0 : pair(`Mean ${central}`, `Median ${central}`),
     );
+  }
+  if (withBand && column) {
+    // La ligne « Distinct … (… of filled) », en gras, plus large que le texte
+    // ordinaire : sans elle, la base de la part se coupait en « of fi… ».
+    widest = Math.max(widest, widthOf(distinctText(column)) * BOLD_FACTOR);
   }
   const floor = withBand ? MIN_WIDTH : MIN_WIDTH_FOLDED;
   const fitted = Math.max(floor, widest + CELL_PADDING);

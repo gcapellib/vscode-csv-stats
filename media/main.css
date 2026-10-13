@@ -1064,6 +1064,12 @@ body.resizing * {
   cursor: pointer;
 }
 
+/* « Missing 0 » : rien à filtrer, la ligne s'efface pour que les colonnes qui
+   ont des vides ressortent. */
+.stat.none {
+  opacity: 0.5;
+}
+
 .stat.pickable:hover {
   text-decoration: underline;
 }

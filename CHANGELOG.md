@@ -47,6 +47,14 @@ cells only" and "Include empty cells", to keep a range *or* the empty cells —
 translated for pandas, where NaN satisfies no comparison, as `between(...) |
 isna()`.
 
+**The band says which base each share uses.** "Missing" is a share of every
+row, "Distinct" a share of filled values — the convention of pandas (`nunique()`
+over `count`) and of ydata-profiling, checked in its source. Side by side, a
+latitude 49 % empty and 99.7 % distinct looked contradictory; the line now reads
+"Distinct 1,547 (99.7% of filled)", and column widths make room for it in bold.
+"Missing 0" is greyed out: identical to a clickable "Missing", it invited clicks
+that did nothing.
+
 **Column index in the band.** Each band shows the column's position next to its
 type — "TEXT · #3" — counted from 0 as pandas does. Dropping a column renumbers
 the ones after it, as `df.drop` does, so the number is the one `df.iloc[:, 3]`
