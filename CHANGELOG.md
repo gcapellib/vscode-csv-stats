@@ -30,6 +30,12 @@ Clicking "(blank)" now keeps every cell the statistics count as missing,
 whitespace-only ones included, and the pandas snippet finds them with `isna()`
 — pandas reads an empty field as NaN, and the former `== ""` matched no row.
 
+**Updates always take effect.** The view's script and style were addressed by
+the same URL from one install to the next whenever the version number stayed
+the same, and VS Code could keep serving an old cached copy even after
+reloading the window — a feature installed and tested did nothing. Their URL
+now carries the file's modification time.
+
 **Empty cells can be filtered in every column.** Only text columns offered
 "(blank)", in their value list; a numeric column — a phone number read as a
 number, say — offered a range and no way to keep its empty cells. An empty cell

@@ -1,3 +1,4 @@
+import { statSync } from 'node:fs';
 import * as vscode from 'vscode';
 import { decode, parse, type CsvTable } from './core/csv';
 import { compute, computeAll, type ColumnStats, type ColumnType } from './core/stats';
@@ -192,9 +193,29 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
     }
   }
 
+  /**
+   * Adresse d'un fichier de la vue, marquée de sa date de modification.
+   *
+   * Sans cette marque, l'adresse restait la même d'une installation à l'autre
+   * tant que le numéro de version ne changeait pas — le dossier s'appelle
+   * csv-stats-0.22.0 à chaque réinstallation — et VS Code pouvait servir un
+   * ancien webview.js gardé en cache, même après « Reload Window » : une
+   * fonction testée et installée restait sans effet.
+   */
+  private resource(webview: vscode.Webview, ...path: string[]): vscode.Uri {
+    const file = vscode.Uri.joinPath(this.context.extensionUri, ...path);
+    let stamp = '0';
+    try {
+      stamp = String(Math.round(statSync(file.fsPath).mtimeMs));
+    } catch {
+      // Fichier illisible : l'adresse reste sans marque, comme avant.
+    }
+    return webview.asWebviewUri(file).with({ query: `v=${stamp}` });
+  }
+
   private html(webview: vscode.Webview): string {
-    const script = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview.js'));
-    const style = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'main.css'));
+    const script = this.resource(webview, 'dist', 'webview.js');
+    const style = this.resource(webview, 'media', 'main.css');
     const nonce = randomNonce();
     return `<!DOCTYPE html>
 <html lang="en">
