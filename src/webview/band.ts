@@ -38,11 +38,13 @@ export function bandCell(modelIndex: number): HTMLElement {
   });
   cell.appendChild(dots);
 
-  // L'index de la colonne dans le fichier, compté depuis 0 comme pandas : il
-  // ne bouge pas quand une colonne est retirée de la vue, et c'est lui que
-  // demandent df.iloc[:, n] ou read_csv(usecols=[n]).
-  const kind = line('type', `${column.type} \u00b7 #${modelIndex}`);
-  kind.title = `Column ${modelIndex} in the file, counted from 0 as pandas does: df.iloc[:, ${modelIndex}]`;
+  // L'index de la colonne dans le tableau tel qu'il est, compté depuis 0
+  // comme pandas : une colonne retirée renumérote les suivantes, comme
+  // df.drop le fait — c'est le nombre qu'attend df.iloc[:, n] sur le df du
+  // code Dataset, qui reproduit ces retraits.
+  const position = state.order.indexOf(modelIndex);
+  const kind = line('type', `${column.type} \u00b7 #${position}`);
+  kind.title = `Column ${position} of the table as it stands, counted from 0 as pandas does: df.iloc[:, ${position}]`;
   cell.appendChild(kind);
   cell.appendChild(line('stat', `Missing ${count(column.missing)} (${percent(column.missingShare)})`));
   cell.appendChild(line('stat', `Distinct ${count(column.distinct)} (${percent(column.distinctShare)})`));

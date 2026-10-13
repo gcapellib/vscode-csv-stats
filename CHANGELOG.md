@@ -30,10 +30,10 @@ Clicking "(blank)" now keeps every cell the statistics count as missing,
 whitespace-only ones included, and the pandas snippet finds them with `isna()`
 — pandas reads an empty field as NaN, and the former `== ""` matched no row.
 
-**Column index in the band.** Each band shows the column's position in the
-file next to its type — "TEXT · #3" — counted from 0 as pandas does, so it is
-the number `df.iloc[:, 3]` or `read_csv(usecols=[3])` expects. It does not move
-when a column is dropped from the view.
+**Column index in the band.** Each band shows the column's position next to its
+type — "TEXT · #3" — counted from 0 as pandas does. Dropping a column renumbers
+the ones after it, as `df.drop` does, so the number is the one `df.iloc[:, 3]`
+expects on the dataframe the Dataset snippet builds.
 
 **All values right-aligned.** Only numbers were, after Excel, so a row
 switched between left and right from one column to the next.
