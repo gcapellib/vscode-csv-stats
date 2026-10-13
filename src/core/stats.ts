@@ -12,7 +12,10 @@ import { decideType, parseNumber, MIN_ROWS_FOR_DISTINCT_NOTE, type ColumnType } 
 
 export { parseNumber, type ColumnType } from './types';
 
-/** Une valeur et sa part dans les valeurs renseignées de la colonne. */
+/**
+ * Une valeur et sa part dans le total des lignes de la colonne. La valeur
+ * vide, "", représente les cellules manquantes : elle se classe comme les autres.
+ */
 export interface ValueShare {
   value: string;
   count: number;
@@ -83,7 +86,7 @@ export interface RankingFold {
  * jamais déborder du bandeau. Sans reste, les valeurs s'affichent toutes et
  * « Other » disparaît, puisqu'une ligne à 0.0% ne dirait rien.
  */
-export function foldRanking(top: ValueShare[], otherCount: number, present: number, rows = BAND_ROWS): RankingFold {
+export function foldRanking(top: ValueShare[], otherCount: number, base: number, rows = BAND_ROWS): RankingFold {
   // Le total ne doit jamais dépasser « rows », même si l'appelant fournit un
   // « top » plus long que prévu : c'est le rôle de cette fonction de le
   // garantir, pas une hypothèse qu'elle est en droit de faire sur ses entrées.
@@ -91,7 +94,7 @@ export function foldRanking(top: ValueShare[], otherCount: number, present: numb
   const shown = top.slice(0, Math.max(0, needsOther ? rows - 1 : rows));
   const folded = top.slice(shown.length);
   const foldedCount = otherCount + folded.reduce((sum, entry) => sum + entry.count, 0);
-  const foldedShare = present === 0 ? 0 : foldedCount / present;
+  const foldedShare = base === 0 ? 0 : foldedCount / base;
   return { shown, otherCount: foldedCount, otherShare: foldedShare };
 }
 
@@ -248,18 +251,31 @@ function orderStatistic(pairs: Array<[number, number]>, index: number): number {
   return pairs[pairs.length - 1][0];
 }
 
+/**
+ * Le classement des valeurs, parts rapportées au total des lignes.
+ *
+ * Il les rapportait aux seules valeurs renseignées : une colonne vide à 93 %
+ * dont le reste valait « True » affichait « True 100 % », juste mais trompeur
+ * — 6,6 % seulement des lignes le disent. Et Column details, qui listait les
+ * vides sur cette même base, affichait « (blank) 149 % ». Rapportées au total,
+ * vides compris (comme `value_counts(dropna=False, normalize=True)`), les
+ * parts totalisent 100 % et disent la vérité sur le fichier.
+ */
 function fillTopValues(stats: ColumnStats, counts: Map<string, number>): void {
-  const ordered = [...counts.entries()].sort(
+  const withBlanks = new Map(counts);
+  if (stats.missing > 0) withBlanks.set('', stats.missing);
+  const ordered = [...withBlanks.entries()].sort(
     (left, right) => right[1] - left[1] || (left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0),
   );
+  const total = stats.total;
   stats.top = ordered.slice(0, TOP_VALUES).map(([value, count]) => ({
     value,
     count,
-    share: stats.present === 0 ? 0 : count / stats.present,
+    share: total === 0 ? 0 : count / total,
   }));
   const taken = stats.top.reduce((sum, entry) => sum + entry.count, 0);
-  stats.otherCount = stats.present - taken;
-  stats.otherShare = stats.present === 0 ? 0 : stats.otherCount / stats.present;
+  stats.otherCount = total - taken;
+  stats.otherShare = total === 0 ? 0 : stats.otherCount / total;
 }
 
 /** Statistiques de toutes les colonnes. `onColumnDone` alimente la progression. */

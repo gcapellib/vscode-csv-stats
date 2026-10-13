@@ -1,6 +1,6 @@
 import { type Filter } from '../core/filters';
 import { count, num } from '../core/format';
-import { compute } from '../core/stats';
+import { compute, isMissing } from '../core/stats';
 import { parseNumber } from '../core/types';
 import { closePicker, getOpenPanel, refilter } from './actions';
 import { HEAD_BUTTONS, MAX_WIDTH, MIN_WIDTH, MIN_WIDTH_FOLDED, OVERSCAN, RESIZE_MAX, RESIZE_MIN, ROW_HEIGHT, WIDTH_SAMPLE_ROWS } from './constants';
@@ -122,7 +122,10 @@ export function matches(cells: string[], filter: Filter, rowIndex: number): bool
     case 'contains':
       return raw.toLowerCase().includes(filter.text);
     case 'values':
-      return filter.values.includes(raw);
+      // « (blank) » retrouve toutes les cellules que les statistiques comptent
+      // comme manquantes, espaces seules comprises — sinon un clic sur lui ne
+      // ramènerait pas toutes les lignes annoncées.
+      return filter.values.includes(raw) || (isMissing(raw) && filter.values.includes(''));
     case 'range': {
       const value = parseNumber(raw, state.delimiter === ';');
       if (value === null) return false;

@@ -21,10 +21,20 @@ export function filterToPandas(filter: Filter, columnName: string): string {
   switch (filter.kind) {
     case 'contains':
       return `df = df[df[${name}].astype(str).str.contains(${JSON.stringify(filter.text)}, case=False, na=False)]`;
-    case 'values':
-      return filter.values.length === 1
-        ? `df = df[df[${name}] == ${JSON.stringify(filter.values[0])}]`
-        : `df = df[df[${name}].isin(${JSON.stringify(filter.values)})]`;
+    case 'values': {
+      const named = filter.values.filter((value) => value !== '');
+      if (named.length === filter.values.length) {
+        return named.length === 1
+          ? `df = df[df[${name}] == ${JSON.stringify(named[0])}]`
+          : `df = df[df[${name}].isin(${JSON.stringify(named)})]`;
+      }
+      // « (blank) » : pandas lit une cellule vide comme NaN, et « == "" » ne la
+      // retrouverait pas ; une cellule d'espaces, elle, reste une chaîne.
+      const blank = `df[${name}].isna() | df[${name}].astype(str).str.strip().eq("")`;
+      if (named.length === 0) return `df = df[${blank}]`;
+      const kept = named.length === 1 ? `(df[${name}] == ${JSON.stringify(named[0])})` : `df[${name}].isin(${JSON.stringify(named)})`;
+      return `df = df[${kept} | ${blank}]`;
+    }
     case 'range':
       // Une borne unique et fermée désigne une seule valeur : « == 7 » se lit,
       // « between(7, 7) » se déchiffre.

@@ -117,8 +117,11 @@ export function distributionChart(column: ColumnStats, details: ColumnDetails, c
       'Value length',
     );
   }
+  // La liste compte les vides sous « (blank) » : ses parts se rapportent donc
+  // au total des lignes. Rapportées aux seules valeurs renseignées, elles
+  // donnaient « (blank) 149 % ».
   const ranked = rankedValues(column.index);
-  return barChart(ranked, column.present, colours, 'Most frequent values');
+  return barChart(ranked, column.total, colours, 'Most frequent values');
 }
 
 /** Valeurs les plus fréquentes, le reste regroupé pour ne pas noyer le graphique. */

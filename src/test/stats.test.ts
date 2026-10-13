@@ -95,13 +95,35 @@ describe('StatsComputer', () => {
     assert.equal(statsOf('prix\n10\n20\nn d\n')[0].type, 'text');
   });
 
-  it('traite une colonne entièrement vide comme du texte sans top', () => {
+  it('traite une colonne entièrement vide comme du texte, classée « (blank) » à 100 %', () => {
     const stats = statsOf('a,b\n1,\n2,\n')[1];
     assert.equal(stats.type, 'text');
     assert.equal(stats.missing, 2);
     assert.equal(stats.distinct, 0);
-    assert.equal(stats.top.length, 0);
+    assert.deepEqual(stats.top, [{ value: '', count: 2, share: 1 }]);
     assert.equal(stats.distinctShare, 0);
+  });
+
+  it('rapporte les parts au total des lignes, vides compris', () => {
+    // Le cas qui a alerté : une colonne « cave » vide à 93 %, le reste valant
+    // « True ». Rapportée aux seules valeurs renseignées, « True » affichait
+    // 100 % ; rapportée au total, elle dit la part réelle des annonces.
+    // Une colonne id devant : seule, une cellule vide ferait une ligne vide,
+    // que le lecteur ignore — comme pandas (skip_blank_lines).
+    const rows = [...Array(14).fill(''), 'True'].map((cave, i) => `${i},${cave}`);
+    const stats = statsOf(`id,cave\n${rows.join('\n')}\n`)[1];
+    assert.deepEqual(
+      stats.top.map((entry) => [entry.value, entry.count, Math.round(entry.share * 1000) / 10]),
+      [['', 14, 93.3], ['True', 1, 6.7]],
+    );
+    const total = stats.top.reduce((sum, entry) => sum + entry.share, 0) + stats.otherShare;
+    assert.ok(Math.abs(total - 1) < 1e-9, `total des parts : ${total}`);
+  });
+
+  it('classe les vides à leur rang, ni toujours en tête ni toujours à la fin', () => {
+    const stats = statsOf('id,agence\n1,A\n2,A\n3,A\n4,\n5,B\n')[1];
+    assert.deepEqual(stats.top.map((entry) => entry.value), ['A', '', 'B']);
+    assert.equal(stats.top[0].share, 0.6);
   });
 
   it('reconnaît la virgule décimale dans un fichier à point-virgule', () => {

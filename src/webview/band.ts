@@ -69,11 +69,13 @@ export function bandCell(modelIndex: number): HTMLElement {
   } else {
     // La règle des sept lignes vit dans core/stats.ts, testée là-bas : ici on ne
     // fait plus qu'en dessiner le résultat.
-    const { shown, otherCount, otherShare } = foldRanking(column.top, column.otherCount, column.present);
+    // Parts rapportées au total des lignes, vides compris : ils figurent dans
+    // le classement sous « (blank) », à leur rang.
+    const { shown, otherCount, otherShare } = foldRanking(column.top, column.otherCount, column.total);
 
     for (const share of shown) {
       body.appendChild(
-        valueLine(share.value, share.share, colours.text, colours.accent, false, () =>
+        valueLine(share.value === '' ? '(blank)' : share.value, share.share, colours.text, colours.accent, false, () =>
           toggleFilter(valuesFilter(modelIndex, [share.value])),
         ),
       );

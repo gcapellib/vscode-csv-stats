@@ -17,6 +17,19 @@ to the title alone crushed them. With the band folded, a column narrows freely
 and the double-click shrinks it to its title, read in full beside its two
 buttons; reopening the band brings it back to its default width.
 
+**Percentages now read against every row, blanks included.** The value ranking
+in the band and in Column details divided by filled values only. Column details
+listed blanks on that same base, and so showed "(blank) 149.3 %"; the band
+showed a column that is 93 % empty and otherwise "True" as "True 100 %" — right
+about the filled values, misleading about the file. Shares are now taken over
+all rows, as pandas' `value_counts(dropna=False, normalize=True)` does: blanks
+take their rank as "(blank)", and the list adds up to 100 %. Checked against an
+independent computation on a 3,042-row, 35-column file: no difference.
+
+Clicking "(blank)" now keeps every cell the statistics count as missing,
+whitespace-only ones included, and the pandas snippet finds them with `isna()`
+— pandas reads an empty field as NaN, and the former `== ""` matched no row.
+
 **All values right-aligned.** Only numbers were, after Excel, so a row
 switched between left and right from one column to the next.
 

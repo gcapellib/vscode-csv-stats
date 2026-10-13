@@ -3,6 +3,18 @@ import { describe, it } from 'node:test';
 import { datasetTransformLines, filterToPandas, type Filter } from '../core/filters';
 
 describe('filterToPandas', () => {
+  it('traduit « (blank) » par isna, puisque pandas lit une cellule vide comme NaN', () => {
+    // « == "" » ne retrouvait aucune ligne : le filtre généré ne reproduisait
+    // pas celui du tableau.
+    const blank: Filter = { kind: 'values', column: 0, values: [''], label: '' };
+    assert.equal(filterToPandas(blank, 'cave'), 'df = df[df["cave"].isna() | df["cave"].astype(str).str.strip().eq("")]');
+    const mixed: Filter = { kind: 'values', column: 0, values: ['Lyon', ''], label: '' };
+    assert.equal(
+      filterToPandas(mixed, 'ville'),
+      'df = df[(df["ville"] == "Lyon") | df["ville"].isna() | df["ville"].astype(str).str.strip().eq("")]',
+    );
+  });
+
   it('traduit un filtre texte en str.contains', () => {
     const filter: Filter = { kind: 'contains', column: 0, text: 'lyon', label: '' };
     assert.equal(
