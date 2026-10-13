@@ -64,26 +64,6 @@ export function applyDrop(modelIndex: number): void {
   paint();
 }
 
-export async function applyFilter(modelIndex: number): Promise<void> {
-  const column = state.stats[modelIndex];
-  const existing = state.filters.find(
-    (filter): filter is Extract<Filter, { kind: 'contains' }> =>
-      filter.kind === 'contains' && filter.column === modelIndex,
-  );
-  const entered = await ask('Filter Column', `Keep rows where « ${column.name} » contains:`, existing?.text ?? '');
-  if (entered === null) return;
-  state.filters = state.filters.filter((filter) => filter !== existing);
-  if (entered !== '') {
-    state.filters.push({
-      kind: 'contains',
-      column: modelIndex,
-      text: entered.toLowerCase(),
-      label: `${column.name} contains « ${entered} »`,
-    });
-  }
-  refilter();
-}
-
 export async function applyRename(modelIndex: number): Promise<void> {
   const column = state.stats[modelIndex];
   const entered = await ask('Rename Column', 'New name for this column:', column.name);

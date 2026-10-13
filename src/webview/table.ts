@@ -1,14 +1,13 @@
-import { type Filter } from '../core/filters';
+import { cellMatches, type Filter } from '../core/filters';
 import { count, num } from '../core/format';
-import { compute, isMissing } from '../core/stats';
+import { compute } from '../core/stats';
 import { parseNumber } from '../core/types';
 import { closePicker, getOpenPanel, refilter } from './actions';
 import { HEAD_BUTTONS, MAX_WIDTH, MIN_WIDTH, MIN_WIDTH_FOLDED, OVERSCAN, RESIZE_MAX, RESIZE_MIN, ROW_HEIGHT, WIDTH_SAMPLE_ROWS } from './constants';
 import { elements } from './dom';
 import { closeMenu } from './menu';
 import { paint } from './paint';
-import { openRangePicker } from './panels/range-picker';
-import { openValuePicker } from './panels/value-picker';
+import { openFilterPanel } from './panels/filter-panel';
 import { distinctText } from './band';
 import { resizeHandle } from './resize';
 import { palette, state } from './state';
@@ -144,24 +143,8 @@ export function totalWidth(): number {
 /** Une ligne satisfait-elle la condition ? */
 export function matches(cells: string[], filter: Filter, rowIndex: number): boolean {
   if (filter.kind === 'duplicates') return filter.rows.has(rowIndex);
-  const raw = cells[filter.column] ?? '';
-  switch (filter.kind) {
-    case 'contains':
-      return raw.toLowerCase().includes(filter.text);
-    case 'values':
-      // « (blank) » retrouve toutes les cellules que les statistiques comptent
-      // comme manquantes, espaces seules comprises — sinon un clic sur lui ne
-      // ramènerait pas toutes les lignes annoncées.
-      return filter.values.includes(raw) || (isMissing(raw) && filter.values.includes(''));
-    case 'range': {
-      if (isMissing(raw)) return filter.blank === true;
-      const value = parseNumber(raw, state.delimiter === ';');
-      if (value === null) return false;
-      // La dernière classe inclut sa borne haute, sinon le maximum lui-même
-      // serait exclu de l'intervalle qui le contient.
-      return value >= filter.low && (filter.last ? value <= filter.high : value < filter.high);
-    }
-  }
+  const decimalComma = state.delimiter === ';';
+  return cellMatches(cells[filter.column] ?? '', filter, (raw) => parseNumber(raw, decimalComma));
 }
 
 /** Indices des lignes retenues par les filtres actifs. */
@@ -287,7 +270,7 @@ export function cycleSort(modelIndex: number): void {
   paint();
 }
 
-/** Le panneau du bouton de gauche : la liste des valeurs, ou les bornes. */
+/** Le panneau du bouton de filtre : liste de valeurs, condition texte ou nombre. */
 export function openColumnFilter(modelIndex: number, anchor: HTMLElement): void {
   // Le bouton qui ouvre referme : sans quoi le second clic rouvrait le même
   // panneau, et le seul moyen d'en sortir était de cliquer ailleurs.
@@ -295,9 +278,7 @@ export function openColumnFilter(modelIndex: number, anchor: HTMLElement): void 
     closePicker();
     return;
   }
-  const column = state.stats[modelIndex];
-  if (column?.type === 'numeric') openRangePicker(modelIndex, anchor);
-  else openValuePicker(modelIndex, anchor);
+  openFilterPanel(modelIndex, anchor);
 }
 
 export function paintRows(): void {
@@ -376,7 +357,7 @@ export function applySort(modelIndex: number, ascending: boolean): void {
  * Une seule pastille quel que soit le nombre de valeurs : c'est une seule
  * condition, et la relire doit rester aussi simple que la poser.
  */
-export function valuesFilter(columnIndex: number, values: string[]): Filter {
+export function valuesFilter(columnIndex: number, values: string[], exclude = false): Filter {
   const name = state.stats[columnIndex]?.name ?? `column ${columnIndex + 1}`;
   // Une valeur bordée d'espaces se met entre guillemets : sans eux, « Nantes »
   // et « Nantes  » se lisent pareil, et le compte affiché paraît faux.
@@ -384,12 +365,14 @@ export function valuesFilter(columnIndex: number, values: string[]): Filter {
     value === '' ? '(blank)' : value !== value.trim() ? JSON.stringify(value) : value;
   const shown = values.slice(0, 3).map(show).join(', ');
   const rest = values.length > 3 ? ` +${values.length - 3}` : '';
-  return {
-    kind: 'values',
-    column: columnIndex,
-    values,
-    label: values.length === 1 ? `${name} = ${show(values[0])}` : `${name} ∈ {${shown}${rest}}`,
-  };
+  const label = exclude
+    ? values.length === 1
+      ? `${name} ≠ ${show(values[0])}`
+      : `${name} ∉ {${shown}${rest}}`
+    : values.length === 1
+      ? `${name} = ${show(values[0])}`
+      : `${name} ∈ {${shown}${rest}}`;
+  return { kind: 'values', column: columnIndex, values, ...(exclude ? { exclude: true } : {}), label };
 }
 
 /** Remplace la condition posée sur cette colonne, ou la retire si vide. */

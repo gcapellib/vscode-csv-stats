@@ -3,12 +3,11 @@ import { COLUMN_TYPES, TYPE_LABELS } from './constants';
 import { elements } from './dom';
 import { floating, positionFloating } from './floating-setup';
 import { openDetails } from './panels/column-details';
-import { openRangePicker } from './panels/range-picker';
-import { openValuePicker } from './panels/value-picker';
+import { openFilterPanel } from './panels/filter-panel';
 import { state } from './state';
 import { applySort } from './table';
 import { vscode } from './vscode-api';
-import { applyFilter, applyRename } from './actions';
+import { applyRename } from './actions';
 
 /**
  * Toutes ces actions sont des actions de vue : le fichier n'est jamais réécrit.
@@ -31,11 +30,7 @@ export function openMenu(modelIndex: number, anchor: HTMLElement): void {
     'separator',
     ['Sort ascending', () => applySort(modelIndex, true)],
     ['Sort descending', () => applySort(modelIndex, false)],
-    [
-      column.type === 'numeric' ? 'Filter by range…' : 'Filter by value…',
-      () => (column.type === 'numeric' ? openRangePicker(modelIndex, anchor) : openValuePicker(modelIndex, anchor)),
-    ],
-    ['Filter by text…', () => void applyFilter(modelIndex)],
+    ['Filter…', () => openFilterPanel(modelIndex, anchor)],
     'separator',
     ['Rename column', () => void applyRename(modelIndex)],
     ['Drop column', () => applyDrop(modelIndex)],

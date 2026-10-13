@@ -121,7 +121,7 @@ export function compute(table: CsvTable, columnIndex: number, forced?: ColumnTyp
   const present = total - missing;
   const keys = [...counts.keys()];
   const name = table.headers[columnIndex] ?? `column ${columnIndex + 1}`;
-  const type = forced ?? decideType(keys, present, decimalComma);
+  const type = forced ?? decideType(keys, present, decimalComma, name);
 
   const stats: ColumnStats = {
     name,

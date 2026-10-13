@@ -25,24 +25,34 @@ test.describe('filtrer les vides', () => {
     await expect(page.locator('.filter-summary')).toHaveText('3 of 12 rows');
   });
 
-  test('le filtre numérique propose « Empty cells only »', async ({ page }) => {
+  test('un téléphone est lu comme du texte : liste de valeurs, pas de bornes numériques', async ({ page }) => {
     await openHarness(page, file);
     await page.locator('.head-cell', { hasText: 'telephone' }).locator('.head-button').first().click();
-    await page.locator('.picker-only-blank').click();
+    await expect(page.locator('.picker-tab')).toHaveText(['Values', 'Text']);
+    await expect(page.locator('.picker-number')).toHaveCount(0);
+  });
+
+  test('« Only empty cells » ne garde que les vides', async ({ page }) => {
+    await openHarness(page, file);
+    await page.locator('.head-cell', { hasText: 'telephone' }).locator('.head-button').first().click();
+    await page.locator('.picker-tab', { hasText: 'Text' }).click();
+    await page.locator('.picker-empties').selectOption('only');
+    await page.locator('.picker-button.primary').click();
     await expect(page.locator('.filter-summary')).toHaveText('5 of 12 rows');
   });
 
-  test('« Include empty cells » ajoute les vides à une plage', async ({ page }) => {
-    await openHarness(page, file);
-    await page.locator('.head-cell', { hasText: 'telephone' }).locator('.head-button').first().click();
-    const bounds = page.locator('.picker-number');
-    // id 4, 5, 6 → 600004444, 600005555, 600006666 : trois lignes dans la
-    // plage, plus les 5 vides.
-    await bounds.nth(0).fill('600004000');
-    await bounds.nth(1).fill('600007000');
-    await page.locator('.picker-blank input').check();
+  test('« Keep them too » ajoute les vides à une condition', async ({ page }) => {
+    await openHarness(page, 'samples/wines.csv');
+    const button = page.locator('.head-cell', { hasText: 'quality_score' }).locator('.head-button').first();
+    await button.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(100);
+    await button.click();
+    await page.locator('.picker-op').selectOption('≥');
+    await page.locator('.picker-number').first().fill('8');
+    await page.locator('.picker-empties').selectOption('add');
     await page.locator('.picker-button.primary').click();
-    await expect(page.locator('.filter-summary')).toHaveText('8 of 12 rows');
+    // 76 notes ≥ 8, plus les 9 sans note.
+    await expect(page.locator('.filter-summary')).toHaveText('85 of 423 rows');
   });
 });
 

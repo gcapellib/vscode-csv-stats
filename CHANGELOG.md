@@ -4,6 +4,29 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.23.0
+
+One filter panel per column, whatever its type — same place, tabs that fit the
+column.
+
+- **Numbers**: one operator menu (`=`, `≠`, `>`, `≥`, `<`, `≤`, `between`) and
+  one value (two for `between`), replacing From / To / Exactly.
+- **Text**: *Values* (the checklist) and *Text* (contains, does not contain,
+  starts with, ends with, is, is not; case-insensitive). The panel opens on
+  *Text* when a column has more than 200 distinct values — ticking one value
+  out of two thousand is no use. The pandas code uses literal matching
+  (`regex=False`) and the `string` dtype, so NaN is never read as "nan".
+- **All except**: tick values, then "Keep all except the checked values".
+- **Empty cells**: one choice instead of a checkbox and a button — follow the
+  condition, hide them, keep them too, or only them.
+- "Select all" now covers every value the search matches, not just the 400
+  drawn rows.
+- Clicking **Distinct** in a column band opens its list of values.
+- Phone numbers, postal codes and similar identifiers (a leading zero, or a
+  column named tel/phone/zip/postal…) are read as text, not as numbers. The
+  "Read this column as" menu still overrides it.
+- The column menu has a single "Filter…" entry.
+
 ## 0.22.2
 
 "Distinct … (… of filled)" could be cut short where the interface font is

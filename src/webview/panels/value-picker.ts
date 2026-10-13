@@ -1,24 +1,23 @@
 import { type Filter } from '../../core/filters';
 import { count } from '../../core/format';
-import { closePicker, setOpenPanel } from '../actions';
-import { elements, textSpan } from '../dom';
-import { floating, positionFloating } from '../floating-setup';
+import { closePicker } from '../actions';
+import { textSpan } from '../dom';
 import { state } from '../state';
 import { setColumnFilter, valueCounts, valuesFilter } from '../table';
+import { footerButtons } from './filter-fields';
 
-/** Au-delà, la liste devient illisible : la recherche prend le relais. */
+/** Au-delà, le DOM de la liste devient lourd : seules les premières lignes s'affichent. */
 const PICKER_MAX_ROWS = 400;
 
 /**
- * Sélecteur de valeurs, à la manière d'Excel.
+ * Liste de valeurs, à la manière d'Excel.
  *
- * Le palmarès du bandeau ne montre que trois valeurs ; toutes les autres sont
- * noyées dans « Other » et resteraient hors d'atteinte. Ce panneau les rend
- * toutes sélectionnables, et la recherche lui permet de tenir même sur une
- * colonne à plusieurs milliers de valeurs distinctes.
+ * Le palmarès du bandeau ne montre que quelques valeurs ; toutes les autres
+ * sont noyées dans « Other » et resteraient hors d'atteinte. « Select all »
+ * porte sur **toutes** les valeurs que la recherche laisse, pas seulement sur
+ * les lignes dessinées, et « All except » inverse la sélection.
  */
-export function openValuePicker(columnIndex: number, anchor: HTMLElement): void {
-  const column = state.stats[columnIndex];
+export function renderValuesTab(parent: HTMLElement, columnIndex: number): HTMLElement {
   const counts = valueCounts(columnIndex);
   const current = state.filters.find(
     (filter): filter is Extract<Filter, { kind: 'values' }> =>
@@ -26,39 +25,41 @@ export function openValuePicker(columnIndex: number, anchor: HTMLElement): void 
   );
   const chosen = new Set<string>(current?.values ?? []);
 
-  elements.picker.textContent = '';
-  const title = document.createElement('div');
-  title.className = 'picker-title';
-  title.textContent = column?.name ?? '';
-  elements.picker.appendChild(title);
-
   const search = document.createElement('input');
   search.className = 'picker-search';
   search.type = 'search';
   search.placeholder = 'Search values…';
-  elements.picker.appendChild(search);
+  parent.appendChild(search);
 
   const selectAll = document.createElement('label');
   selectAll.className = 'picker-row picker-all';
   const allBox = document.createElement('input');
   allBox.type = 'checkbox';
   selectAll.append(allBox, textSpan('(Select all)'));
-  elements.picker.appendChild(selectAll);
+  parent.appendChild(selectAll);
 
   const list = document.createElement('div');
   list.className = 'picker-list';
-  elements.picker.appendChild(list);
+  parent.appendChild(list);
 
   const note = document.createElement('div');
   note.className = 'picker-note';
-  elements.picker.appendChild(note);
+  parent.appendChild(note);
 
-  let visible: string[] = [];
+  const exceptRow = document.createElement('label');
+  exceptRow.className = 'picker-blank';
+  const except = document.createElement('input');
+  except.type = 'checkbox';
+  except.className = 'picker-except';
+  except.checked = current?.exclude === true;
+  exceptRow.append(except, textSpan('Keep all except the checked values'));
+  parent.appendChild(exceptRow);
+
+  let matching: Array<[string, number]> = counts;
 
   const render = () => {
     const needle = search.value.trim().toLowerCase();
-    const matching = needle === '' ? counts : counts.filter(([value]) => value.toLowerCase().includes(needle));
-    visible = matching.slice(0, PICKER_MAX_ROWS).map(([value]) => value);
+    matching = needle === '' ? counts : counts.filter(([value]) => value.toLowerCase().includes(needle));
     list.textContent = '';
     for (const [value, occurrences] of matching.slice(0, PICKER_MAX_ROWS)) {
       const row = document.createElement('label');
@@ -73,6 +74,7 @@ export function openValuePicker(columnIndex: number, anchor: HTMLElement): void 
       });
       const name = textSpan(value === '' ? '(blank)' : value);
       name.className = 'picker-value';
+      name.title = value;
       const tally = textSpan(count(occurrences));
       tally.className = 'picker-count';
       row.append(box, name, tally);
@@ -80,21 +82,20 @@ export function openValuePicker(columnIndex: number, anchor: HTMLElement): void 
     }
     note.textContent =
       matching.length > PICKER_MAX_ROWS
-        ? `Showing ${count(PICKER_MAX_ROWS)} of ${count(matching.length)} values — refine your search`
+        ? `${count(matching.length)} values, first ${count(PICKER_MAX_ROWS)} shown — “Select all” covers all ${count(matching.length)}`
         : `${count(matching.length)} values`;
     syncAll();
   };
 
   const syncAll = () => {
-    const picked = visible.filter((value) => chosen.has(value)).length;
-    allBox.checked = picked > 0 && picked === visible.length;
-    allBox.indeterminate = picked > 0 && picked < visible.length;
+    let picked = 0;
+    for (const [value] of matching) if (chosen.has(value)) picked++;
+    allBox.checked = picked > 0 && picked === matching.length;
+    allBox.indeterminate = picked > 0 && picked < matching.length;
   };
 
   allBox.addEventListener('change', () => {
-    // « Tout sélectionner » porte sur ce que la recherche laisse voir, comme
-    // dans Excel : sur une liste filtrée, il serait trompeur de tout cocher.
-    for (const value of visible) {
+    for (const [value] of matching) {
       if (allBox.checked) chosen.add(value);
       else chosen.delete(value);
     }
@@ -104,27 +105,20 @@ export function openValuePicker(columnIndex: number, anchor: HTMLElement): void 
   search.addEventListener('input', render);
   render();
 
-  const footer = document.createElement('div');
-  footer.className = 'picker-footer';
-  const cancel = document.createElement('button');
-  cancel.className = 'picker-button';
-  cancel.textContent = 'Cancel';
-  cancel.addEventListener('click', closePicker);
-  const apply = document.createElement('button');
-  apply.className = 'picker-button primary';
-  apply.textContent = 'Apply';
-  apply.addEventListener('click', () => {
+  const apply = () => {
     closePicker();
-    // Tout cocher ne filtre rien : autant retirer la condition.
+    // Rien de coché, ou tout coché sans inversion : aucune condition à poser.
     const values = [...chosen];
     const everything = values.length === counts.length;
-    setColumnFilter(columnIndex, values.length === 0 || everything ? null : valuesFilter(columnIndex, values));
-  });
-  footer.append(cancel, apply);
-  elements.picker.appendChild(footer);
-
-  floating.open('picker', anchor);
-  positionFloating(elements.picker, anchor);
-  setOpenPanel(`filter:${columnIndex}`);
-  search.focus();
+    const nothing = values.length === 0;
+    const noFilter = except.checked ? nothing : nothing || everything;
+    setColumnFilter(columnIndex, noFilter ? null : valuesFilter(columnIndex, values, except.checked));
+  };
+  parent.appendChild(
+    footerButtons([
+      ['Cancel', closePicker, false],
+      ['Apply', apply, true],
+    ]),
+  );
+  return search;
 }

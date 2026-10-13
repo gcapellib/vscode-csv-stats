@@ -37,7 +37,23 @@ export function parseNumber(raw: string, decimalComma: boolean): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
-export function decideType(values: string[], present: number, decimalComma: boolean): ColumnType {
+/**
+ * Noms de colonnes qui désignent un identifiant : un numéro de téléphone ou un
+ * code postal ne se compare pas, ne se somme pas, et une plage « de 62909 à
+ * 999625132 » n'a aucun sens. Mots entiers seulement, pour ne pas prendre
+ * « interval » pour « tel ».
+ */
+const IDENTIFIER_NAME = /(^|[^a-z])(tel|telephone|téléphone|phone|mobile|portable|fax|zip|zipcode|postal|postcode|cp|siret|siren|iban|ssn)([^a-z]|$)/i;
+
+/** « 0612345678 », « 06000 » : un zéro initial devant un autre chiffre n'est pas un nombre. */
+const LEADING_ZERO = /^0\d/;
+
+export function looksLikeIdentifier(name: string, values: string[]): boolean {
+  return IDENTIFIER_NAME.test(name) || values.some((value) => LEADING_ZERO.test(value.trim()));
+}
+
+export function decideType(values: string[], present: number, decimalComma: boolean, name = ''): ColumnType {
   if (present === 0 || values.length === 0) return 'text';
+  if (looksLikeIdentifier(name, values)) return 'text';
   return values.every((value) => parseNumber(value, decimalComma) !== null) ? 'numeric' : 'text';
 }
