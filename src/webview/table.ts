@@ -137,7 +137,37 @@ export function fitWidths(index: number): { compact: number; full: number } {
 }
 
 export function totalWidth(): number {
-  return state.order.reduce((sum, index) => sum + state.widths[index], 0);
+  return gutterWidth() + state.order.reduce((sum, index) => sum + state.widths[index], 0);
+}
+
+/**
+ * Numéro de ligne du fichier, celui de la vue Raw : il ne bouge ni avec le tri
+ * ni avec le filtre, et sert à retrouver une ligne dans l'éditeur. Sans le
+ * numéro reçu, l'en-tête étant la ligne 1, la première donnée est la ligne 2.
+ */
+export function lineOf(rowIndex: number): number {
+  return state.lines[rowIndex] ?? rowIndex + 2;
+}
+
+/** Largeur de la gouttière : assez pour le plus grand numéro du fichier. */
+export function gutterWidth(): number {
+  const digits = String(lineOf(Math.max(0, state.rows.length - 1))).length;
+  // Mesuré une fois par nombre de chiffres : appelée à chaque ligne peinte.
+  if (gutterMeasured?.digits !== digits) {
+    gutterMeasured = { digits, width: Math.ceil(textMeasurer()('0') * digits) + 20 };
+  }
+  return gutterMeasured.width;
+}
+
+let gutterMeasured: { digits: number; width: number } | null = null;
+
+/** Cellule de gouttière, vide en tête : elle garde en place les colonnes du bandeau et de l'en-tête. */
+export function gutterCell(text = ''): HTMLDivElement {
+  const cell = document.createElement('div');
+  cell.className = 'gutter';
+  cell.style.width = `${gutterWidth()}px`;
+  cell.textContent = text;
+  return cell;
 }
 
 /** Une ligne satisfait-elle la condition ? */
@@ -225,10 +255,18 @@ export function rebuildView(): void {
 
 export function paintHead(): void {
   elements.head.textContent = '';
+  elements.head.appendChild(gutterCell());
   for (const modelIndex of state.order) {
     const cell = document.createElement('div');
     cell.className = 'head-cell';
     cell.style.width = `${state.widths[modelIndex]}px`;
+    if (state.selectedColumn === modelIndex) cell.classList.add('selected');
+    // Comme un clic sur une cellule marque sa ligne : un clic sur l'en-tête
+    // marque sa colonne. Les boutons et la poignée gardent leur propre geste.
+    cell.addEventListener('mousedown', (event) => {
+      if ((event.target as HTMLElement).closest('.head-button, .col-resizer')) return;
+      selectColumn(modelIndex);
+    });
 
     // Le titre ne trie plus : seule la flèche le fait. Un titre cliquable qui
     // réordonnait tout sans rien annoncer surprenait plus qu'il ne servait,
@@ -313,12 +351,14 @@ export function paintRows(): void {
     const isSelected = state.selected.has(rowIndex);
     row.className = isSelected ? 'row selected' : 'row';
     row.style.top = `${position * ROW_HEIGHT}px`;
+    row.appendChild(gutterCell(String(lineOf(rowIndex))));
     for (const modelIndex of state.order) {
       const colours = palette(modelIndex);
       const cell = document.createElement('div');
       const isActive = state.active?.row === rowIndex && state.active.column === modelIndex;
       cell.className = state.stats[modelIndex].type === 'numeric' ? 'cell num' : 'cell';
       if (isActive) cell.classList.add('active');
+      if (state.selectedColumn === modelIndex) cell.classList.add('column-selected');
       cell.style.width = `${state.widths[modelIndex]}px`;
       // La teinte de colonne reste posée même sur une ligne marquée : le
       // marquage se fait par un voile par-dessus, non en remplaçant la couleur.
@@ -336,7 +376,19 @@ export function paintRows(): void {
   elements.body.appendChild(fragment);
 }
 
+/** Un second clic sur la même colonne la démarque, comme pour une ligne. */
+export function selectColumn(modelIndex: number): void {
+  state.selectedColumn = state.selectedColumn === modelIndex ? null : modelIndex;
+  state.selected.clear();
+  state.active = null;
+  updateSelectionCount();
+  paintHead();
+  paintRows();
+}
+
 export function select(rowIndex: number, columnIndex: number, add: boolean): void {
+  const hadColumn = state.selectedColumn !== null;
+  state.selectedColumn = null;
   state.active = { row: rowIndex, column: columnIndex };
   if (add) {
     if (!state.selected.delete(rowIndex)) state.selected.add(rowIndex);
@@ -347,11 +399,18 @@ export function select(rowIndex: number, columnIndex: number, add: boolean): voi
     else state.active = null;
   }
   updateSelectionCount();
+  if (hadColumn) paintHead();
   paintRows();
 }
 
 export function updateSelectionCount(): void {
-  elements.selection.textContent = state.selected.size === 0 ? '' : `${count(state.selected.size)} selected`;
+  const column = state.selectedColumn === null ? null : state.stats[state.selectedColumn]?.name;
+  elements.selection.textContent =
+    column !== undefined && column !== null
+      ? `Column “${column}” selected`
+      : state.selected.size === 0
+        ? ''
+        : `${count(state.selected.size)} selected`;
 }
 
 elements.scroller.addEventListener('scroll', () => {

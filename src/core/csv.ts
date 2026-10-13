@@ -9,6 +9,13 @@
 export interface CsvTable {
   headers: string[];
   rows: string[][];
+  /**
+   * Numéro de ligne du fichier où commence chaque ligne de données, l'en-tête
+   * étant la ligne 1 : ce sont les numéros de la vue Raw. Ils diffèrent de
+   * l'index de la ligne dès qu'un champ s'étend sur plusieurs lignes ou qu'une
+   * ligne blanche a été ignorée. Absent d'une table recalculée sur un sous-ensemble.
+   */
+  lines?: number[];
   delimiter: string;
   /** Vrai si le fichier dépassait la limite de lignes et a été tronqué. */
   truncated: boolean;
@@ -87,12 +94,13 @@ export function parse(
   const records = new RecordReader(text, delimiter);
   const first = records.next();
   if (first === null) {
-    return { headers: [], rows: [], delimiter, truncated: false };
+    return { headers: [], rows: [], lines: [], delimiter, truncated: false };
   }
 
   const headers = first.map((raw, index) => raw.trim() || `column ${index + 1}`);
   const width = headers.length;
   const rows: string[][] = [];
+  const lines: number[] = [];
   let truncated = false;
 
   for (;;) {
@@ -105,10 +113,11 @@ export function parse(
     const row = new Array<string>(width);
     for (let i = 0; i < width; i++) row[i] = i < record.length ? record[i] : '';
     rows.push(row);
+    lines.push(records.startLine);
     if (rows.length % 10_000 === 0) onRowsRead(rows.length);
   }
   onRowsRead(rows.length);
-  return { headers, rows, delimiter, truncated };
+  return { headers, rows, lines, delimiter, truncated };
 }
 
 /**
@@ -117,6 +126,10 @@ export function parse(
  */
 class RecordReader {
   private position = 0;
+  /** Ligne du fichier sous `position`, comptée en « \n » comme le fait la vue Raw. */
+  private line = 1;
+  /** Ligne où commence le dernier enregistrement lu. */
+  startLine = 1;
 
   constructor(private readonly text: string, private readonly delimiter: string) {}
 
@@ -136,6 +149,7 @@ class RecordReader {
     let field = '';
     let quoted = false;
     let inQuotes = false;
+    this.startLine = this.line;
 
     while (this.position < this.text.length) {
       const character = this.text[this.position];
@@ -151,6 +165,7 @@ class RecordReader {
           this.position++;
           continue;
         }
+        if (character === '\n') this.line++;
         field += character;
         this.position++;
         continue;
@@ -171,12 +186,16 @@ class RecordReader {
       }
       if (character === '\n') {
         this.position++;
+        this.line++;
         fields.push(field);
         return fields;
       }
       if (character === '\r') {
         this.position++;
-        if (this.text[this.position] === '\n') this.position++;
+        if (this.text[this.position] === '\n') {
+          this.position++;
+          this.line++;
+        }
         fields.push(field);
         return fields;
       }

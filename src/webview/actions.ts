@@ -1,6 +1,7 @@
 import { type Filter } from '../core/filters';
 import { floating } from './floating-setup';
 import { paint } from './paint';
+import { elements } from './dom';
 import { state } from './state';
 import { rebuildView, recomputeStats } from './table';
 import { paintFilterBar } from './toolbar';
@@ -61,6 +62,10 @@ export function refilter(): void {
 
 export function applyDrop(modelIndex: number): void {
   state.order = state.order.filter((index) => index !== modelIndex);
+  if (state.selectedColumn === modelIndex) {
+    state.selectedColumn = null;
+    elements.selection.textContent = '';
+  }
   paint();
 }
 

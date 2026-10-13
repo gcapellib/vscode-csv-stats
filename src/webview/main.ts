@@ -76,7 +76,11 @@ window.addEventListener('message', (event: MessageEvent) => {
     case 'rows': {
       const start = message.start as number;
       const chunk = message.rows as string[][];
-      for (let i = 0; i < chunk.length; i++) state.rows[start + i] = chunk[i];
+      const lines = message.lines as number[] | undefined;
+      for (let i = 0; i < chunk.length; i++) {
+        state.rows[start + i] = chunk[i];
+        if (lines) state.lines[start + i] = lines[i];
+      }
       if (!state.ready && state.rows.length > 0) {
         measureWidths();
         state.ready = true;

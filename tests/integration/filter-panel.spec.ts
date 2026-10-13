@@ -118,10 +118,11 @@ test.describe('panneau de filtre', () => {
     await expect(page.locator('.snippet')).toContainText('df = df.drop_duplicates(subset=["producer"])');
   });
 
-  test('le menu « ⋯ » n’a plus qu’une entrée « Filter… »', async ({ page }) => {
+  test('le menu « ⋯ » ne répète ni le tri ni le filtre des boutons de l’en-tête', async ({ page }) => {
     await openHarness(page, 'samples/wines.csv');
     await page.locator('.band-cell .dots').nth(2).click();
-    await expect(page.locator('#menu')).toContainText('Filter…');
-    await expect(page.locator('#menu')).not.toContainText('Filter by');
+    await expect(page.locator('#menu')).toContainText('Column details…');
+    await expect(page.locator('#menu')).not.toContainText('Filter');
+    await expect(page.locator('#menu')).not.toContainText('Sort');
   });
 });

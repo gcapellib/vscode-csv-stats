@@ -627,6 +627,27 @@ body {
   height: var(--row-height);
 }
 
+/* Numéros de ligne du fichier, collés à gauche comme ceux de la vue Raw. */
+.gutter {
+  flex: 0 0 auto;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  padding: 2px 8px;
+  border-right: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-editor-background);
+  color: var(--vscode-editorLineNumber-foreground, var(--vscode-descriptionForeground));
+  text-align: right;
+  user-select: none;
+  overflow: hidden;
+}
+
+.row > .gutter {
+  height: var(--row-height);
+  border-bottom: 1px solid var(--grid);
+}
+
 .cell {
   flex: 0 0 auto;
   padding: 2px 8px;
@@ -650,6 +671,19 @@ body {
    visible dessous. La cellule cliquée, elle, assombrit davantage et s'encadre. */
 .row.selected .cell {
   box-shadow: inset 0 0 0 999px rgb(140 140 140 / 20%);
+}
+
+/* Une colonne marquée reçoit le même voile qu'une ligne, et son en-tête le
+   cadre de la cellule cliquée. */
+.cell.column-selected {
+  box-shadow: inset 0 0 0 999px rgb(140 140 140 / 20%);
+}
+
+.head-cell.selected {
+  background: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+  outline: 2px solid var(--vscode-focusBorder, rgb(120 170 255 / 90%));
+  outline-offset: -2px;
 }
 
 .cell.active,

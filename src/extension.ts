@@ -178,6 +178,7 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
               type: 'rows',
               start,
               rows: table.rows.slice(start, start + CHUNK_ROWS),
+              lines: table.lines?.slice(start, start + CHUNK_ROWS),
               done: start + CHUNK_ROWS >= table.rows.length,
             });
             // Laisse l'hôte respirer entre deux paquets.

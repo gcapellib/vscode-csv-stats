@@ -84,6 +84,19 @@ describe('CsvLoader', () => {
   });
 });
 
+describe('numéros de ligne', () => {
+  it('suivent les lignes du fichier, en-tête = 1, comme la vue Raw', () => {
+    // Une ligne blanche ignorée et un champ sur deux lignes décalent les
+    // numéros par rapport à l'index de la ligne.
+    const table = parse('a,b\n1,2\n\n3,"x\ny"\n5,6\n');
+    assert.deepEqual(table.lines, [2, 4, 6]);
+  });
+
+  it('comptent un saut CRLF pour une ligne', () => {
+    assert.deepEqual(parse('a\r\n1\r\n2\r\n').lines, [2, 3]);
+  });
+});
+
 describe('rawSegments', () => {
   /** Recollés bout à bout, les morceaux doivent redonner la ligne d'origine. */
   function recolle(line: string, delimiter = ','): string {

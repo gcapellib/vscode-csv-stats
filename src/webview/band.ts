@@ -6,13 +6,14 @@ import { HIST_HEIGHT } from './constants';
 import { elements, textSpan } from './dom';
 import { openMenu } from './menu';
 import { palette, state } from './state';
-import { valuesFilter } from './table';
+import { gutterCell, valuesFilter } from './table';
 import { hideTooltip, showTooltip } from './tooltip';
 
 export function paintBand(): void {
   elements.band.hidden = !state.bandVisible;
   if (!state.bandVisible) return;
   elements.band.textContent = '';
+  elements.band.appendChild(gutterCell());
   for (const modelIndex of state.order) {
     elements.band.appendChild(bandCell(modelIndex));
   }

@@ -31,7 +31,7 @@ export function harnessHtml(csvPath: string, theme = 'syntax'): string {
     stats,
     theme,
   };
-  const rows = { type: 'rows', start: 0, rows: table.rows, done: true };
+  const rows = { type: 'rows', start: 0, rows: table.rows, lines: table.lines, done: true };
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>${css}</style>

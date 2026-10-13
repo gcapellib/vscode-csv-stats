@@ -13,6 +13,8 @@ import { type Filter } from '../core/filters';
 export interface State {
   headers: string[];
   rows: string[][];
+  /** Numéro de ligne du fichier de chaque ligne, comme dans la vue Raw ; voir lineOf. */
+  lines: number[];
   stats: ColumnStats[];
   delimiter: string;
   rowCount: number;
@@ -40,6 +42,8 @@ export interface State {
   selected: Set<number>;
   /** Cellule cliquée en dernier : la ligne se teinte, celle-ci s'encadre. */
   active: { row: number; column: number } | null;
+  /** Colonne marquée par un clic sur son en-tête : toutes ses cellules se teintent. */
+  selectedColumn: number | null;
   themeId: string;
   ready: boolean;
   /** Texte brut du fichier, demandé une seule fois au premier clic sur « Raw ». */
@@ -51,6 +55,7 @@ export interface State {
 export const state: State = {
   headers: [],
   rows: [],
+  lines: [],
   stats: [],
   delimiter: ',',
   rowCount: 0,
@@ -65,6 +70,7 @@ export const state: State = {
   fileName: '',
   selected: new Set<number>(),
   active: null,
+  selectedColumn: null,
   themeId: THEMES[0].id,
   ready: false,
   rawLines: null,

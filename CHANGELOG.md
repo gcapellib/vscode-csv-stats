@@ -4,6 +4,25 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.23.4
+
+The table now has a line-number gutter on the left, like the Raw view. The
+numbers are the file's own lines (header = line 1), so they do not change when
+you sort or filter, and they stay correct when a field spans several lines or
+a blank line was skipped.
+
+## 0.23.3
+
+Clicking a column header now marks the whole column, the way clicking a cell
+marks its row: every cell gets the grey veil and the header is outlined. Click
+again to unmark; clicking a cell swaps the column for a row. The ⇅ and ▾ buttons
+keep their own gesture.
+
+## 0.23.2
+
+The column "⋯" menu no longer repeats the Sort and Filter entries: the ⇅ and ▾
+buttons in the column header already do both.
+
 ## 0.23.1
 
 Clicking **Distinct** in a column band now filters the table to one row per

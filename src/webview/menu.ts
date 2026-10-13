@@ -3,9 +3,7 @@ import { COLUMN_TYPES, TYPE_LABELS } from './constants';
 import { elements } from './dom';
 import { floating, positionFloating } from './floating-setup';
 import { openDetails } from './panels/column-details';
-import { openFilterPanel } from './panels/filter-panel';
 import { state } from './state';
-import { applySort } from './table';
 import { vscode } from './vscode-api';
 import { applyRename } from './actions';
 
@@ -27,10 +25,6 @@ export function openMenu(modelIndex: number, anchor: HTMLElement): void {
   type Entry = [string, () => void] | 'separator' | { heading: string };
   const entries: Entry[] = [
     ['Column details…', () => openDetails(modelIndex, anchor)],
-    'separator',
-    ['Sort ascending', () => applySort(modelIndex, true)],
-    ['Sort descending', () => applySort(modelIndex, false)],
-    ['Filter…', () => openFilterPanel(modelIndex, anchor)],
     'separator',
     ['Rename column', () => void applyRename(modelIndex)],
     ['Drop column', () => applyDrop(modelIndex)],

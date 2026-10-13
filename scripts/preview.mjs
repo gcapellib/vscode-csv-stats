@@ -33,7 +33,7 @@ function page(csv) {
     stats: computeAll(table),
     theme: 'syntax',
   };
-  const rows = { type: 'rows', start: 0, rows: table.rows, done: true };
+  const rows = { type: 'rows', start: 0, rows: table.rows, lines: table.lines, done: true };
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>CSV Stats — ${relative(root, csv)}</title>
 <style>${css}</style>
 <style>:root{--vscode-font-family:system-ui,sans-serif;--vscode-font-size:13px;--vscode-foreground:#cccccc;--vscode-editor-background:#1f1f1f;
