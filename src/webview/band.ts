@@ -46,7 +46,16 @@ export function bandCell(modelIndex: number): HTMLElement {
   const kind = line('type', `${column.type} \u00b7 #${position}`);
   kind.title = `Column ${position} of the table as it stands, counted from 0 as pandas does: df.iloc[:, ${position}]`;
   cell.appendChild(kind);
-  cell.appendChild(line('stat', `Missing ${count(column.missing)} (${percent(column.missingShare)})`));
+  const missing = line('stat', `Missing ${count(column.missing)} (${percent(column.missingShare)})`);
+  // Un vide n'est pas une valeur du type de la colonne, c'est un état de la
+  // cellule : il se filtre partout de la même façon, numérique compris — ce
+  // que seule la liste des valeurs du texte permettait jusqu'ici.
+  if (column.missing > 0) {
+    missing.classList.add('pickable');
+    missing.title = 'Keep only the rows where this column is empty';
+    missing.addEventListener('click', () => toggleFilter(valuesFilter(modelIndex, [''])));
+  }
+  cell.appendChild(missing);
   cell.appendChild(line('stat', `Distinct ${count(column.distinct)} (${percent(column.distinctShare)})`));
   if (column.allDistinct) cell.appendChild(line('note', 'every value occurs once'));
 

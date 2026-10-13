@@ -4,7 +4,7 @@ import { closePicker, setOpenPanel } from '../actions';
 import { elements, textSpan } from '../dom';
 import { floating, positionFloating } from '../floating-setup';
 import { state } from '../state';
-import { setColumnFilter } from '../table';
+import { setColumnFilter, valuesFilter } from '../table';
 
 /**
  * Pendant numérique du sélecteur : deux bornes saisies à la main.
@@ -54,6 +54,31 @@ export function openRangePicker(columnIndex: number, anchor: HTMLElement): void 
 
   const exact = make('Exactly', point ? String(current.low) : '');
 
+  // Les vides, comme dans Excel ou Google Sheets : un vide n'est pas une
+  // valeur du type de la colonne, il se filtre à part. Une case seule aurait
+  // piégé — les bornes sont préremplies du min au max, et « plage ou vide »
+  // aurait tout gardé — d'où deux gestes : ajouter les vides à la plage, ou
+  // ne garder qu'eux.
+  const missing = column?.missing ?? 0;
+  const blankRow = document.createElement('label');
+  blankRow.className = 'picker-blank';
+  const withBlank = document.createElement('input');
+  withBlank.type = 'checkbox';
+  withBlank.checked = current?.blank === true;
+  blankRow.append(withBlank, textSpan(`Include empty cells (${num(missing)})`));
+  const onlyBlank = document.createElement('button');
+  onlyBlank.className = 'picker-button picker-only-blank';
+  onlyBlank.textContent = `Empty cells only (${num(missing)})`;
+  onlyBlank.addEventListener('click', () => {
+    closePicker();
+    setColumnFilter(columnIndex, valuesFilter(columnIndex, ['']));
+  });
+  if (missing === 0) {
+    withBlank.disabled = true;
+    onlyBlank.disabled = true;
+  }
+  elements.picker.append(blankRow, onlyBlank);
+
   // Les deux modes s'excluent : remplir l'un vide l'autre, plutôt que de
   // laisser deviner lequel l'emporte au moment d'appliquer.
   for (const bound of [low, high]) {
@@ -92,7 +117,8 @@ export function openRangePicker(columnIndex: number, anchor: HTMLElement): void 
         low: single,
         high: single,
         last: true,
-        label: `${column?.name} = ${num(single)}`,
+        blank: withBlank.checked,
+        label: `${column?.name} = ${num(single)}${withBlank.checked ? ' or (blank)' : ''}`,
       });
       return;
     }
@@ -109,7 +135,8 @@ export function openRangePicker(columnIndex: number, anchor: HTMLElement): void 
       high: Math.max(from, to),
       // Bornes saisies à la main : les deux sont incluses, comme on les lit.
       last: true,
-      label: `${column?.name} ${num(Math.min(from, to))} – ${num(Math.max(from, to))}`,
+      blank: withBlank.checked,
+      label: `${column?.name} ${num(Math.min(from, to))} – ${num(Math.max(from, to))}${withBlank.checked ? ' or (blank)' : ''}`,
     });
   });
   footer.append(clear, apply);

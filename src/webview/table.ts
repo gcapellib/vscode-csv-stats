@@ -127,6 +127,7 @@ export function matches(cells: string[], filter: Filter, rowIndex: number): bool
       // ramènerait pas toutes les lignes annoncées.
       return filter.values.includes(raw) || (isMissing(raw) && filter.values.includes(''));
     case 'range': {
+      if (isMissing(raw)) return filter.blank === true;
       const value = parseNumber(raw, state.delimiter === ';');
       if (value === null) return false;
       // La dernière classe inclut sa borne haute, sinon le maximum lui-même

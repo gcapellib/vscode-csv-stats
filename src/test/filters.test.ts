@@ -3,6 +3,17 @@ import { describe, it } from 'node:test';
 import { datasetTransformLines, filterToPandas, type Filter } from '../core/filters';
 
 describe('filterToPandas', () => {
+  it('ajoute les vides à une plage numérique, que NaN ne satisferait pas', () => {
+    const range: Filter = { kind: 'range', column: 0, low: 100, high: 200, last: true, blank: true, label: '' };
+    assert.equal(
+      filterToPandas(range, 'prix'),
+      'df = df[(df["prix"].between(100, 200)) | df["prix"].isna() | df["prix"].astype(str).str.strip().eq("")]',
+    );
+    // Sans les vides, la traduction ne change pas.
+    const plain: Filter = { kind: 'range', column: 0, low: 100, high: 200, last: true, label: '' };
+    assert.equal(filterToPandas(plain, 'prix'), 'df = df[df["prix"].between(100, 200)]');
+  });
+
   it('traduit « (blank) » par isna, puisque pandas lit une cellule vide comme NaN', () => {
     // « == "" » ne retrouvait aucune ligne : le filtre généré ne reproduisait
     // pas celui du tableau.

@@ -9,7 +9,8 @@
 export type Filter =
   | { kind: 'contains'; column: number; text: string; label: string }
   | { kind: 'values'; column: number; values: string[]; label: string }
-  | { kind: 'range'; column: number; low: number; high: number; last: boolean; label: string }
+  /** `blank` retient aussi les cellules vides : « entre 100 et 200, ou vide ». */
+  | { kind: 'range'; column: number; low: number; high: number; last: boolean; blank?: boolean; label: string }
   /** Lignes dupliquées, désignées par leur index — seul cas où un ensemble de
    * lignes explicite est nécessaire plutôt qu'une condition sur une colonne. */
   | { kind: 'duplicates'; column: number; rows: Set<number>; label: string };
@@ -30,23 +31,34 @@ export function filterToPandas(filter: Filter, columnName: string): string {
       }
       // « (blank) » : pandas lit une cellule vide comme NaN, et « == "" » ne la
       // retrouverait pas ; une cellule d'espaces, elle, reste une chaîne.
-      const blank = `df[${name}].isna() | df[${name}].astype(str).str.strip().eq("")`;
+      const blank = blankCondition(name);
       if (named.length === 0) return `df = df[${blank}]`;
       const kept = named.length === 1 ? `(df[${name}] == ${JSON.stringify(named[0])})` : `df[${name}].isin(${JSON.stringify(named)})`;
       return `df = df[${kept} | ${blank}]`;
     }
-    case 'range':
+    case 'range': {
       // Une borne unique et fermée désigne une seule valeur : « == 7 » se lit,
-      // « between(7, 7) » se déchiffre.
-      if (filter.last && filter.low === filter.high) {
-        return `df = df[df[${name}] == ${filter.low}]`;
-      }
-      // Une classe d'histogramme exclut sa borne haute ; une plage saisie à la
-      // main (Filter by range…) inclut les deux, d'où les deux formes.
-      return filter.last
-        ? `df = df[df[${name}].between(${filter.low}, ${filter.high})]`
-        : `df = df[(df[${name}] >= ${filter.low}) & (df[${name}] < ${filter.high})]`;
+      // « between(7, 7) » se déchiffre. Une classe d'histogramme exclut sa
+      // borne haute ; une plage saisie à la main inclut les deux.
+      const condition =
+        filter.last && filter.low === filter.high
+          ? `df[${name}] == ${filter.low}`
+          : filter.last
+            ? `df[${name}].between(${filter.low}, ${filter.high})`
+            : `(df[${name}] >= ${filter.low}) & (df[${name}] < ${filter.high})`;
+      // NaN ne satisfait aucune comparaison : les vides s'ajoutent à part.
+      if (filter.blank) return `df = df[(${condition}) | ${blankCondition(name)}]`;
+      return `df = df[${condition}]`;
+    }
   }
+}
+
+/**
+ * Les cellules vides, en pandas : NaN à la lecture d'un champ vide — « == "" »
+ * ne le retrouverait pas — et chaînes d'espaces seules, qui restent du texte.
+ */
+function blankCondition(name: string): string {
+  return `df[${name}].isna() | df[${name}].astype(str).str.strip().eq("")`;
 }
 
 /** Une colonne renommée, dans le fichier comme dans le code généré. */

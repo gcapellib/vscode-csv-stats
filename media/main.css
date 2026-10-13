@@ -1045,3 +1045,25 @@ body.resizing * {
   cursor: col-resize !important;
   user-select: none;
 }
+
+/* Les vides dans le filtre numérique : une case pour les ajouter à la plage,
+   un bouton pour ne garder qu'eux. */
+.picker-blank {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+
+.picker-only-blank {
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.stat.pickable {
+  cursor: pointer;
+}
+
+.stat.pickable:hover {
+  text-decoration: underline;
+}
