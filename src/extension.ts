@@ -88,6 +88,9 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
             }
           });
           break;
+        case 'copy':
+          await vscode.env.clipboard.writeText(String(message.text ?? ''));
+          break;
         case 'selectTheme':
           await this.context.globalState.update(THEME_KEY, message.id as string);
           break;

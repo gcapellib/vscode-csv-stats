@@ -12,10 +12,10 @@ import { type ColumnStats } from '../core/stats';
 import { vscode } from './vscode-api';
 import { elements } from './dom';
 import { state } from './state';
-import { floating } from './floating-setup';
+import { floating, positionFloating } from './floating-setup';
 import { paint } from './paint';
 import { resolvePrompt } from './prompt';
-import { measureWidths, rebuildView } from './table';
+import { measureWidths, rebuildView, select, selectedRowsText } from './table';
 import { paintRaw } from './raw';
 import { resetMenuColumn } from './menu';
 import { setOpenPanel } from './actions';
@@ -124,6 +124,95 @@ window.addEventListener('message', (event: MessageEvent) => {
 // survivre plusieurs versions avant d'être corrigé en 0.15.1.
 document.addEventListener('mousedown', (event) => {
   floating.handleOutsideClick(event.target);
+});
+
+// Un glissé de souris sur « Distinct », « Missing » ou une valeur du bandeau
+// finit par un `click` sur cet élément : sans ce garde, il déclenchait le
+// filtre au lieu de laisser le texte sélectionné, donc impossible à copier.
+// En phase de capture pour passer avant les gestionnaires de chaque ligne.
+document.addEventListener(
+  'click',
+  (event) => {
+    const selection = window.getSelection();
+    if (selection && !selection.isCollapsed && (event.target as HTMLElement).closest('#band')) {
+      event.stopPropagation();
+    }
+  },
+  true,
+);
+
+// Clic droit sur une valeur : le « Copier » du menu natif de VS Code ne copiait
+// rien dans ce webview, que la valeur soit sélectionnée ou non. On le remplace
+// par un menu à nous dont « Copy » passe par l'hôte (vscode.env.clipboard), seul
+// chemin fiable. Sans sélection sur la valeur visée, c'est la valeur entière qui
+// est copiée ; un clic droit dans une sélection faite à la main copie celle-ci.
+document.addEventListener('contextmenu', (event) => {
+  const gutter = (event.target as HTMLElement).closest('.row > .gutter');
+  if (gutter) {
+    event.preventDefault();
+    const rowIndex = Number((gutter.parentElement as HTMLElement).dataset.row);
+    if (!state.selected.has(rowIndex)) select(rowIndex, 0, false);
+    const rows = state.selected.size;
+    showCopyMenu(rows === 1 ? 'Copy row' : `Copy ${rows} rows`, selectedRowsText(), event, gutter as HTMLElement);
+    return;
+  }
+  const target = (event.target as HTMLElement).closest('.cell, .stat, .value, .head-name');
+  if (!target || target.closest('input, textarea')) return;
+  event.preventDefault();
+  const selection = window.getSelection();
+  if (!selection) return;
+  if (selection.isCollapsed || !selection.containsNode(target, true)) {
+    const range = document.createRange();
+    range.selectNodeContents(target);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+  showCopyMenu('Copy', selection.toString(), event, target as HTMLElement);
+});
+
+function showCopyMenu(label: string, text: string, event: MouseEvent, anchor: HTMLElement): void {
+  elements.menu.textContent = '';
+  const item = document.createElement('button');
+  item.className = 'menu-item';
+  item.textContent = label;
+  item.addEventListener('click', () => {
+    floating.close();
+    vscode.postMessage({ type: 'copy', text });
+  });
+  elements.menu.appendChild(item);
+  floating.open('menu', anchor);
+  positionFloating(elements.menu, anchor);
+  elements.menu.style.left = `${event.clientX}px`;
+  elements.menu.style.top = `${event.clientY}px`;
+}
+
+// Lignes marquées et pas de texte sélectionné : c'est elles qu'on copie, en
+// tableur. Deux chemins, car VS Code ne déclenche pas toujours le même : la
+// touche (écrite par l'hôte) et l'événement `copy` du navigateur (déclenché
+// aussi par le « Copier » de l'éditeur). Les deux écrivent le même texte, donc
+// l'ordre dans lequel ils arrivent ne change rien — et aucun ne laisse passer
+// une sélection de texte périmée, qui ne donnait que la première cellule.
+function rowsToCopy(): string | null {
+  if (!(window.getSelection()?.isCollapsed ?? true) || state.selected.size === 0) return null;
+  return selectedRowsText();
+}
+
+document.addEventListener('keydown', (event) => {
+  if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'c') return;
+  if ((event.target as HTMLElement).closest('input, textarea')) return;
+  const text = rowsToCopy();
+  if (text === null) return;
+  event.preventDefault();
+  vscode.postMessage({ type: 'copy', text });
+});
+
+document.addEventListener('copy', (event) => {
+  if ((event.target as HTMLElement).closest?.('input, textarea')) return;
+  const text = rowsToCopy();
+  if (text === null) return;
+  event.preventDefault();
+  event.clipboardData?.setData('text/plain', text);
+  vscode.postMessage({ type: 'copy', text });
 });
 
 document.addEventListener('keydown', (event) => {

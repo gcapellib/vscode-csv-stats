@@ -4,6 +4,57 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.23.11
+
+Copying a marked row now also answers the browser's own `copy` event, not just
+the Ctrl+C key, so the editor's Copy path writes the same full row (every
+column, tab-separated) instead of whatever text was left selected.
+
+## 0.23.10
+
+Clicking a row number in the gutter marks the whole row; dragging over several
+numbers marks the range, and Ctrl/Cmd-click adds or removes one. Ctrl+C (with no
+text selected) or right-click → **Copy row(s)** copies the marked rows the way a
+spreadsheet expects: columns separated by a tab, rows by a line break, a field
+that contains a tab, quote or line break quoted. Clicking a cell marks its row
+too, so Ctrl+C there copies that row.
+
+## 0.23.9
+
+Right-click → Copy now really copies. VS Code's own Copy entry copied nothing in
+this view, so a right-click on a value opens a small menu of ours instead: its
+**Copy** sends the text (the cell, statistic line or title, or your own
+selection if you right-clicked inside one) to the extension, which writes it to
+the clipboard. Ctrl+C is unchanged.
+
+## 0.23.8
+
+Right-click → Copy now works on a value. A right-click on a cell, a statistic
+line or a column title selects that value when nothing there is selected, so the
+editor's Copy entry has something to copy; right-clicking inside a selection you
+just made leaves it alone.
+
+## 0.23.7
+
+Dragging the mouse over text in a statistics band (the "Distinct" and "Missing"
+lines, the top values) now selects it instead of applying that line's filter:
+the drag ended in a `click` on the line. A click that ends a text selection is
+ignored there; a plain click still filters.
+
+## 0.23.6
+
+Scrolling by a few pixels (or the auto-scroll of a text drag) no longer
+rebuilds the rows when the visible window has not changed, so a text selection
+survives it. The table only repaints when new rows actually come into view.
+
+## 0.23.5
+
+Text can be selected and copied again. Clicking a cell (or a column header)
+repainted every row on mouse-down, replacing the very element under the cursor,
+so a drag, a double-click or Ctrl+C had nothing left to act on. Cells and
+headers now react on `click`, and a click that ends a text selection no longer
+marks the row or column.
+
 ## 0.23.4
 
 The table now has a line-number gutter on the left, like the Raw view. The

@@ -644,6 +644,7 @@ body {
 }
 
 .row > .gutter {
+  cursor: pointer;
   height: var(--row-height);
   border-bottom: 1px solid var(--grid);
 }
@@ -675,6 +676,11 @@ body {
 
 /* Une colonne marquée reçoit le même voile qu'une ligne, et son en-tête le
    cadre de la cellule cliquée. */
+.row.selected > .gutter {
+  background: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+
 .cell.column-selected {
   box-shadow: inset 0 0 0 999px rgb(140 140 140 / 20%);
 }

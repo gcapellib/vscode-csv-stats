@@ -263,8 +263,9 @@ export function paintHead(): void {
     if (state.selectedColumn === modelIndex) cell.classList.add('selected');
     // Comme un clic sur une cellule marque sa ligne : un clic sur l'en-tête
     // marque sa colonne. Les boutons et la poignée gardent leur propre geste.
-    cell.addEventListener('mousedown', (event) => {
+    cell.addEventListener('click', (event) => {
       if ((event.target as HTMLElement).closest('.head-button, .col-resizer')) return;
+      if (hasTextSelection()) return;
       selectColumn(modelIndex);
     });
 
@@ -334,13 +335,22 @@ export function openColumnFilter(modelIndex: number, anchor: HTMLElement): void 
   openFilterPanel(modelIndex, anchor);
 }
 
-export function paintRows(): void {
+// Fenêtre de lignes actuellement peinte, pour ne pas tout reconstruire quand un
+// défilement d'un pixel (ou le défilement automatique d'un glissé) n'a rien
+// changé : reconstruire détruit la sélection de texte en cours.
+let paintedWindow = '';
+
+export function paintRows(onlyIfMoved = false): void {
   const total = state.view.length;
   elements.body.style.height = `${total * ROW_HEIGHT}px`;
   const scrollTop = elements.scroller.scrollTop;
   const viewport = elements.scroller.clientHeight;
   const first = Math.max(0, Math.floor((scrollTop - elements.body.offsetTop) / ROW_HEIGHT) - OVERSCAN);
   const last = Math.min(total, first + Math.ceil(viewport / ROW_HEIGHT) + OVERSCAN * 2);
+
+  const windowKey = `${first}:${last}:${total}`;
+  if (onlyIfMoved && windowKey === paintedWindow) return;
+  paintedWindow = windowKey;
 
   const fragment = document.createDocumentFragment();
   for (let position = first; position < last; position++) {
@@ -351,7 +361,10 @@ export function paintRows(): void {
     const isSelected = state.selected.has(rowIndex);
     row.className = isSelected ? 'row selected' : 'row';
     row.style.top = `${position * ROW_HEIGHT}px`;
-    row.appendChild(gutterCell(String(lineOf(rowIndex))));
+    row.dataset.row = String(rowIndex);
+    const gutter = gutterCell(String(lineOf(rowIndex)));
+    gutter.addEventListener('mousedown', (event) => startRowDrag(event, position));
+    row.appendChild(gutter);
     for (const modelIndex of state.order) {
       const colours = palette(modelIndex);
       const cell = document.createElement('div');
@@ -365,15 +378,97 @@ export function paintRows(): void {
       cell.style.background = colours.cell;
       cell.style.color = colours.text;
       cell.textContent = cells[modelIndex] ?? '';
-      cell.addEventListener('mousedown', (event) =>
-        select(rowIndex, modelIndex, event.ctrlKey || event.metaKey),
-      );
+      // Au `click` et non au `mousedown` : repeindre les lignes dès l'appui
+      // remplaçait la cellule sous le curseur et détruisait la sélection de
+      // texte avant même qu'elle commence (ni glissé, ni double-clic, ni Ctrl+C).
+      cell.addEventListener('click', (event) => {
+        if (hasTextSelection()) return;
+        select(rowIndex, modelIndex, event.ctrlKey || event.metaKey);
+      });
       row.appendChild(cell);
     }
     fragment.appendChild(row);
   }
   elements.body.textContent = '';
   elements.body.appendChild(fragment);
+}
+
+/** Vrai quand l'utilisateur vient de sélectionner du texte : le clic n'est alors qu'un geste de copie. */
+function hasTextSelection(): boolean {
+  return !(window.getSelection()?.isCollapsed ?? true);
+}
+
+/** Position, dans la vue, de la ligne sous une ordonnée d'écran. */
+function positionAt(clientY: number): number {
+  const top = elements.body.getBoundingClientRect().top;
+  return Math.min(state.view.length - 1, Math.max(0, Math.floor((clientY - top) / ROW_HEIGHT)));
+}
+
+/**
+ * Clic sur un numéro de ligne : la ligne entière est marquée ; glisser sur
+ * plusieurs numéros marque l'intervalle ; Ctrl/Cmd ajoute ou retire une ligne.
+ * Comme dans un tableur, le numéro est la poignée de la ligne.
+ */
+function startRowDrag(event: MouseEvent, anchor: number): void {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  window.getSelection()?.removeAllRanges();
+  const additive = event.ctrlKey || event.metaKey;
+  const anchorRow = state.view[anchor];
+  const wasAlone = state.selected.size === 1 && state.selected.has(anchorRow);
+  const base = additive ? new Set(state.selected) : new Set<number>();
+  state.selectedColumn = null;
+  state.active = null;
+  let moved = false;
+
+  const apply = (last: number) => {
+    state.selected = new Set(base);
+    const [from, to] = anchor <= last ? [anchor, last] : [last, anchor];
+    for (let position = from; position <= to; position++) {
+      const row = state.view[position];
+      if (additive && anchor === last) {
+        if (base.has(row)) state.selected.delete(row);
+        else state.selected.add(row);
+      } else state.selected.add(row);
+    }
+    updateSelectionCount();
+    paintHead();
+    paintRows();
+  };
+  apply(anchor);
+
+  const move = (pointer: MouseEvent) => {
+    const position = positionAt(pointer.clientY);
+    if (position !== anchor) moved = true;
+    apply(position);
+  };
+  const stop = () => {
+    window.removeEventListener('mousemove', move);
+    window.removeEventListener('mouseup', stop);
+    if (!moved && wasAlone && !additive) {
+      state.selected.clear();
+      updateSelectionCount();
+      paintRows();
+    }
+  };
+  window.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', stop);
+}
+
+/** Valeur d'un champ pour un tableur : entre guillemets si elle contient tabulation, saut de ligne ou guillemet. */
+function spreadsheetField(value: string): string {
+  return /[\t\r\n"]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+/** Les lignes marquées, dans l'ordre affiché : colonnes séparées par une tabulation, lignes par un saut de ligne. */
+export function selectedRowsText(): string {
+  const lines: string[] = [];
+  for (const rowIndex of state.view) {
+    if (!state.selected.has(rowIndex)) continue;
+    const cells = state.rows[rowIndex] ?? [];
+    lines.push(state.order.map((modelIndex) => spreadsheetField(cells[modelIndex] ?? '')).join('\t'));
+  }
+  return lines.join('\n');
 }
 
 /** Un second clic sur la même colonne la démarque, comme pour une ligne. */
@@ -414,7 +509,7 @@ export function updateSelectionCount(): void {
 }
 
 elements.scroller.addEventListener('scroll', () => {
-  if (state.ready) paintRows();
+  if (state.ready) paintRows(true);
   hideTooltip();
   closeMenu();
 });
