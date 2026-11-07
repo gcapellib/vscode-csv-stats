@@ -74,6 +74,18 @@ describe('analyse approfondie', () => {
     assert.equal(computeDataset(table, details).duplicateRows, 2);
   });
 
+  it('regroupe les lignes identiques, original compris, par ordre de première apparition', () => {
+    const text = 'a,b\n3,4\n1,2\n5,6\n3,4\n1,2\n1,2\n';
+    const table = parse(text);
+    const details = table.headers.map((_, index) => computeDetails(table, index, computeAll(table)[index].type));
+    const dataset = computeDataset(table, details);
+    assert.deepEqual(dataset.duplicateGroups, [
+      [0, 3],
+      [1, 4, 5],
+    ]);
+    assert.equal(dataset.duplicateRows, 3);
+  });
+
   it('produit un read_csv qui reprend ce qui a été détecté', () => {
     const table = parse('ville;prix\nLyon;47,5\nNantes;-\n');
     const stats = computeAll(table);

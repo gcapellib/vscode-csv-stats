@@ -253,8 +253,34 @@ export function recomputeStats(kept: number[]): void {
   });
 }
 
+/**
+ * Sous le filtre des doublons, le groupe de chaque ligne : son rang (l'ordre
+ * de première apparition) et toutes les lignes identiques. Sert à les montrer
+ * côte à côte, à alterner le fond d'un groupe à l'autre et à dire, dans la
+ * gouttière, où se trouvent les autres.
+ */
+let duplicateGroup = new Map<number, { rank: number; members: number[] }>();
+
+function indexDuplicates(): void {
+  duplicateGroup = new Map();
+  for (const filter of state.filters) {
+    if (filter.kind !== 'duplicates') continue;
+    filter.groups.forEach((members, rank) => {
+      for (const row of members) duplicateGroup.set(row, { rank, members });
+    });
+  }
+}
+
 export function rebuildView(): void {
+  indexDuplicates();
   const view: number[] = filteredRows();
+  // Les lignes identiques l'une sous l'autre, pour les comparer d'un coup
+  // d'œil ; un tri choisi dans l'en-tête passe devant.
+  if (!state.sort && duplicateGroup.size > 0) {
+    view.sort(
+      (left, right) => (duplicateGroup.get(left)?.rank ?? 0) - (duplicateGroup.get(right)?.rank ?? 0) || left - right,
+    );
+  }
 
   const sort = state.sort;
   if (sort) {
@@ -392,6 +418,14 @@ export function paintRows(onlyIfMoved = false): void {
     const gutter = gutterCell(String(lineOf(rowIndex)));
     gutter.addEventListener('mousedown', (event) => startRowDrag(event, position));
     row.appendChild(gutter);
+    // Un groupe de doublons sur deux prend le fond du bandeau de chaque
+    // colonne : un léger décalage de sa propre teinte, donc assorti au thème.
+    const duplicate = duplicateGroup.get(rowIndex);
+    const shaded = duplicate !== undefined && duplicate.rank % 2 === 1;
+    if (duplicate) {
+      const others = duplicate.members.filter((member) => member !== rowIndex).map(lineOf);
+      gutter.title = `Same as line${others.length > 1 ? 's' : ''} ${others.join(', ')}`;
+    }
     for (const modelIndex of state.order) {
       const colours = palette(modelIndex);
       const cell = document.createElement('div');
@@ -402,7 +436,7 @@ export function paintRows(onlyIfMoved = false): void {
       cell.style.width = `${state.widths[modelIndex]}px`;
       // La teinte de colonne reste posée même sur une ligne marquée : le
       // marquage se fait par un voile par-dessus, non en remplaçant la couleur.
-      cell.style.background = colours.cell;
+      cell.style.background = shaded ? colours.band : colours.cell;
       cell.style.color = colours.text;
       cell.textContent = cells[modelIndex] ?? '';
       // Au `click` et non au `mousedown` : repeindre les lignes dès l'appui

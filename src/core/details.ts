@@ -219,6 +219,11 @@ export interface DatasetDetails {
   duplicateRows: number;
   /** Leurs index, pour pouvoir les afficher. */
   duplicateRowIndices: number[];
+  /**
+   * Chaque ensemble de lignes identiques, original compris, dans l'ordre de
+   * sa première apparition : de quoi les montrer côte à côte.
+   */
+  duplicateGroups: number[][];
   /** Jetons d'absence à passer à pandas, ceux qu'il ne connaît pas déjà. */
   extraNaValues: string[];
   /** Colonnes à lire en texte pour préserver leurs zéros de tête. */
@@ -233,13 +238,19 @@ export interface DatasetDetails {
 }
 
 export function computeDataset(table: CsvTable, details: ColumnDetails[]): DatasetDetails {
-  const seen = new Set<string>();
+  const byContent = new Map<string, number[]>();
   const duplicateRowIndices: number[] = [];
   table.rows.forEach((row, index) => {
     const key = row.join(ROW_JOIN);
-    if (seen.has(key)) duplicateRowIndices.push(index);
-    else seen.add(key);
+    const group = byContent.get(key);
+    if (group) {
+      group.push(index);
+      duplicateRowIndices.push(index);
+    } else byContent.set(key, [index]);
   });
+  // Les groupes, dans l'ordre de leur première apparition : la Map garde
+  // l'ordre d'insertion.
+  const duplicateGroups = [...byContent.values()].filter((group) => group.length > 1);
 
   const extra = new Set<string>();
   const stringColumns: string[] = [];
@@ -285,6 +296,7 @@ export function computeDataset(table: CsvTable, details: ColumnDetails[]): Datas
     columns: table.headers.length,
     duplicateRows: duplicateRowIndices.length,
     duplicateRowIndices,
+    duplicateGroups,
     extraNaValues: [...extra].sort(),
     stringColumns,
     dateColumns,

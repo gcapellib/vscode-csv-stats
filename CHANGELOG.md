@@ -4,6 +4,23 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.24.4
+
+**Duplicated rows, side by side.** Clicking *N rows are exact duplicates of
+another* now keeps every occurrence, the original included — like Power Query's
+*Keep duplicates* and the `duplicated(keep=False)` the generated pandas already
+used, where the table showed only the extra copies. Identical rows sit one under
+the other, groups in order of first appearance (a sort chosen in a header still
+wins), and every other group takes a slightly shifted shade of each column's own
+colour, so the grouping follows the palette. Hovering a row number says where
+the others are: *Same as lines 242, 243*. The chip reads *5 duplicated rows (3
+extra copies)*.
+
+**Findings stand out.** In *Dataset…*, each finding wears the colours of the
+column it is about — background, ink and accent — in bold with a thicker edge,
+so you see at once where to clean. The duplicated-rows finding takes the
+toolbar's gradient.
+
 ## 0.24.3
 
 (0.24.0 to 0.24.2 were trial builds of a cleaning panel, since withdrawn; this

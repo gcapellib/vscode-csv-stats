@@ -10,14 +10,19 @@ Right-click a `.csv` file in the explorer → **Open in CSV Stats**.
 
 *A band above every column: type, missing, distinct and unique values, then a histogram or the most frequent values.*
 
-## What's new in 0.24.3
+## What's new
 
-- **Unique values.** Next to *Distinct*, the count of values that occur only
+- **Duplicated rows, side by side** (0.24.4). Every occurrence, original
+  included, grouped one under the other on alternating shades of the palette;
+  hover a row number to see where the others are.
+- **Findings in colour** (0.24.4). Each finding in *Dataset…* wears its column's
+  colours, so you see at once where to clean.
+- **Unique values** (0.24.3). Next to *Distinct*, the count of values that occur only
   once — often typos hidden under *Other*. Click it to see those rows.
-- **Dates and times.** `2015-01-31`, `31/01/2015` and `12:52:01` are recognised:
+- **Dates and times** (0.24.3). `2015-01-31`, `31/01/2015` and `12:52:01` are recognised:
   a timeline instead of a ranking, a chronological sort, a *before / after /
   between* filter, and `parse_dates` in the generated pandas code.
-- **Fixes.** A column no longer changes type under a filter, and *Read this
+- **Fixes** (0.24.3). A column no longer changes type under a filter, and *Read this
   column as* now applies to the filtered rows and survives later filters.
 
 Every version is listed in the [changelog](https://github.com/gcapellib/vscode-csv-stats/blob/main/CHANGELOG.md).
@@ -66,5 +71,5 @@ Every version is listed in the [changelog](https://github.com/gcapellib/vscode-c
 Extensions view → `…` → **Install from VSIX…**, or:
 
 ```bash
-code --install-extension csv-stats-0.24.3.vsix
+code --install-extension csv-stats-0.24.4.vsix
 ```

@@ -110,7 +110,7 @@ describe('filterToPandas', () => {
   });
 
   it('traduit le constat de doublons sans référencer aucune colonne', () => {
-    const filter: Filter = { kind: 'duplicates', column: -1, rows: new Set(), label: '' };
+    const filter: Filter = { kind: 'duplicates', column: -1, rows: new Set(), groups: [], label: '' };
     assert.equal(filterToPandas(filter, 'peu importe'), 'df = df[df.duplicated(keep=False)]');
   });
 });

@@ -3,7 +3,8 @@ import { count } from '../../core/format';
 import { closePicker, setOpenPanel } from '../actions';
 import { elements, textSpan } from '../dom';
 import { floating, positionFloating } from '../floating-setup';
-import { state } from '../state';
+import { gradientFor, themeById } from '../../core/themes';
+import { isDark, palette, state } from '../state';
 import { currentTable, setColumnFilter, valuesFilter } from '../table';
 import { openDetails } from './column-details';
 import { footer, panelTitle, sectionTitle } from './shared';
@@ -124,24 +125,35 @@ export function openDataset(anchor: HTMLElement): void {
   list.className = 'findings';
 
   if (dataset.duplicateRows > 0) {
+    // Index du tableau analysé (les lignes affichées) ramenés aux index du modèle.
+    const groups = dataset.duplicateGroups.map((group) => group.map((index) => state.view[index] ?? index));
+    const involved = groups.reduce((sum, group) => sum + group.length, 0);
     list.appendChild(
-      finding(`${count(dataset.duplicateRows)} rows are exact duplicates of another`, () => {
-        closePicker();
-        setColumnFilter(-1, {
-          kind: 'duplicates',
-          column: -1,
-          rows: new Set(dataset.duplicateRowIndices.map((index) => state.view[index] ?? index)),
-          label: `${count(dataset.duplicateRows)} duplicate rows`,
-        });
-      }),
+      finding(
+        `${count(dataset.duplicateRows)} rows are exact duplicates of another (${count(involved)} rows involved)`,
+        () => {
+          closePicker();
+          setColumnFilter(-1, {
+            kind: 'duplicates',
+            column: -1,
+            rows: new Set(groups.flat()),
+            groups,
+            label: `${count(involved)} duplicated rows (${count(dataset.duplicateRows)} extra copies)`,
+          });
+        },
+      ),
     );
   }
   for (const entry of dataset.findings) {
     list.appendChild(
-      finding(entry.text, () => {
-        closePicker();
-        setColumnFilter(entry.column, valuesFilter(entry.column, entry.values));
-      }),
+      finding(
+        entry.text,
+        () => {
+          closePicker();
+          setColumnFilter(entry.column, valuesFilter(entry.column, entry.values));
+        },
+        entry.column,
+      ),
     );
   }
   if (list.childElementCount === 0) list.appendChild(Object.assign(textSpan('Nothing to report.'), { className: 'picker-note' }));
@@ -158,12 +170,28 @@ export function head(text: string): HTMLElement {
   return Object.assign(textSpan(text), { className: 'info-head' });
 }
 
-/** Un constat qu'on peut aller vérifier : le clic filtre le tableau dessus. */
-export function finding(text: string, onPick: () => void): HTMLElement {
+/**
+ * Un constat qu'on peut aller vérifier : le clic filtre le tableau dessus.
+ *
+ * Il porte les couleurs de sa colonne — le fond, l'encre et l'accent qu'elle
+ * a dans le tableau — pour qu'on voie d'un coup d'œil où aller nettoyer. Un
+ * constat sur le fichier entier (lignes dupliquées) prend le dégradé de la
+ * barre d'outils.
+ */
+export function finding(text: string, onPick: () => void, columnIndex = -1): HTMLElement {
   const item = document.createElement('button');
   item.className = 'flag pickable';
   item.title = 'Show these rows in the table';
   item.textContent = text;
+  if (columnIndex >= 0) {
+    const colours = palette(columnIndex);
+    item.style.background = colours.band;
+    item.style.color = colours.text;
+    item.style.borderLeftColor = colours.accent;
+  } else {
+    item.style.backgroundImage = gradientFor(themeById(state.themeId), isDark());
+    item.style.borderLeftColor = palette(0).accent;
+  }
   item.addEventListener('click', onPick);
   return item;
 }

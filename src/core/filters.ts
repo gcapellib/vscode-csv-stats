@@ -47,9 +47,14 @@ export type Filter =
       temporal?: TemporalFormat;
       label: string;
     }
-  /** Lignes dupliquées, désignées par leur index — seul cas où un ensemble de
-   * lignes explicite est nécessaire plutôt qu'une condition sur une colonne. */
-  | { kind: 'duplicates'; column: number; rows: Set<number>; label: string }
+  /**
+   * Lignes dupliquées, original compris — comme « Keep duplicates » de Power
+   * Query et `duplicated(keep=False)` —, désignées par leur index : seul cas où
+   * un ensemble de lignes explicite est nécessaire plutôt qu'une condition sur
+   * une colonne. `groups` réunit les lignes identiques, dans l'ordre de leur
+   * première apparition, pour les montrer côte à côte.
+   */
+  | { kind: 'duplicates'; column: number; rows: Set<number>; groups: number[][]; label: string }
   /**
    * Une ligne par valeur distincte de la colonne : la première rencontrée.
    * Se juge sur l'ensemble des lignes déjà retenues, pas sur une cellule.
