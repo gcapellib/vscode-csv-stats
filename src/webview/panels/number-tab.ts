@@ -1,9 +1,10 @@
 import { compareFilter, type CompareOp, type Filter } from '../../core/filters';
-import { num } from '../../core/format';
+import { formatTemporal, parseTyped } from '../../core/temporal';
+import { formatValue } from '../../core/values';
 import { closePicker } from '../actions';
 import { state } from '../state';
 import { setColumnFilter, valuesFilter } from '../table';
-import { emptyChoiceRow, fieldRow, footerButtons, numberInput, select, type EmptyChoice } from './filter-fields';
+import { dateInput, emptyChoiceRow, fieldRow, footerButtons, numberInput, select, type EmptyChoice } from './filter-fields';
 
 const OPERATORS: Array<[CompareOp, string]> = [
   ['=', '= equals'],
@@ -12,6 +13,17 @@ const OPERATORS: Array<[CompareOp, string]> = [
   ['≥', '≥ at least'],
   ['<', '< less than'],
   ['≤', '≤ at most'],
+  ['between', 'between'],
+];
+
+/** Les mêmes conditions, dites comme on parle d'une date. */
+const DATE_OPERATORS: Array<[CompareOp, string]> = [
+  ['=', '= on'],
+  ['≠', '≠ not on'],
+  ['>', '> after'],
+  ['≥', '≥ on or after'],
+  ['<', '< before'],
+  ['≤', '≤ on or before'],
   ['between', 'between'],
 ];
 
@@ -27,27 +39,48 @@ export function renderNumberTab(parent: HTMLElement, columnIndex: number): HTMLE
     (filter): filter is Extract<Filter, { kind: 'compare' | 'range' }> =>
       (filter.kind === 'compare' || filter.kind === 'range') && filter.column === columnIndex,
   );
+  // « Only empty cells » et « Hide them » sans valeur s'enregistrent comme un
+  // filtre de valeurs sur la cellule vide : sans cette relecture, le panneau
+  // rouvert affichait « Follow the condition » sous un filtre pourtant actif.
+  const blankOnly = state.filters.find(
+    (filter): filter is Extract<Filter, { kind: 'values' }> =>
+      filter.kind === 'values' && filter.column === columnIndex && filter.values.length === 1 && filter.values[0] === '',
+  );
 
   // Une classe d'histogramme (`range`) se relit comme « between ».
   let op: CompareOp = '=';
   let first = '';
   let second = '';
   let empties: EmptyChoice = '';
+  // Une date se relit dans l'écriture du fichier ; un nombre, tel quel.
+  const temporal = column?.temporal ?? null;
+  const shown = (value: number) => (temporal ? formatTemporal(value, temporal) : String(value));
   if (current?.kind === 'compare') {
     op = current.op;
-    first = String(current.value);
-    second = current.value2 === undefined ? '' : String(current.value2);
+    first = shown(current.value);
+    second = current.value2 === undefined ? '' : shown(current.value2);
     empties = current.blank ?? '';
   } else if (current?.kind === 'range') {
     op = 'between';
-    first = String(current.low);
-    second = String(current.high);
+    first = shown(current.low);
+    second = shown(current.high);
     empties = current.blank ? 'add' : '';
+  } else if (blankOnly) {
+    empties = blankOnly.exclude ? 'exclude' : 'only';
   }
 
-  const operator = select('picker-op', OPERATORS, op);
-  const low = numberInput(column?.min == null ? '' : `min ${num(column.min)}`, first);
-  const high = numberInput(column?.max == null ? '' : `max ${num(column.max)}`, second);
+  const operator = select('picker-op', temporal ? DATE_OPERATORS : OPERATORS, op);
+  const input = temporal ? dateInput : numberInput;
+  const low = input(column?.min == null ? '' : `min ${formatValue(column, column.min)}`, first);
+  const high = input(column?.max == null ? '' : `max ${formatValue(column, column.max)}`, second);
+  // Lit un champ : null s'il est vide ou illisible.
+  const read = (field: HTMLInputElement): number | null => {
+    const text = field.value.trim();
+    if (text === '') return null;
+    if (temporal) return parseTyped(text, temporal);
+    const value = Number(text);
+    return Number.isFinite(value) ? value : null;
+  };
   const sync = () => {
     highRow.hidden = operator.value !== 'between';
     lowRow.firstElementChild!.textContent = operator.value === 'between' ? 'From' : 'Value';
@@ -67,10 +100,10 @@ export function renderNumberTab(parent: HTMLElement, columnIndex: number): HTMLE
       setColumnFilter(columnIndex, valuesFilter(columnIndex, ['']));
       return;
     }
-    const a = Number(low.value);
-    const b = Number(high.value);
+    const a = read(low);
+    const b = read(high);
     const between = operator.value === 'between';
-    if (low.value.trim() === '' || !Number.isFinite(a) || (between && (high.value.trim() === '' || !Number.isFinite(b)))) {
+    if (a === null || (between && b === null)) {
       // Sans valeur, seul « Hide them » a un sens : retirer les lignes vides.
       if (choice === 'exclude' && low.value.trim() === '') {
         closePicker();
@@ -83,7 +116,15 @@ export function renderNumberTab(parent: HTMLElement, columnIndex: number): HTMLE
     closePicker();
     setColumnFilter(
       columnIndex,
-      compareFilter(columnIndex, column?.name ?? '', operator.value as CompareOp, a, between ? b : undefined, choice === '' ? undefined : choice),
+      compareFilter(
+        columnIndex,
+        column?.name ?? '',
+        operator.value as CompareOp,
+        a,
+        between ? (b ?? undefined) : undefined,
+        choice === '' ? undefined : choice,
+        temporal ?? undefined,
+      ),
     );
   };
   for (const input of [low, high]) {

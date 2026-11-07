@@ -37,9 +37,9 @@ export const HIST_HEIGHT = 84;
 export const WIDTH_SAMPLE_ROWS = 60;
 export const OVERSCAN = 8;
 
-export const COLUMN_TYPES: ColumnType[] = ['numeric', 'text'];
+export const COLUMN_TYPES: ColumnType[] = ['numeric', 'date', 'time', 'text'];
 
-export const TYPE_LABELS: Record<ColumnType, string> = { numeric: 'Numeric', text: 'Text' };
+export const TYPE_LABELS: Record<ColumnType, string> = { numeric: 'Numeric', date: 'Date', time: 'Time', text: 'Text' };
 
 /**
  * Durée du pliage du bandeau **et** du glissement des colonnes.

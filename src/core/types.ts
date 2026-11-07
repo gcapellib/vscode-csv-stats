@@ -1,20 +1,25 @@
 /**
  * Reconnaissance du type d'une colonne.
  *
- * Deux types, et deux seulement. Un CSV n'en porte aucun — tout y est du texte —
- * si bien que toute typologie est une inférence. On s'en tient donc à celle qui
- * ne s'invente rien : une colonne dont chaque valeur renseignée se lit comme un
- * nombre est numérique, tout le reste est du texte.
+ * Un CSV n'en porte aucun — tout y est du texte — si bien que toute typologie
+ * est une inférence. On s'en tient donc à celles qui ne s'inventent rien et qui
+ * changent ce qui s'affiche : une colonne dont chaque valeur renseignée se lit
+ * comme un nombre est numérique ; comme une date ou une heure sans ambiguïté
+ * (voir temporal.ts), elle est `date` ou `time`, avec une frise au lieu d'un
+ * palmarès ; tout le reste est du texte.
  *
  * Le verdict se prend sur les **valeurs distinctes**, pas sur toutes les lignes :
  * un fichier de cent mille lignes n'a souvent que quelques centaines de valeurs
  * différentes, et l'essai coûte alors cent fois moins cher.
  */
+import { detectTemporal } from './temporal';
 
-export type ColumnType = 'numeric' | 'text';
+export type ColumnType = 'numeric' | 'text' | 'date' | 'time';
 
-/** En deçà, « toutes les valeurs sont distinctes » ne veut rien dire. */
-export const MIN_ROWS_FOR_DISTINCT_NOTE = 20;
+/** Les types qui se mesurent : histogramme, bornes, tri et filtres par valeur. */
+export function isMeasurable(type: ColumnType): boolean {
+  return type !== 'text';
+}
 
 /** Chiffres, séparateur décimal point, exposant optionnel. */
 const NUMBER = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/;
@@ -54,6 +59,10 @@ export function looksLikeIdentifier(name: string, values: string[]): boolean {
 
 export function decideType(values: string[], present: number, decimalComma: boolean, name = ''): ColumnType {
   if (present === 0 || values.length === 0) return 'text';
+  // Avant la règle des identifiants : « 01/02/2015 » commence par un zéro
+  // sans être un code postal.
+  const temporal = detectTemporal(values);
+  if (temporal) return temporal.order === 'time' ? 'time' : 'date';
   if (looksLikeIdentifier(name, values)) return 'text';
   return values.every((value) => parseNumber(value, decimalComma) !== null) ? 'numeric' : 'text';
 }

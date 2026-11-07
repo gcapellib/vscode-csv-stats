@@ -2,6 +2,7 @@ import { computeDetails, type ColumnDetails } from '../../core/details';
 import { count, num, percent } from '../../core/format';
 import { type ColumnStats } from '../../core/stats';
 import { type Palette } from '../../core/themes';
+import { formatValue } from '../../core/values';
 import { closePicker, setOpenPanel } from '../actions';
 import { floating, positionFloating } from '../floating-setup';
 import { palette, state } from '../state';
@@ -20,7 +21,7 @@ export function openDetails(columnIndex: number, anchor: HTMLElement): void {
   const column = state.stats[columnIndex];
   if (!column) return;
   const table = currentTable();
-  const details = computeDetails(table, columnIndex, column.type);
+  const details = computeDetails(table, columnIndex, column.type, column.temporal);
 
   elements.picker.textContent = '';
   elements.picker.classList.add('wide');
@@ -70,13 +71,16 @@ export function openDetails(columnIndex: number, anchor: HTMLElement): void {
   if (column.mean !== null) {
     elements.picker.appendChild(sectionTitle('Statistics'));
     const numbers = grid();
-    addRow(numbers, 'Min', num(column.min ?? 0));
-    addRow(numbers, 'Max', num(column.max ?? 0));
-    addRow(numbers, 'Mean', num(column.mean));
-    addRow(numbers, 'Median', num(column.median ?? 0));
-    addRow(numbers, 'Q1', num(column.q1 ?? 0));
-    addRow(numbers, 'Q3', num(column.q3 ?? 0));
-    addRow(numbers, 'Std deviation', num(column.deviation ?? 0));
+    const show = (value: number) => formatValue(column, value);
+    addRow(numbers, 'Min', show(column.min ?? 0));
+    addRow(numbers, 'Max', show(column.max ?? 0));
+    addRow(numbers, 'Mean', show(column.mean));
+    addRow(numbers, 'Median', show(column.median ?? 0));
+    addRow(numbers, 'Q1', show(column.q1 ?? 0));
+    addRow(numbers, 'Q3', show(column.q3 ?? 0));
+    // Un écart-type de dates en millisecondes ne dit rien à personne : la
+    // dispersion d'une frise se lit sur Q1 et Q3.
+    if (!column.temporal) addRow(numbers, 'Std deviation', num(column.deviation ?? 0));
     addRow(numbers, 'Outliers', count(column.outliers));
     elements.picker.appendChild(numbers);
   } else {
@@ -231,7 +235,7 @@ export function markedHistogram(column: ColumnStats, colours: Palette): HTMLElem
   scale.setAttribute('font-size', '10');
   scale.setAttribute('fill', 'currentColor');
   scale.setAttribute('opacity', '0.6');
-  scale.textContent = `${num(min)} … ${num(column.max ?? 0)}`;
+  scale.textContent = `${formatValue(column, min)} … ${formatValue(column, column.max ?? 0)}`;
   svg.appendChild(scale);
 
   wrapper.appendChild(svg);

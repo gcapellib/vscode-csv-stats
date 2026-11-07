@@ -7,6 +7,7 @@
  * n'a donc jamais à savoir comment les colonnes sont nommées ou retrouvées.
  */
 import { num } from './format';
+import { formatTemporal, pandasTemporal, type TemporalFormat } from './temporal';
 
 export type TextOp = 'contains' | 'notContains' | 'startsWith' | 'endsWith' | 'equals' | 'notEquals';
 export type CompareOp = '=' | '≠' | '>' | '≥' | '<' | '≤' | 'between';
@@ -22,11 +23,30 @@ export type BlankMode = 'add' | 'exclude';
 export type Filter =
   | { kind: 'text'; column: number; op: TextOp; text: string; blank?: BlankMode; label: string }
   /** Condition numérique saisie : `value2` n'existe que pour « between ». */
-  | { kind: 'compare'; column: number; op: CompareOp; value: number; value2?: number; blank?: BlankMode; label: string }
+  | {
+      kind: 'compare';
+      column: number;
+      op: CompareOp;
+      value: number;
+      value2?: number;
+      blank?: BlankMode;
+      /** Présent sur une colonne de dates ou d'heures : les valeurs sont alors des millisecondes. */
+      temporal?: TemporalFormat;
+      label: string;
+    }
   /** `exclude` : « tout sauf ces valeurs ». */
   | { kind: 'values'; column: number; values: string[]; exclude?: boolean; label: string }
   /** `blank` retient aussi les cellules vides : « entre 100 et 200, ou vide ». */
-  | { kind: 'range'; column: number; low: number; high: number; last: boolean; blank?: boolean; label: string }
+  | {
+      kind: 'range';
+      column: number;
+      low: number;
+      high: number;
+      last: boolean;
+      blank?: boolean;
+      temporal?: TemporalFormat;
+      label: string;
+    }
   /** Lignes dupliquées, désignées par leur index — seul cas où un ensemble de
    * lignes explicite est nécessaire plutôt qu'une condition sur une colonne. */
   | { kind: 'duplicates'; column: number; rows: Set<number>; label: string }
@@ -34,15 +54,29 @@ export type Filter =
    * Une ligne par valeur distincte de la colonne : la première rencontrée.
    * Se juge sur l'ensemble des lignes déjà retenues, pas sur une cellule.
    */
-  | { kind: 'distinct'; column: number; label: string };
+  | { kind: 'distinct'; column: number; label: string }
+  /**
+   * Les lignes dont la valeur n'apparaît qu'une fois dans la colonne, vides
+   * exclus. Se juge, comme `distinct`, sur les lignes déjà retenues.
+   */
+  | { kind: 'unique'; column: number; label: string };
 
 /** Les conditions qui se jugent sur une seule cellule. */
-export type CellFilter = Exclude<Filter, { kind: 'duplicates' | 'distinct' }>;
+export type CellFilter = Exclude<Filter, { kind: 'duplicates' | 'distinct' | 'unique' }>;
+
+/** Les conditions qui portent sur l'ensemble des lignes retenues, appliquées après les autres. */
+export function isSetFilter(filter: Filter): boolean {
+  return filter.kind === 'distinct' || filter.kind === 'unique';
+}
 
 /** Traduit une condition de filtrage en une ligne pandas. */
 export function filterToPandas(filter: Filter, columnName: string): string {
   if (filter.kind === 'duplicates') return 'df = df[df.duplicated(keep=False)]';
   if (filter.kind === 'distinct') return `df = df.drop_duplicates(subset=[${JSON.stringify(columnName)}])`;
+  if (filter.kind === 'unique') {
+    const column = `df[${JSON.stringify(columnName)}]`;
+    return `df = df[${column}.notna() & ~${column}.duplicated(keep=False)]`;
+  }
   const name = JSON.stringify(columnName);
   switch (filter.kind) {
     case 'text':
@@ -67,12 +101,14 @@ export function filterToPandas(filter: Filter, columnName: string): string {
       // Une borne unique et fermée désigne une seule valeur : « == 7 » se lit,
       // « between(7, 7) » se déchiffre. Une classe d'histogramme exclut sa
       // borne haute ; une plage saisie à la main inclut les deux.
+      const low = literal(filter.low, filter.temporal);
+      const high = literal(filter.high, filter.temporal);
       const condition =
         filter.last && filter.low === filter.high
-          ? `df[${name}] == ${filter.low}`
+          ? `df[${name}] == ${low}`
           : filter.last
-            ? `df[${name}].between(${filter.low}, ${filter.high})`
-            : `(df[${name}] >= ${filter.low}) & (df[${name}] < ${filter.high})`;
+            ? `df[${name}].between(${low}, ${high})`
+            : `(df[${name}] >= ${low}) & (df[${name}] < ${high})`;
       // NaN ne satisfait aucune comparaison : les vides s'ajoutent à part.
       if (filter.blank) return `df = df[(${condition}) | ${blankCondition(name)}]`;
       return `df = df[${condition}]`;
@@ -118,19 +154,25 @@ function textCondition(name: string, op: TextOp, text: string): string {
   }
 }
 
+/** Une valeur en littéral pandas : un nombre tel quel, une date en `pd.Timestamp`. */
+function literal(value: number, temporal: TemporalFormat | undefined): string {
+  return temporal ? pandasTemporal(value, temporal) : String(value);
+}
+
 function compareCondition(name: string, filter: Extract<Filter, { kind: 'compare' }>): string {
   const column = `df[${name}]`;
+  const value = literal(filter.value, filter.temporal);
   switch (filter.op) {
     case '=':
-      return `${column} == ${filter.value}`;
+      return `${column} == ${value}`;
     case '≠':
-      return `${column} != ${filter.value}`;
+      return `${column} != ${value}`;
     case 'between': {
       const [low, high] = bounds(filter);
-      return `${column}.between(${low}, ${high})`;
+      return `${column}.between(${literal(low, filter.temporal)}, ${literal(high, filter.temporal)})`;
     }
     default:
-      return `${column} ${filter.op === '≥' ? '>=' : filter.op === '≤' ? '<=' : filter.op} ${filter.value}`;
+      return `${column} ${filter.op === '≥' ? '>=' : filter.op === '≤' ? '<=' : filter.op} ${value}`;
   }
 }
 
@@ -183,16 +225,19 @@ export function compareFilter(
   value: number,
   value2?: number,
   blank?: BlankMode,
+  temporal?: TemporalFormat,
 ): Filter {
   const base = { value, value2: op === 'between' ? value2 : undefined };
   const [low, high] = bounds(base);
-  const condition = op === 'between' ? `${num(low)} – ${num(high)}` : `${op} ${num(value)}`;
+  const show = (amount: number) => (temporal ? formatTemporal(amount, temporal) : num(amount));
+  const condition = op === 'between' ? `${show(low)} – ${show(high)}` : `${op} ${show(value)}`;
   return {
     kind: 'compare',
     column,
     op,
     ...base,
     blank,
+    temporal,
     label: `${columnName} ${condition}${blank ? BLANK_SUFFIX[blank] : ''}`,
   };
 }
@@ -305,8 +350,9 @@ export function datasetTransformLines(input: DatasetTransformInput): string[] {
 
   if (input.filters.length > 0) {
     lines.push('', '# Matching the filters applied in this session');
-    // « Une ligne par valeur » s'applique après les autres conditions, comme la vue.
-    const ordered = [...input.filters].sort((a, b) => Number(a.filter.kind === 'distinct') - Number(b.filter.kind === 'distinct'));
+    // « Une ligne par valeur » et « valeurs vues une fois » s'appliquent après
+    // les autres conditions, dans l'ordre où on les a posées, comme la vue.
+    const ordered = [...input.filters].sort((a, b) => Number(isSetFilter(a.filter)) - Number(isSetFilter(b.filter)));
     for (const { filter, columnName } of ordered) {
       lines.push(`# ${filter.label}`, filterToPandas(filter, columnName));
     }

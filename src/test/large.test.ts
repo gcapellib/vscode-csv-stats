@@ -34,7 +34,7 @@ describe('charge', () => {
     const statsMs = Math.round(performance.now() - beforeStats);
 
     assert.equal(stats[0].type, 'numeric');
-    assert.equal(stats[0].allDistinct, true);
+    assert.equal(stats[0].unique, 100_000);
     assert.equal(stats[1].type, 'text');
     assert.equal(stats[2].type, 'numeric');
     assert.equal(stats[2].missing, 2_000);

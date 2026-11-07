@@ -6,6 +6,7 @@
  * coûterait cher pour une information qu'on ne regarde qu'à la demande.
  */
 import type { CsvTable } from './csv';
+import { parseTemporal, type TemporalFormat } from './temporal';
 import { parseNumber, type ColumnType } from './types';
 
 /**
@@ -58,6 +59,10 @@ export interface ColumnDetails {
   leadingZeros: boolean;
   /** Type que pandas donnerait à la colonne, et ce qui l'en empêche. */
   pandasType: string;
+  /** L'écriture des dates ou heures de la colonne, pour `parse_dates` ; null sinon. */
+  temporal: TemporalFormat | null;
+  /** Des heures écrites sans secondes (12:52), que `pd.to_timedelta` refuse telles quelles. */
+  timeWithoutSeconds: boolean;
   blockers: string[];
   /** Répartition des longueurs, pour les colonnes à forte cardinalité. */
   lengths: Array<{ length: number; count: number }>;
@@ -68,7 +73,12 @@ function isNullToken(raw: string): boolean {
   return PANDAS_DEFAULT_NA.has(word) || EXTRA_NA.has(word);
 }
 
-export function computeDetails(table: CsvTable, columnIndex: number, type: ColumnType): ColumnDetails {
+export function computeDetails(
+  table: CsvTable,
+  columnIndex: number,
+  type: ColumnType,
+  temporal: TemporalFormat | null = null,
+): ColumnDetails {
   const decimalComma = table.delimiter === ';';
   const counts = new Map<string, number>();
   const nullCounts = new Map<string, number>();
@@ -84,6 +94,7 @@ export function computeDetails(table: CsvTable, columnIndex: number, type: Colum
   let present = 0;
   let digitsOnly = true;
   let sawLeadingZero = false;
+  let timeWithoutSeconds = false;
 
   for (const row of table.rows) {
     const raw = row[columnIndex] ?? '';
@@ -120,6 +131,10 @@ export function computeDetails(table: CsvTable, columnIndex: number, type: Colum
     if (type === 'numeric' && parseNumber(raw, decimalComma) === null) {
       offenders.set(trimmed, (offenders.get(trimmed) ?? 0) + 1);
     }
+    if (temporal?.order === 'time' && /^\d{1,2}:\d{2}$/.test(trimmed)) timeWithoutSeconds = true;
+    if (temporal && parseTemporal(raw, temporal.order) === null) {
+      offenders.set(trimmed, (offenders.get(trimmed) ?? 0) + 1);
+    }
   }
 
   let caseVariants = 0;
@@ -139,7 +154,11 @@ export function computeDetails(table: CsvTable, columnIndex: number, type: Colum
 
   const blockers: string[] = [];
   let pandasType = 'object';
-  if (type === 'numeric') {
+  if (temporal) {
+    // Une heure seule devient une durée depuis minuit : `parse_dates` lui
+    // collerait la date du jour.
+    pandasType = temporal.order === 'time' ? 'timedelta64[ns]' : 'datetime64[ns]';
+  } else if (type === 'numeric') {
     const anyDecimal = [...counts.keys()].some((raw) => !Number.isInteger(parseNumber(raw, decimalComma) ?? 0.5));
     pandasType = anyDecimal ? 'float64' : 'int64';
   } else if (nullTotal > 0 && present > nullTotal) {
@@ -153,7 +172,7 @@ export function computeDetails(table: CsvTable, columnIndex: number, type: Colum
   }
   if (digitsOnly && sawLeadingZero) blockers.push('leading zeros are lost unless dtype is "string"');
   for (const [value, count] of [...offenders.entries()].slice(0, 3)) {
-    blockers.push(`${count} value(s) not numeric: ${value}`);
+    blockers.push(`${count} value(s) not ${temporal ? (temporal.order === 'time' ? 'a time' : 'a date') : 'numeric'}: ${value}`);
   }
 
   return {
@@ -171,6 +190,8 @@ export function computeDetails(table: CsvTable, columnIndex: number, type: Colum
     spacePaddedValues,
     leadingZeros: digitsOnly && sawLeadingZero,
     pandasType,
+    temporal,
+    timeWithoutSeconds,
     blockers,
     lengths: [...lengthCounts.entries()]
       .map(([length, count]) => ({ length, count }))
@@ -202,6 +223,12 @@ export interface DatasetDetails {
   extraNaValues: string[];
   /** Colonnes à lire en texte pour préserver leurs zéros de tête. */
   stringColumns: string[];
+  /** Colonnes de dates, pour `parse_dates`. */
+  dateColumns: string[];
+  /** Vrai si l'une d'elles s'écrit jour/mois/an : pandas lit alors `dayfirst=True`. */
+  dayFirst: boolean;
+  /** Colonnes d'heures seules, converties ensuite en durées ; `pad` si certaines n'ont pas de secondes. */
+  timeColumns: Array<{ name: string; pad: boolean }>;
   findings: Finding[];
 }
 
@@ -216,9 +243,17 @@ export function computeDataset(table: CsvTable, details: ColumnDetails[]): Datas
 
   const extra = new Set<string>();
   const stringColumns: string[] = [];
+  const dateColumns: string[] = [];
+  const timeColumns: Array<{ name: string; pad: boolean }> = [];
+  let dayFirst = false;
   const findings: Finding[] = [];
   details.forEach((column, index) => {
     const name = table.headers[index] ?? `column ${index + 1}`;
+    if (column.temporal?.order === 'time') timeColumns.push({ name, pad: column.timeWithoutSeconds });
+    else if (column.temporal) {
+      dateColumns.push(name);
+      if (column.temporal.order === 'dmy') dayFirst = true;
+    }
     for (const token of column.nullTokens) if (!token.known) extra.add(token.value);
     if (column.leadingZeros) stringColumns.push(name);
     if (column.caseVariants > 0) {
@@ -252,6 +287,9 @@ export function computeDataset(table: CsvTable, details: ColumnDetails[]): Datas
     duplicateRowIndices,
     extraNaValues: [...extra].sort(),
     stringColumns,
+    dateColumns,
+    dayFirst,
+    timeColumns,
     findings,
   };
 }
@@ -269,5 +307,17 @@ export function readCsvSnippet(fileName: string, table: CsvTable, dataset: Datas
     const mapping = dataset.stringColumns.map((name) => `${JSON.stringify(name)}: "string"`).join(', ');
     options.push(`    dtype={${mapping}},`);
   }
-  return `import pandas as pd\n\ndf = pd.read_csv(\n${options.join('\n')}\n)`;
+  if (dataset.dateColumns.length > 0) {
+    options.push(`    parse_dates=[${dataset.dateColumns.map((name) => JSON.stringify(name)).join(', ')}],`);
+    if (dataset.dayFirst) options.push('    dayfirst=True,');
+  }
+  const read = `import pandas as pd\n\ndf = pd.read_csv(\n${options.join('\n')}\n)`;
+  // Une heure seule n'a pas de date : une durée depuis minuit la compare et la trie.
+  const times = dataset.timeColumns.map(({ name, pad }) => {
+    const column = `df[${JSON.stringify(name)}]`;
+    // « 12:52 » doit devenir « 12:52:00 » : pd.to_timedelta exige les secondes.
+    const source = pad ? `${column}.str.replace(r"^(\\d{1,2}:\\d{2})$", r"\\1:00", regex=True)` : column;
+    return `${column} = pd.to_timedelta(${source})`;
+  });
+  return [read, ...times].join('\n');
 }

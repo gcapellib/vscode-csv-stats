@@ -8,7 +8,9 @@
  * effectif.
  */
 import type { CsvTable } from './csv';
-import { decideType, parseNumber, MIN_ROWS_FOR_DISTINCT_NOTE, type ColumnType } from './types';
+import { temporalFormatFor, type TemporalFormat } from './temporal';
+import { decideType, type ColumnType } from './types';
+import { valueParser } from './values';
 
 export { parseNumber, type ColumnType } from './types';
 
@@ -27,6 +29,8 @@ export interface ColumnStats {
   name: string;
   index: number;
   type: ColumnType;
+  /** L'écriture des dates ou des heures ; null hors de ces deux types. */
+  temporal: TemporalFormat | null;
   /** Nombre de lignes de la table. */
   total: number;
   missing: number;
@@ -37,9 +41,12 @@ export interface ColumnStats {
   distinctShare: number;
   min: number | null;
   max: number | null;
-  /** Vrai quand chaque valeur renseignée n'apparaît qu'une fois. */
-  allDistinct: boolean;
-  /** Statistiques descriptives ; nulles hors colonne numérique. */
+  /**
+   * Valeurs renseignées qui n'apparaissent qu'une fois — l'« unique » de Power
+   * Query. Égal à `distinct` quand aucune valeur ne se répète.
+   */
+  unique: number;
+  /** Statistiques descriptives ; nulles hors colonne mesurable. Les dates en millisecondes. */
   mean: number | null;
   median: number | null;
   q1: number | null;
@@ -103,6 +110,12 @@ export function isMissing(raw: string): boolean {
   return raw.trim() === '';
 }
 
+function countSingletons(counts: Map<string, number>): number {
+  let singletons = 0;
+  for (const occurrences of counts.values()) if (occurrences === 1) singletons++;
+  return singletons;
+}
+
 export function compute(table: CsvTable, columnIndex: number, forced?: ColumnType): ColumnStats {
   const decimalComma = table.delimiter === ';';
   const counts = new Map<string, number>();
@@ -122,18 +135,20 @@ export function compute(table: CsvTable, columnIndex: number, forced?: ColumnTyp
   const keys = [...counts.keys()];
   const name = table.headers[columnIndex] ?? `column ${columnIndex + 1}`;
   const type = forced ?? decideType(keys, present, decimalComma, name);
+  const temporal = type === 'date' || type === 'time' ? temporalFormatFor(keys, type) : null;
 
   const stats: ColumnStats = {
     name,
     index: columnIndex,
     type,
+    temporal,
     total,
     missing,
     distinct: counts.size,
     present,
     missingShare: total === 0 ? 0 : missing / total,
     distinctShare: present === 0 ? 0 : counts.size / present,
-    allDistinct: counts.size === present && present >= MIN_ROWS_FOR_DISTINCT_NOTE,
+    unique: countSingletons(counts),
     min: null,
     max: null,
     mean: null,
@@ -148,8 +163,8 @@ export function compute(table: CsvTable, columnIndex: number, forced?: ColumnTyp
     otherShare: 0,
   };
 
-  if (type === 'numeric') {
-    fillDistribution(stats, counts, decimalComma);
+  if (type !== 'text') {
+    fillDistribution(stats, counts, valueParser(stats, decimalComma));
     // Un type forcé peut ne rien donner de mesurable : mieux vaut un palmarès
     // qu'un histogramme vide.
     if (stats.min !== null) return stats;
@@ -160,12 +175,14 @@ export function compute(table: CsvTable, columnIndex: number, forced?: ColumnTyp
   return stats;
 }
 
-function fillDistribution(stats: ColumnStats, counts: Map<string, number>, decimalComma: boolean): void {
+type Parse = (raw: string) => number | null;
+
+function fillDistribution(stats: ColumnStats, counts: Map<string, number>, parse: Parse): void {
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
   let seen = 0;
   for (const raw of counts.keys()) {
-    const value = parseNumber(raw, decimalComma);
+    const value = parse(raw);
     if (value === null) continue;
     seen++;
     if (value < min) min = value;
@@ -178,14 +195,14 @@ function fillDistribution(stats: ColumnStats, counts: Map<string, number>, decim
   const span = max - min;
   const histogram = new Array<number>(HISTOGRAM_BINS).fill(0);
   for (const [raw, occurrences] of counts) {
-    const value = parseNumber(raw, decimalComma);
+    const value = parse(raw);
     if (value === null) continue;
     const bin =
       span <= 0 ? 0 : Math.min(HISTOGRAM_BINS - 1, Math.floor(((value - min) / span) * HISTOGRAM_BINS));
     histogram[bin] += occurrences;
   }
   stats.histogram = histogram;
-  fillDescriptive(stats, counts, decimalComma);
+  fillDescriptive(stats, counts, parse);
 }
 
 /**
@@ -195,12 +212,12 @@ function fillDistribution(stats: ColumnStats, counts: Map<string, number>, decim
  * quantiles n'exigent pas de trier les lignes, seulement les valeurs distinctes,
  * souvent cent fois moins nombreuses.
  */
-function fillDescriptive(stats: ColumnStats, counts: Map<string, number>, decimalComma: boolean): void {
+function fillDescriptive(stats: ColumnStats, counts: Map<string, number>, parse: Parse): void {
   const pairs: Array<[number, number]> = [];
   let population = 0;
   let sum = 0;
   for (const [raw, occurrences] of counts) {
-    const value = parseNumber(raw, decimalComma);
+    const value = parse(raw);
     if (value === null) continue;
     pairs.push([value, occurrences]);
     population += occurrences;

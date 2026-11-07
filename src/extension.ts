@@ -1,7 +1,7 @@
 import { statSync } from 'node:fs';
 import * as vscode from 'vscode';
-import { decode, parse, type CsvTable } from './core/csv';
-import { compute, computeAll, type ColumnStats, type ColumnType } from './core/stats';
+import { decode, parse } from './core/csv';
+import { computeAll } from './core/stats';
 
 const VIEW_TYPE = 'csvStats.editor';
 const THEME_KEY = 'csvStats.theme';
@@ -64,7 +64,6 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
     };
     panel.webview.html = this.html(panel.webview);
 
-    let table: CsvTable | null = null;
     // Le texte décodé, jamais renvoyé tant qu'on ne le demande pas : la
     // vue brute est un bouton, pas une charge que tout le monde paie.
     let rawText: string | null = null;
@@ -72,16 +71,12 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
     // en cours d'analyse : sans ce drapeau, elle trouverait rawText a null et
     // serait perdue en silence, laissant la vue bloquee sur « Loading… ».
     let rawRequested = false;
-    const stats: ColumnStats[] = [];
 
     panel.webview.onDidReceiveMessage(async (message: { type: string; [key: string]: unknown }) => {
       switch (message.type) {
         case 'ready':
-          await this.load(document, panel, (loaded, computed, text) => {
-            table = loaded;
+          await this.load(document, panel, (text) => {
             rawText = text;
-            stats.length = 0;
-            stats.push(...computed);
             if (rawRequested) {
               rawRequested = false;
               void panel.webview.postMessage({ type: 'raw', text });
@@ -123,15 +118,6 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
           if (rawText !== null) void panel.webview.postMessage({ type: 'raw', text: rawText });
           else rawRequested = true;
           break;
-        case 'changeType': {
-          if (!table) return;
-          const index = message.index as number;
-          const recomputed = compute(table, index, message.forced as ColumnType);
-          recomputed.name = stats[index]?.name ?? recomputed.name;
-          stats[index] = recomputed;
-          void panel.webview.postMessage({ type: 'columnStats', index, stats: recomputed });
-          break;
-        }
       }
     });
   }
@@ -139,7 +125,7 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
   private async load(
     document: CsvDocument,
     panel: vscode.WebviewPanel,
-    keep: (table: CsvTable, stats: ColumnStats[], text: string) => void,
+    keep: (text: string) => void,
   ): Promise<void> {
     try {
       const raw = await vscode.workspace.fs.readFile(document.uri);
@@ -161,7 +147,7 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
             return;
           }
           const stats = computeAll(table);
-          keep(table, stats, text);
+          keep(text);
 
           void panel.webview.postMessage({
             type: 'head',

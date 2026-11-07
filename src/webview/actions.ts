@@ -1,4 +1,5 @@
 import { type Filter } from '../core/filters';
+import { type ColumnType } from '../core/types';
 import { floating } from './floating-setup';
 import { paint } from './paint';
 import { elements } from './dom';
@@ -58,6 +59,19 @@ export function refilter(): void {
   // l'ouverture.
   paintFilterBar();
   paint();
+}
+
+/**
+ * Lit la colonne avec un autre type, sur les lignes affichées : sous un filtre,
+ * son bandeau doit décrire le même sous-ensemble que ses voisins. Le type est
+ * retenu dans `forcedTypes`, que chaque recalcul réapplique.
+ */
+export function forceType(modelIndex: number, type: ColumnType): void {
+  state.forcedTypes.set(modelIndex, type);
+  const column = state.stats[modelIndex];
+  // Le tri de rebuildView lit le type avant le recalcul : il doit déjà être le bon.
+  if (column) state.stats[modelIndex] = { ...column, type };
+  refilter();
 }
 
 export function applyDrop(modelIndex: number): void {

@@ -1,5 +1,6 @@
-import { count, num, percent } from '../core/format';
+import { count, percent } from '../core/format';
 import { foldRanking, type ColumnStats } from '../core/stats';
+import { formatValue } from '../core/values';
 import { type Palette } from '../core/themes';
 import { toggleFilter } from './actions';
 import { HIST_HEIGHT } from './constants';
@@ -79,7 +80,22 @@ export function bandCell(modelIndex: number): HTMLElement {
     );
   }
   cell.appendChild(distinct);
-  if (column.allDistinct) cell.appendChild(line('note', 'every value occurs once'));
+  // Les valeurs vues une seule fois — l'« unique » de Power Query. Dans une
+  // nomenclature, ce sont souvent des fautes de frappe que le palmarès range
+  // sous « Other » ; le clic les montre. Égal à Distinct, il dit ce que disait
+  // l'ancienne note « every value occurs once ».
+  const unique = line('stat', uniqueText(column));
+  if (column.unique > 0) {
+    unique.classList.add('pickable');
+    unique.title = 'Keep only the rows whose value occurs once in this column';
+    unique.addEventListener('click', () =>
+      toggleFilter({ kind: 'unique', column: modelIndex, label: `${column.name}: values seen once` }),
+    );
+  } else {
+    unique.classList.add('none');
+    unique.title = 'Every value occurs more than once';
+  }
+  cell.appendChild(unique);
 
   // Le corps du bandeau — histogramme ou palmarès — est un bloc à part, pour
   // qu'un seul écart le sépare du décompte au-dessus, quel que soit son contenu.
@@ -90,17 +106,17 @@ export function bandCell(modelIndex: number): HTMLElement {
     const bounds = document.createElement('div');
     bounds.className = 'bounds';
     const min = document.createElement('span');
-    min.textContent = `Min ${num(column.min ?? 0)}`;
+    min.textContent = `Min ${formatValue(column, column.min ?? 0)}`;
     const max = document.createElement('span');
-    max.textContent = `Max ${num(column.max ?? 0)}`;
+    max.textContent = `Max ${formatValue(column, column.max ?? 0)}`;
     bounds.append(min, max);
     body.appendChild(bounds);
     if (column.mean !== null) {
       const central = document.createElement('div');
       central.className = 'bounds';
       central.append(
-        textSpan(`Mean ${num(column.mean)}`),
-        textSpan(`Median ${num(column.median ?? 0)}`),
+        textSpan(`Mean ${formatValue(column, column.mean)}`),
+        textSpan(`Median ${formatValue(column, column.median ?? 0)}`),
       );
       body.appendChild(central);
     }
@@ -140,6 +156,12 @@ export function bandCell(modelIndex: number): HTMLElement {
 /** « Distinct 1,547 (99.7% of filled) » : la base de la part est dite. */
 export function distinctText(column: ColumnStats): string {
   return `Distinct ${count(column.distinct)} (${percent(column.distinctShare)} of filled)`;
+}
+
+/** « Unique 166 (27.3% of filled) » : même base que Distinct, une ligne par valeur unique. */
+export function uniqueText(column: ColumnStats): string {
+  const share = column.present === 0 ? 0 : column.unique / column.present;
+  return `Unique ${count(column.unique)} (${percent(share)} of filled)`;
 }
 
 export function line(className: string, text: string): HTMLElement {
@@ -218,7 +240,8 @@ export function histogram(column: ColumnStats, colours: Palette, width: number):
     target.setAttribute('fill', 'transparent');
     const low = (column.min ?? 0) + (span * index) / bins;
     const high = index === bins - 1 ? (column.max ?? 0) : (column.min ?? 0) + (span * (index + 1)) / bins;
-    const range = span <= 0 ? num(column.min ?? 0) : `${num(low)} – ${num(high)}`;
+    const range =
+      span <= 0 ? formatValue(column, column.min ?? 0) : `${formatValue(column, low)} – ${formatValue(column, high)}`;
     const share = column.present === 0 ? 0 : value / column.present;
     target.addEventListener('mousemove', (event) => {
       event.stopPropagation();
@@ -233,6 +256,7 @@ export function histogram(column: ColumnStats, colours: Palette, width: number):
         low,
         high,
         last: index === bins - 1,
+        temporal: column.temporal ?? undefined,
         label: `${column.name} ${range}`,
       });
     });
@@ -246,7 +270,8 @@ export function summaryOf(column: ColumnStats): string {
   return (
     `<b>${escape(column.name)}</b><br>${column.type}<br>` +
     `Missing ${count(column.missing)} (${percent(column.missingShare)})<br>` +
-    distinctText(column)
+    `${distinctText(column)}<br>` +
+    uniqueText(column)
   );
 }
 

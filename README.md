@@ -40,11 +40,13 @@ table itself shows the cells exactly as they are written in the file.
 
 Above every column, a band reports:
 
-- the detected type — **numeric** or **text**;
+- the detected type — **numeric**, **date**, **time** or **text**;
 - the count and share of missing values;
 - the count and share of distinct values;
-- a note when every value occurs exactly once — not a type, a fact about the
-  spread, which warns you that the ranking just below ranks nothing;
+- the count of **unique** values — those that occur exactly once, what Power
+  Query calls *unique*. In a nomenclature these are often typos the ranking
+  hides under **Other**; click the line to keep only those rows. When it equals
+  the distinct count, no value repeats and the ranking below ranks nothing;
 - for a numeric column, a 20-bin histogram, then **Min / Max** and
   **Mean / Median** — the two figures you want at a glance, the rest one click
   away in **Column details**; hovering a bar shows that bin's range and count, and hovering the
@@ -164,19 +166,38 @@ worry.
 ## Column menu
 
 Three dots at the top right of each band: sort ascending or descending, a
-contains-filter, rename, drop the column, and read the column as the other type.
+contains-filter, rename, drop the column, and read the column as another type.
 
 These are all **view actions**: the file is never rewritten. Reopening the tab
 restores the original state. Forcing a type keeps only the values that read that
 way, without requiring that all of them do — that is the whole point of a manual
 override.
 
-**Two types, and two only.** A CSV carries none — everything in it is text — so
-any typology is an inference, and an inference can be wrong. The one kept here
-invents nothing: a column whose every present value reads as a number is numeric,
-everything else is text. Types are decided from the **distinct values**, not from
+**Only the types that change what you see.** A CSV carries none — everything in
+it is text — so any typology is an inference, and an inference can be wrong. The
+one kept here invents nothing: a column whose every present value reads as a
+number is **numeric**; as a date or a time, it is **date** or **time**;
+everything else is **text**. Types are decided from the **distinct values**, not from
 every row: a hundred-thousand-row file often holds only a few hundred different
 values, which makes the guess a hundred times cheaper.
+
+A date column earns its type because it changes the display: a timeline instead
+of a ranking, **Min / Max** written as dates, a chronological sort —
+`02/01/2016` after `03/01/2015`, not before — a *before / after / between*
+filter, and `parse_dates` in the generated `pd.read_csv`. Dates are recognised
+only where nothing is left to chance:
+
+- `2015-01-31` or `2015/01/31`, with or without a time — the year first is never
+  ambiguous;
+- `31/01/2015`, `31.01.2015` or `31-01-2015` — only when at least one value
+  settles it, a day above 12. A column of `01/02/2015`-style values alone could be
+  the first of February or the second of January, so it stays text; the menu
+  reads it as a date if you know which;
+- `12:52` or `12:52:01` alone — a **time**, read by pandas as a duration since
+  midnight, since `parse_dates` would stamp it with today's date.
+
+The American `01/31/2015` is not recognised: reading it would mean betting on
+every ambiguous date in the file.
 
 ## Column width
 

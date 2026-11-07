@@ -89,13 +89,6 @@ window.addEventListener('message', (event: MessageEvent) => {
       paint();
       break;
     }
-    case 'columnStats': {
-      const index = message.index as number;
-      state.stats[index] = message.stats as ColumnStats;
-      rebuildView();
-      paint();
-      break;
-    }
     case 'failed':
       elements.scroller.remove();
       elements.notice.textContent = message.message as string;

@@ -50,7 +50,7 @@ export function datasetTransformLines(): string[] {
 export function openDataset(anchor: HTMLElement): void {
   const table = currentTable();
   const details = state.headers.map((_, index) =>
-    computeDetails(table, index, state.stats[index]?.type ?? 'text'),
+    computeDetails(table, index, state.stats[index]?.type ?? 'text', state.stats[index]?.temporal ?? null),
   );
   const dataset = computeDataset(table, details);
 

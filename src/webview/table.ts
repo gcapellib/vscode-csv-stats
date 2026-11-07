@@ -1,14 +1,15 @@
 import { cellMatches, type Filter } from '../core/filters';
-import { count, num } from '../core/format';
+import { count } from '../core/format';
 import { compute } from '../core/stats';
-import { parseNumber } from '../core/types';
+import { isMeasurable } from '../core/types';
+import { formatValue, valueParser } from '../core/values';
 import { closePicker, getOpenPanel, refilter } from './actions';
 import { HEAD_BUTTONS, MAX_WIDTH, MIN_WIDTH, MIN_WIDTH_FOLDED, OVERSCAN, RESIZE_MAX, RESIZE_MIN, ROW_HEIGHT, WIDTH_SAMPLE_ROWS } from './constants';
 import { elements } from './dom';
 import { closeMenu } from './menu';
 import { paint } from './paint';
 import { openFilterPanel } from './panels/filter-panel';
-import { distinctText } from './band';
+import { distinctText, uniqueText } from './band';
 import { resizeHandle } from './resize';
 import { palette, state } from './state';
 import { hideTooltip } from './tooltip';
@@ -96,8 +97,9 @@ function autoWidth(index: number, withBand: boolean, widthOf: (text: string) => 
     // Les deux bornes sont mesurées sur la plus longue des deux : un filtre
     // peut restreindre à « Min 999,999 » là où le fichier entier affichait
     // « Min 0 », et la largeur ne se rediscute plus après l'ouverture.
+    const show = (value: number) => formatValue(column, value);
     const longest = (left: number, right: number) =>
-      widthOf(num(left)) >= widthOf(num(right)) ? num(left) : num(right);
+      widthOf(show(left)) >= widthOf(show(right)) ? show(left) : show(right);
     const bound = longest(column.min ?? 0, column.max ?? 0);
     const central = longest(column.mean ?? 0, column.median ?? 0);
     widest = Math.max(
@@ -112,7 +114,9 @@ function autoWidth(index: number, withBand: boolean, widthOf: (text: string) => 
   // comprises, et non devinée : un facteur fixe appliqué à une mesure en
   // maigre suffisait sur un poste, pas sur la machine de la CI, dont les
   // polices sont plus larges — six lignes coupées sur wines.csv.
-  const band = withBand && column ? bandLineWidth(distinctText(column)) : 0;
+  // La ligne « Unique », de même gabarit, peut être la plus longue des deux :
+  // « Unique 598 (100.0% of filled) » contre « Distinct 598 (98.8% of filled) ».
+  const band = withBand && column ? Math.max(bandLineWidth(distinctText(column)), bandLineWidth(uniqueText(column))) : 0;
   const fitted = Math.max(floor, widest + CELL_PADDING, band);
   return Math.round(capped ? Math.min(MAX_WIDTH, fitted) : Math.min(RESIZE_MAX, fitted));
 }
@@ -170,13 +174,21 @@ export function gutterCell(text = ''): HTMLDivElement {
   return cell;
 }
 
+/**
+ * La lecture des cellules d'une colonne en nombre, selon son type : nombre,
+ * date ou heure. Une colonne texte ne se lit pas — null partout.
+ */
+export function parserOf(columnIndex: number): (raw: string) => number | null {
+  const column = state.stats[columnIndex];
+  return column ? valueParser(column, state.delimiter === ';') : () => null;
+}
+
 /** Une ligne satisfait-elle la condition ? */
 export function matches(cells: string[], filter: Filter, rowIndex: number): boolean {
   if (filter.kind === 'duplicates') return filter.rows.has(rowIndex);
-  // Jugé sur l'ensemble des lignes retenues : voir filteredRows.
-  if (filter.kind === 'distinct') return true;
-  const decimalComma = state.delimiter === ';';
-  return cellMatches(cells[filter.column] ?? '', filter, (raw) => parseNumber(raw, decimalComma));
+  // Jugés sur l'ensemble des lignes retenues : voir filteredRows.
+  if (filter.kind === 'distinct' || filter.kind === 'unique') return true;
+  return cellMatches(cells[filter.column] ?? '', filter, parserOf(filter.column));
 }
 
 /** Indices des lignes retenues par les filtres actifs. */
@@ -188,18 +200,28 @@ export function filteredRows(): number[] {
     const cells = rows[row];
     if (cells && state.filters.every((filter) => matches(cells, filter, row))) kept.push(row);
   }
-  // « Une ligne par valeur » porte sur ce que les autres conditions ont laissé :
-  // la première ligne retenue de chaque valeur, les vides comptant pour une.
+  // « Une ligne par valeur » et « valeurs vues une fois » portent sur ce que
+  // les autres conditions ont laissé, dans l'ordre où on les a posés.
   for (const filter of state.filters) {
-    if (filter.kind !== 'distinct') continue;
-    const seen = new Set<string>();
-    kept = kept.filter((row) => {
-      const raw = state.rows[row]?.[filter.column] ?? '';
-      const key = raw.trim() === '' ? '' : raw;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    if (filter.kind === 'distinct') {
+      // La première ligne retenue de chaque valeur, les vides comptant pour une.
+      const seen = new Set<string>();
+      kept = kept.filter((row) => {
+        const raw = state.rows[row]?.[filter.column] ?? '';
+        const key = raw.trim() === '' ? '' : raw;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    } else if (filter.kind === 'unique') {
+      // Le même compte que le bandeau : les vides ne sont pas des valeurs.
+      const occurrences = new Map<string, number>();
+      for (const row of kept) {
+        const raw = state.rows[row]?.[filter.column] ?? '';
+        if (raw.trim() !== '') occurrences.set(raw, (occurrences.get(raw) ?? 0) + 1);
+      }
+      kept = kept.filter((row) => occurrences.get(state.rows[row]?.[filter.column] ?? '') === 1);
+    }
   }
   return kept;
 }
@@ -219,8 +241,12 @@ export function recomputeStats(kept: number[]): void {
     truncated: false,
   };
   const names = state.stats.map((column) => column.name);
+  // Le type est une propriété du fichier, pas du sous-ensemble : redeviné sur
+  // les seules lignes retenues, une colonne numérique réduite à ses cellules
+  // vides passait « text », et son filtre comme son tri changeaient de nature.
+  const types = state.stats.map((column) => column.type);
   state.stats = state.headers.map((_, index) => {
-    const recomputed = compute(subset, index, state.forcedTypes.get(index));
+    const recomputed = compute(subset, index, state.forcedTypes.get(index) ?? types[index]);
     // Les renommages sont un état d'affichage : ils survivent au recalcul.
     recomputed.name = names[index] ?? recomputed.name;
     return recomputed;
@@ -232,15 +258,16 @@ export function rebuildView(): void {
 
   const sort = state.sort;
   if (sort) {
-    const numeric = state.stats[sort.index]?.type === 'numeric';
-    const decimalComma = state.delimiter === ';';
+    // Dates et heures se trient comme des nombres : 02/01/2016 après 03/01/2015.
+    const measurable = isMeasurable(state.stats[sort.index]?.type ?? 'text');
+    const parse = parserOf(sort.index);
     const direction = sort.ascending ? 1 : -1;
     view.sort((left, right) => {
       const a = state.rows[left]?.[sort.index] ?? '';
       const b = state.rows[right]?.[sort.index] ?? '';
-      if (numeric) {
-        const x = parseNumber(a, decimalComma);
-        const y = parseNumber(b, decimalComma);
+      if (measurable) {
+        const x = parse(a);
+        const y = parse(b);
         // Les cellules illisibles vont en fin de tri, quel que soit le sens.
         if (x === null && y === null) return 0;
         if (x === null) return 1;
@@ -369,7 +396,7 @@ export function paintRows(onlyIfMoved = false): void {
       const colours = palette(modelIndex);
       const cell = document.createElement('div');
       const isActive = state.active?.row === rowIndex && state.active.column === modelIndex;
-      cell.className = state.stats[modelIndex].type === 'numeric' ? 'cell num' : 'cell';
+      cell.className = isMeasurable(state.stats[modelIndex].type) ? 'cell num' : 'cell';
       if (isActive) cell.classList.add('active');
       if (state.selectedColumn === modelIndex) cell.classList.add('column-selected');
       cell.style.width = `${state.widths[modelIndex]}px`;

@@ -1,4 +1,5 @@
 import { type CellFilter } from '../../core/filters';
+import { isMeasurable } from '../../core/types';
 import { setOpenPanel } from '../actions';
 import { elements } from '../dom';
 import { floating, positionFloating } from '../floating-setup';
@@ -22,10 +23,12 @@ const LIST_MAX_DISTINCT = 200;
  */
 export function openFilterPanel(columnIndex: number, anchor: HTMLElement, preferred?: Tab): void {
   const column = state.stats[columnIndex];
-  const numeric = column?.type === 'numeric';
+  // Dates et heures se filtrent comme des nombres : avant, après, entre.
+  const numeric = isMeasurable(column?.type ?? 'text');
   const tabs: Tab[] = numeric ? ['number'] : ['values', 'text'];
   const existing = state.filters.find(
-    (filter): filter is CellFilter => filter.kind !== 'duplicates' && filter.kind !== 'distinct' && filter.column === columnIndex,
+    (filter): filter is CellFilter =>
+      filter.kind !== 'duplicates' && filter.kind !== 'distinct' && filter.kind !== 'unique' && filter.column === columnIndex,
   );
   const fallback: Tab = numeric
     ? 'number'

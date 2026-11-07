@@ -24,6 +24,17 @@ export function fieldRow(label: string, ...fields: HTMLElement[]): HTMLElement {
   return row;
 }
 
+/** Un champ de date ou d'heure : du texte, lu dans l'écriture du fichier ou en ISO. */
+export function dateInput(placeholder: string, value: string): HTMLInputElement {
+  const input = document.createElement('input');
+  input.className = 'picker-number';
+  input.type = 'text';
+  input.spellcheck = false;
+  input.placeholder = placeholder;
+  input.value = value;
+  return input;
+}
+
 export function numberInput(placeholder: string, value: string): HTMLInputElement {
   const input = document.createElement('input');
   input.className = 'picker-number';

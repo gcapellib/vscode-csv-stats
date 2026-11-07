@@ -174,6 +174,23 @@ describe('une ligne par valeur', () => {
   });
 });
 
+describe('valeurs vues une fois', () => {
+  it('se traduit en duplicated(keep=False), vides exclus, et passe après les autres conditions', () => {
+    const unique: Filter = { kind: 'unique', column: 1, label: '' };
+    assert.equal(filterToPandas(unique, 'ville'), 'df = df[df["ville"].notna() & ~df["ville"].duplicated(keep=False)]');
+    const lines = datasetTransformLines({
+      renamed: [],
+      dropped: [],
+      sort: null,
+      filters: [
+        { filter: unique, columnName: 'ville' },
+        { filter: { kind: 'values', column: 0, values: ['A'], label: 'x' }, columnName: 'groupe' },
+      ],
+    });
+    assert.ok(lines.findIndex((line) => line.includes('keep=False')) > lines.findIndex((line) => line.includes('== "A"')));
+  });
+});
+
 describe('cellMatches', () => {
   const parse = (raw: string) => parseNumber(raw, false);
   const text = (op: TextOp, value: string, blank?: 'add' | 'exclude') => textFilter(0, 'c', op, value, blank) as Extract<Filter, { kind: 'text' }>;

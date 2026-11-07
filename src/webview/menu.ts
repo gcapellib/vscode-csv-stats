@@ -1,10 +1,9 @@
-import { applyDrop } from './actions';
+import { applyDrop, forceType } from './actions';
 import { COLUMN_TYPES, TYPE_LABELS } from './constants';
 import { elements } from './dom';
 import { floating, positionFloating } from './floating-setup';
 import { openDetails } from './panels/column-details';
 import { state } from './state';
-import { vscode } from './vscode-api';
 import { applyRename } from './actions';
 
 /**
@@ -34,7 +33,7 @@ export function openMenu(modelIndex: number, anchor: HTMLElement): void {
       (type): Entry => [
         // La coche dit ce que la colonne est aujourd'hui, détecté ou forcé.
         `${type === column.type ? '\u2713' : '\u2007'}  ${TYPE_LABELS[type]}`,
-        () => vscode.postMessage({ type: 'changeType', index: modelIndex, forced: type }),
+        () => forceType(modelIndex, type),
       ],
     ),
   ];

@@ -157,14 +157,16 @@ describe('StatsComputer', () => {
     assert.equal(sum(stats.histogram), 3);
   });
 
-  it('signale une colonne dont chaque valeur est unique', () => {
-    // Ce n'est pas un type : c'est un constat de répartition, qui prévient que
-    // le palmarès affiché juste en dessous ne hiérarchise rien.
-    const unique = 'ref\n' + Array.from({ length: 30 }, (_, i) => `A-${i}\n`).join('');
-    assert.equal(statsOf(unique)[0].allDistinct, true);
-    assert.equal(statsOf('ville\nLyon\nLyon\nNantes\n')[0].allDistinct, false);
-    // Sur trois lignes, « toutes distinctes » ne veut rien dire.
-    assert.equal(statsOf('ville\nLyon\nNantes\nBrest\n')[0].allDistinct, false);
+  it('compte les valeurs vues une seule fois, comme le « unique » de Power Query', () => {
+    // Lyon se répète, Nantes et Brest non ; le vide n'est pas une valeur.
+    const stats = statsOf('ville\nLyon\nLyon\nNantes\n\nBrest\n')[0];
+    assert.equal(stats.distinct, 3);
+    assert.equal(stats.unique, 2);
+    // Sans répétition, unique et distinct se confondent : c'est le constat que
+    // portait l'ancienne note « every value occurs once ».
+    const ids = 'ref\n' + Array.from({ length: 30 }, (_, i) => `A-${i}\n`).join('');
+    assert.equal(statsOf(ids)[0].unique, 30);
+    assert.equal(statsOf(ids)[0].distinct, 30);
   });
 
   it('remplit chaque classe du min au max', () => {
