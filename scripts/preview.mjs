@@ -31,7 +31,7 @@ function page(csv) {
     truncated: table.truncated,
     rowCount: table.rows.length,
     stats: computeAll(table),
-    theme: 'syntax',
+    theme: undefined,
   };
   const rows = { type: 'rows', start: 0, rows: table.rows, lines: table.lines, done: true };
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>CSV Stats — ${relative(root, csv)}</title>

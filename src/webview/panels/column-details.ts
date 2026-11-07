@@ -12,7 +12,9 @@ import { elements, textSpan } from '../dom';
 import { valueCounts } from '../table';
 import { hideTooltip, showTooltip } from '../tooltip';
 import { addStep } from '../cleaning';
-import { actionBar, detailsExtras } from './details-extras';
+import { actionBar, detailsExtras, placeholderSection, withoutNote } from './details-extras';
+import { rowOrderChart } from './row-order';
+import { byCategory } from './by-category';
 
 /**
  * Panneau de détail d'une colonne.
@@ -29,7 +31,7 @@ export function openDetails(columnIndex: number, anchor: HTMLElement): void {
   elements.picker.textContent = '';
   elements.picker.classList.add('wide');
   tintPanel(columnIndex);
-  elements.picker.appendChild(panelTitle(column.name, `${column.type} · pandas ${details.pandasType}`));
+  elements.picker.appendChild(panelTitle(column.name, `${column.type} · pandas ${details.pandasType}`, columnIndex));
 
   const scope = document.createElement('div');
   scope.className = 'picker-note';
@@ -45,6 +47,9 @@ export function openDetails(columnIndex: number, anchor: HTMLElement): void {
     flag.textContent = blocker;
     elements.picker.appendChild(flag);
   }
+
+  const reopen = () => openDetails(columnIndex, anchor);
+  for (const part of placeholderSection(column, details, reopen)) elements.picker.appendChild(part);
 
   elements.picker.appendChild(sectionTitle('Completeness'));
   const completeness = grid();
@@ -70,7 +75,6 @@ export function openDetails(columnIndex: number, anchor: HTMLElement): void {
   elements.picker.appendChild(completeness);
   // Le constat mène à l'étape : les jetons d'absence se traitent comme vides,
   // d'un clic, sans retaper ce que le panneau vient d'énumérer.
-  const reopen = () => openDetails(columnIndex, anchor);
   if (details.nullTokens.length > 0) {
     const tokens = details.nullTokens.map((token) => token.value);
     elements.picker.appendChild(
@@ -89,7 +93,15 @@ export function openDetails(columnIndex: number, anchor: HTMLElement): void {
   elements.picker.appendChild(sectionTitle('Distribution'));
   elements.picker.appendChild(distributionChart(column, details, palette(columnIndex)));
 
-  for (const part of detailsExtras(column, details, reopen)) elements.picker.appendChild(part);
+  const rowOrder = rowOrderChart(column, details, palette(columnIndex));
+  if (rowOrder) {
+    elements.picker.appendChild(sectionTitle('Values by row order'));
+    elements.picker.appendChild(rowOrder);
+  }
+
+  for (const part of byCategory(column, details, palette(columnIndex), reopen)) elements.picker.appendChild(part);
+
+  for (const part of detailsExtras(column, details, reopen, rowOrder !== null)) elements.picker.appendChild(part);
 
   if (column.mean !== null) {
     elements.picker.appendChild(sectionTitle('Statistics'));
@@ -106,6 +118,8 @@ export function openDetails(columnIndex: number, anchor: HTMLElement): void {
     if (!column.temporal) addRow(numbers, 'Std deviation', num(column.deviation ?? 0));
     addRow(numbers, 'Outliers', count(column.outliers));
     elements.picker.appendChild(numbers);
+    const without = withoutNote(column, details);
+    if (without) elements.picker.appendChild(without);
   } else {
     elements.picker.appendChild(sectionTitle('Text'));
     const text = grid();
@@ -268,9 +282,9 @@ export function markedHistogram(column: ColumnStats, colours: Palette): HTMLElem
   const wrapper = document.createElement('div');
   wrapper.className = 'chart';
   const width = 340;
-  const top = 36;
-  const bottom = 158;
-  const height = 192;
+  const top = 34;
+  const bottom = 170;
+  const height = 206;
   const svg = document.createElementNS(NS, 'svg');
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   svg.setAttribute('class', 'big-hist');
@@ -298,7 +312,10 @@ export function markedHistogram(column: ColumnStats, colours: Palette): HTMLElem
   const bins = [...column.histogram];
   if (lowOutliers) bins[0] -= lowCount;
   if (highOutliers) bins[bins.length - 1] -= highCount;
-  const scale = niceScale(Math.max(...bins, lowCount, highCount, 1));
+  // La barre la plus haute touche le haut du tracé : pas de vide entre elle et
+  // les étiquettes. Les repères restent ronds, ceux au-delà du pic sont omis.
+  const peak = Math.max(...bins, lowCount, highCount, 1);
+  const scale = niceScale(peak);
 
   const axisWidth = 28;
   const plotLeft = 6 + axisWidth;
@@ -307,8 +324,8 @@ export function markedHistogram(column: ColumnStats, colours: Palette): HTMLElem
   const x0 = plotLeft + (lowOutliers ? zone : 0);
   const x1 = plotRight - (highOutliers ? zone : 0);
   const barLeft = (index: number) => x0 + ((x1 - x0) * index) / bins.length;
-  const room = bottom - top - 14;
-  const heightOf = (value: number) => (value === 0 ? 0 : Math.max(1, (room * value) / scale.max));
+  const room = bottom - top;
+  const heightOf = (value: number) => (value === 0 ? 0 : Math.max(1, (room * value) / peak));
   const share = (value: number) => percent(column.present === 0 ? 0 : value / column.present);
   const plural = (value: number) => `${count(value)} value${value === 1 ? '' : 's'}`;
 
@@ -333,8 +350,8 @@ export function markedHistogram(column: ColumnStats, colours: Palette): HTMLElem
   svg.appendChild(defs);
 
   // L'échelle des effectifs : un repère discret par graduation.
-  for (const tick of scale.ticks) {
-    const y = bottom - (room * tick) / scale.max;
+  for (const tick of scale.ticks.filter((value) => value <= peak)) {
+    const y = bottom - (room * tick) / peak;
     const guide = document.createElementNS(NS, 'line');
     guide.setAttribute('x1', String(plotLeft));
     guide.setAttribute('x2', String(plotRight));
@@ -396,29 +413,45 @@ export function markedHistogram(column: ColumnStats, colours: Palette): HTMLElem
     svg.appendChild(svgText(value, x, axis, { anchor, size: 10, opacity: 0.95 }));
     svg.appendChild(svgText(caption, x, axis + 11, { anchor, size: 9, opacity: 0.6 }));
   };
-  const joint = (x: number) => {
-    const tick = document.createElementNS(NS, 'line');
-    tick.setAttribute('x1', String(x));
-    tick.setAttribute('x2', String(x));
-    tick.setAttribute('y1', String(bottom));
-    tick.setAttribute('y2', String(bottom + 6));
-    tick.setAttribute('stroke', 'currentColor');
-    tick.setAttribute('opacity', '0.7');
-    svg.appendChild(tick);
+  // La borne des outliers : une bande teintée sur leur zone, un trait plein
+  // à la frontière, et la valeur de la borne en couleur sous l'axe.
+  const warn = 'var(--vscode-editorWarning-foreground, #cca700)';
+  const fence = (x: number, edge: number, value: string, side: 'start' | 'end') => {
+    const band = document.createElementNS(NS, 'rect');
+    band.setAttribute('x', String(Math.min(x, edge)));
+    band.setAttribute('y', String(top));
+    band.setAttribute('width', String(Math.abs(edge - x)));
+    band.setAttribute('height', String(bottom - top));
+    band.setAttribute('fill', warn);
+    band.setAttribute('opacity', '0.12');
+    svg.insertBefore(band, svg.firstChild?.nextSibling ?? null);
+    const line = document.createElementNS(NS, 'line');
+    line.setAttribute('x1', String(x));
+    line.setAttribute('x2', String(x));
+    line.setAttribute('y1', String(top));
+    line.setAttribute('y2', String(bottom + 6));
+    line.setAttribute('stroke', warn);
+    line.setAttribute('stroke-width', '2');
+    svg.appendChild(line);
+    const anchor = side === 'start' ? 'end' : 'start';
+    const dx = side === 'start' ? -4 : 4;
+    for (const [content, y, size, weight] of [[value, axis, 10, 700], ['limit', axis + 11, 9, 400]] as const) {
+      const label = svgText(content, x + dx, y, { anchor, size, opacity: 1, weight });
+      label.setAttribute('fill', warn);
+      svg.appendChild(label);
+    }
   };
   if (lowOutliers) {
     outlierBar(plotLeft + 2, lowCount, `Outliers below ${show(fenceLow)}`);
     tickLabel(plotLeft + 2 + (zone - 8) / 2, show(column.min ?? 0), 'min', 'middle');
-    joint(x0);
-    svg.appendChild(svgText(show(fenceLow), x0 + 3, axis, { anchor: 'start', size: 10, opacity: 0.95 }));
+    fence(x0, plotLeft, show(fenceLow), 'end');
   } else {
     tickLabel(plotLeft, show(column.min ?? 0), 'min', 'start');
   }
   if (highOutliers) {
     outlierBar(x1 + 6, highCount, `Outliers above ${show(fenceHigh)}`);
     tickLabel(x1 + 6 + (zone - 8) / 2, show(column.max ?? 0), 'max', 'middle');
-    joint(x1);
-    svg.appendChild(svgText(show(fenceHigh), x1 - 3, axis, { anchor: 'end', size: 10, opacity: 0.95 }));
+    fence(x1, plotRight, show(fenceHigh), 'start');
   } else {
     tickLabel(plotRight, show(column.max ?? 0), 'max', 'end');
   }
@@ -426,8 +459,7 @@ export function markedHistogram(column: ColumnStats, colours: Palette): HTMLElem
   // Les traits, et leurs valeurs en haut, alignés dessus.
   const span = fenceHigh - fenceLow || 1;
   const xOf = (value: number) => x0 + Math.max(0, Math.min(1, (value - fenceLow) / span)) * (x1 - x0);
-  const background = 'fill: var(--vscode-menu-background, var(--vscode-editorWidget-background, #252526))';
-  const ends: number[] = [];
+    const ends: number[] = [];
   const labelled: Array<[string, number]> = [
     ['Q1', column.q1 ?? 0],
     ['Median', column.median ?? 0],
@@ -445,22 +477,23 @@ export function markedHistogram(column: ColumnStats, colours: Palette): HTMLElem
     const line = document.createElementNS(NS, 'line');
     line.setAttribute('x1', String(x));
     line.setAttribute('x2', String(x));
-    line.setAttribute('y1', String(10 + row * 13));
+    line.setAttribute('y1', String(top - 6));
     line.setAttribute('y2', String(bottom));
     line.setAttribute('stroke', 'currentColor');
     line.setAttribute('stroke-width', name === 'Median' ? '2' : '1');
     line.setAttribute('stroke-dasharray', name === 'Median' ? '' : '3 3');
     line.setAttribute('opacity', '0.75');
     svg.appendChild(line);
-    // Un fond sous le nom, pour qu'un trait voisin ne le traverse pas.
-    const plate = document.createElementNS(NS, 'rect');
-    plate.setAttribute('x', String(left));
-    plate.setAttribute('y', String(row * 13));
-    plate.setAttribute('width', String(textWidth));
-    plate.setAttribute('height', '13');
-    plate.setAttribute('rx', '3');
-    plate.setAttribute('style', background);
-    labels.push(plate, svgText(text, left + textWidth / 2, 10 + row * 13, { size: 10, opacity: 1, weight: name === 'Median' ? 600 : 400 }));
+    // Le nom en retrait, la valeur en gras : on lit « Q1 » puis son chiffre, pas un seul mot.
+    const label = svgText('', left + textWidth / 2, 10 + row * 13, { size: 10, opacity: 1 });
+    const nameSpan = document.createElementNS(NS, 'tspan');
+    nameSpan.setAttribute('opacity', '0.6');
+    nameSpan.textContent = `${name} `;
+    const valueSpan = document.createElementNS(NS, 'tspan');
+    valueSpan.setAttribute('font-weight', '700');
+    valueSpan.textContent = show(value);
+    label.append(nameSpan, valueSpan);
+    labels.push(label);
   }
   for (const label of labels) svg.appendChild(label);
   // Les zones sensibles en dernier : elles reçoivent le survol par-dessus les traits.
@@ -468,14 +501,11 @@ export function markedHistogram(column: ColumnStats, colours: Palette): HTMLElem
 
   wrapper.appendChild(svg);
   if (lowOutliers || highOutliers) {
-    wrapper.appendChild(
-      Object.assign(
-        textSpan(
-          `Hatched bars: outliers${lowOutliers ? ` below ${show(fenceLow)}` : ''}${lowOutliers && highOutliers ? ' and' : ''}${highOutliers ? ` above ${show(fenceHigh)}` : ''}.`,
-        ),
-        { className: 'chart-scale' },
-      ),
-    );
+    const legend = Object.assign(document.createElement('div'), { className: 'chart-scale' });
+    const mark = Object.assign(document.createElement('span'), { textContent: '┃' });
+    mark.style.color = 'var(--vscode-editorWarning-foreground, #cca700)';
+    legend.append(mark, ' outlier limit · 1.5 × IQR');
+    wrapper.appendChild(legend);
   }
   return wrapper;
 }

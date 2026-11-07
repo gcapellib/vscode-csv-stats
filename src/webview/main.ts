@@ -11,7 +11,7 @@ import { setCustomThemes, themeById, type CsvTheme } from '../core/themes';
 import { type ColumnStats } from '../core/stats';
 import { vscode } from './vscode-api';
 import { elements } from './dom';
-import { state } from './state';
+import { palette, state } from './state';
 import { floating, positionFloating } from './floating-setup';
 import { paint } from './paint';
 import { resolvePrompt } from './prompt';
@@ -162,7 +162,7 @@ document.addEventListener('contextmenu', (event) => {
     const rowIndex = Number((gutter.parentElement as HTMLElement).dataset.row);
     if (!state.selected.has(rowIndex)) select(rowIndex, 0, false);
     const rows = state.selected.size;
-    showCopyMenu(rows === 1 ? 'Copy row' : `Copy ${rows} rows`, selectedRowsText(), event, gutter as HTMLElement);
+    showCopyMenu(rows === 1 ? 'Copy row' : `Copy ${rows} rows`, selectedRowsText(), event, gutter as HTMLElement, null);
     return;
   }
   const target = (event.target as HTMLElement).closest('.cell, .stat, .value, .head-name');
@@ -176,11 +176,14 @@ document.addEventListener('contextmenu', (event) => {
     selection.removeAllRanges();
     selection.addRange(range);
   }
-  showCopyMenu('Copy', selection.toString(), event, target as HTMLElement);
+  // La couleur du menu est celle de la colonne visée, pas celle du dernier menu ouvert.
+  const owner = target.closest<HTMLElement>('[data-column]')?.dataset.column;
+  showCopyMenu('Copy', selection.toString(), event, target as HTMLElement, owner === undefined ? null : Number(owner));
 });
 
-function showCopyMenu(label: string, text: string, event: MouseEvent, anchor: HTMLElement): void {
+function showCopyMenu(label: string, text: string, event: MouseEvent, anchor: HTMLElement, column: number | null): void {
   elements.menu.textContent = '';
+  elements.menu.style.borderTopColor = column === null ? '' : palette(column).accent;
   const item = document.createElement('button');
   item.className = 'menu-item';
   item.textContent = label;

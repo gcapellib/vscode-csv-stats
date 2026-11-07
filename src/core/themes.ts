@@ -23,7 +23,6 @@ export interface Style {
 const PASTEL: Style = { cellSaturation: 0.13, cellBrightness: 0.99, cellSaturationDark: 0.4, cellBrightnessDark: 0.22, accentSaturation: 0.68, accentBrightness: 0.62, accentBrightnessDark: 0.78 };
 const VIVID: Style = { cellSaturation: 0.24, cellBrightness: 1.0, cellSaturationDark: 0.55, cellBrightnessDark: 0.26, accentSaturation: 0.85, accentBrightness: 0.66, accentBrightnessDark: 0.84 };
 const MUTED: Style = { cellSaturation: 0.1, cellBrightness: 0.97, cellSaturationDark: 0.28, cellBrightnessDark: 0.24, accentSaturation: 0.45, accentBrightness: 0.54, accentBrightnessDark: 0.7 };
-const WASHED: Style = { cellSaturation: 0.07, cellBrightness: 1.0, cellSaturationDark: 0.2, cellBrightnessDark: 0.28, accentSaturation: 0.34, accentBrightness: 0.58, accentBrightnessDark: 0.72 };
 
 
 export interface CsvTheme {
@@ -38,12 +37,14 @@ export interface CsvTheme {
   /**
    * Encres données une à une plutôt que dérivées d'une teinte.
    *
-   * Indispensable pour les palettes scientifiques : Okabe-Ito distingue son
-   * bleu ciel de son bleu par la clarté, pas par la teinte — deux couleurs de
-   * même teinte, que ce modèle réduirait sinon à une seule. C'est précisément
-   * cet écart de clarté qui les rend discernables par un œil daltonien.
+   * Nécessaire pour les palettes écrites couleur par couleur, dont les teintes
+   * ne se déduisent pas d'une règle.
    */
   inks?: { light: string[]; dark: string[] };
+  /** Les encres forment un dégradé : au-delà de la dernière, on revient en arrière (voir pingPong). */
+  gradient?: boolean;
+  /** Sans traits de séparation entre les cellules et les colonnes : seules les couleurs les distinguent. */
+  seamless?: boolean;
   /** Amplitude de la rampe de luminosité sur l'ensemble des teintes. */
   spread: number;
   /**
@@ -89,6 +90,12 @@ export interface Sample {
    * première d'un pas ordinaire.
    */
   loop?: boolean;
+  /**
+   * Fond voilé : chaque cellule garde le fond du tableau, teinté de la couleur de
+   * sa colonne à cette force (0,05 à 0,16) ; le texte reste de cette couleur. Un
+   * fond coloré qui n'écrase pas le tableau — à la différence d'un aplat pastel.
+   */
+  veil?: number;
   light: SampleMode;
   dark: SampleMode;
 }
@@ -132,6 +139,30 @@ function explicit(
   };
 }
 
+/**
+ * Les encres d'une palette pensée pour un fond sombre, refaites pour un fond clair.
+ *
+ * Assombrir un or ou un orange donne un brun, un vert-jaune un olive — ce que le
+ * plugin ne montre jamais. Un dégradé (ton sur ton) est donc déplacé en bloc dans la
+ * zone lisible, comme les tirages (voir lightHues) ; une palette de couleurs franches
+ * replie ses seules teintes orange, jaune et vert-jaune vers le corail et le vert.
+ */
+function onLight(dark: string[], gradient: boolean): string[] {
+  const points = dark.map((hex) => {
+    const [l, a, b] = toOklab(hex);
+    return { l, c: Math.hypot(a, b), h: ((Math.atan2(b, a) * 180) / Math.PI + 360) % 360 };
+  });
+  const hues = gradient ? lightHues(points) : points.map((point) => (point.h >= 30 && point.h < 110 ? 22 : point.h >= 110 && point.h < 145 ? 150 : point.h));
+  return points.map((point, i) =>
+    clean({ l: gradient ? 0.56 - (0.12 * i) / Math.max(1, points.length - 1) : 0.5, c: Math.max(point.c * 1.15, 0.1), h: hues[i] }, false),
+  );
+}
+
+/** Palette pensée pour un fond sombre ; ses encres claires s'en déduisent. */
+function ink(id: string, label: string, dark: string[], gradient = false): CsvTheme {
+  return { ...explicit(id, label, onLight(dark, gradient), dark, '#FBFBFC', '#1E1F22'), gradient, seamless: gradient };
+}
+
 /** Teinte d'un « #rrggbb », en degrés — l'inverse partiel de hsb(). */
 export function hueOf(hex: string): number {
   const value = hex.replace('#', '');
@@ -157,71 +188,40 @@ function duo(id: string, label: string, hues: number[], style: Style, spread = 0
 
 /** Fond coloré, texte d'une seule couleur. */
 const TINTED: CsvTheme[] = [
-  tinted('rainbow', 'Rainbow', [210, 28, 145, 285, 48, 175, 330, 95, 258, 8], PASTEL, '#1B1B1F', '#E8E8EC', 0),
   tinted('ocean', 'Ocean', [200, 186, 212, 174, 222, 164], PASTEL, '#0E2A3A', '#CFE8F5'),
-  tinted('forest', 'Forest', [140, 95, 160, 110, 80, 175], MUTED, '#14301C', '#D3EBD8'),
+  // Forest se montre en duo (fond et texte teintés) : sa version à fond seul a été retirée.
+  duo('forest-duo', 'Forest duo', [140, 95, 160, 110, 80, 175], MUTED),
   tinted('lavender', 'Lavender', [270, 285, 255, 300, 240, 315], PASTEL, '#241A38', '#E4D9F5'),
-  tinted('neon', 'Neon', [300, 180, 120, 60, 330, 200], VIVID, '#14001F', '#F2E4FF'),
   tinted('soft', 'Soft pastel', [340, 200, 150, 50, 270, 20], MUTED, '#2B2B2B', '#E6E6E6'),
   tinted('nordic', 'Nordic', [205, 220, 195, 230, 185, 240], MUTED, '#16222E', '#DCE6F0'),
   tinted('mint', 'Mint', [160, 150, 170, 140, 180, 130], PASTEL, '#0F2B24', '#D6F0E6'),
-  tinted('meadow', 'Meadow', [95, 80, 110, 65, 125, 50], VIVID, '#1B2E0F', '#E0F2CC'),
-  // Teintes reprises de palettes reconnues pour leur confort visuel : tons
-  // terreux sourds, sauge et pastels poudrés (voir CHANGELOG pour les sources).
-  tinted('sage', 'Sage', [95, 150, 75, 175, 120, 200], WASHED, '#1C2620', '#DCE8DE'),
 ];
 
 /** Fond uni, texte coloré par colonne. */
 const INKED: CsvTheme[] = [
   inked('syntax', 'Syntax', [210, 28, 140, 285, 48, 175, 330, 95], '#FCFCFD', '#1E1F22'),
-  inked('console', 'Console', [120, 55, 195, 300, 15, 175, 85, 265], '#F7F7F4', '#14161A'),
-  inked('candy', 'Candy', [320, 275, 190, 345, 240, 160], '#FFF9FC', '#1F1626'),
   inked('jungle', 'Jungle', [135, 95, 165, 75, 150, 110], '#F5FBF5', '#0F2015'),
   inked('steel', 'Steel', [210, 198, 226, 188, 240, 178], '#F6F8FA', '#1A1F26'),
   inked('prism', 'Prism', [0, 45, 90, 135, 180, 225, 270, 315], '#FFFFFF', '#121316'),
-  inked('dawn', 'Dawn', [20, 340, 45, 300, 5, 260], '#FFFAF5', '#241C22'),
   // Cinq palettes qui reprennent l'esprit des thèmes d'éditeur les plus répandus
   // — fond sombre presque neutre, encre franche mais jamais criarde. Les teintes
   // sont rangées pour que deux colonnes voisines s'écartent le plus possible :
   // l'ordre du nuancier d'origine mettait parfois deux oranges côte à côte.
   inked('mocha', 'Mocha', [343, 41, 189, 23, 267, 115, 316, 217], '#EFF1F5', '#1E1E2E'),
-  inked('midnight', 'Midnight', [326, 191, 135, 31, 265, 0, 65], '#FBF7FF', '#282A36'),
   inked('frost', 'Frost', [193, 354, 92, 213, 40, 311, 14], '#ECEFF4', '#2E3440'),
-  inked('solar', 'Solar', [45, 331, 175, 18, 237, 68, 1, 205], '#FDF6E3', '#002B36'),
-  // Palettes conçues pour que des catégories restent distinguables, y compris
-  // par un œil daltonien — c'est exactement le problème d'un tableau dont
-  // chaque colonne porte une couleur.
-  //
-  // Les valeurs publiées sont calibrées pour des marques dans un graphique, pas
-  // pour du texte : le jaune d'Okabe-Ito sur fond blanc donnait un contraste de
-  // 39 pour un seuil de 60. Elles sont donc assombries en mode clair et
-  // éclaircies en mode sombre juste ce qu'il faut pour passer ce seuil, la
-  // teinte restant intacte — c'est elle qui porte la distinction.
-  explicit(
-    'okabe',
-    'Okabe-Ito',
-    ['#E69F00', '#56B4E9', '#009E73', '#D1C73A', '#0072B2', '#D55E00', '#CC79A7'],
-    ['#E6AC29', '#70BEE9', '#1C9E7B', '#F0E661', '#207EB2', '#D57326', '#CC88AE'],
-    '#FCFCFD',
-    '#1E1F22',
-  ),
-  explicit(
-    'tol-bright',
-    'Tol Bright',
-    ['#4477AA', '#EE6677', '#228833', '#CCBB44', '#66CCEE', '#AA3377', '#777777'],
-    ['#5680AA', '#EE7E8C', '#348842', '#CCBE5C', '#7ED2EE', '#AA4880', '#777777'],
-    '#FDFDFC',
-    '#1A1C20',
-  ),
-  inked('ember', 'Ember', [4, 162, 42, 343, 101, 27, 61], '#FBF1C7', '#282828'),
+  // Du ton sur ton : une famille de couleurs qui glisse d'une colonne à l'autre.
+  ink('blue-violet', 'Blue to violet', ['#7FB5E6', '#8EA6EC', '#9D98EE', '#AE8BE8', '#BE80DE'], true),
+  ink('dusk', 'Dusk', ['#E8C168', '#EDA46B', '#EA8A83', '#D77FA6', '#B282C8'], true),
+  ink('woodland', 'Woodland', ['#B5D580', '#8CCB8A', '#6BC4A0', '#5BBBB4', '#5BAFC8'], true),
+  ink('deep-sea', 'Deep sea', ['#7FD3D0', '#74C2D6', '#6BAEDC', '#6C98E0', '#7A84DE'], true),
+  // Deux palettes à couleurs franches, une par colonne.
+  ink('fjord', 'Fjord', ['#8FB8DE', '#9CC9B4', '#D9C08C', '#C5A3D4', '#E0A39A']),
+  ink('bordeaux-gold', 'Bordeaux & gold', ['#E0607E', '#E9B949', '#6FB7E8', '#A98CE6', '#67C59B']),
 ];
 
 /** Fond teinté et texte coloré, tous deux par colonne. */
 const DUO: CsvTheme[] = [
   duo('rainbow-duo', 'Rainbow duo', [210, 28, 145, 285, 48, 175, 330, 95, 258, 8], PASTEL, 0),
-  duo('forest-duo', 'Forest duo', [140, 95, 160, 110, 80, 175], MUTED),
-  duo('mint-duo', 'Mint duo', [160, 150, 170, 140, 180, 130], PASTEL),
-  duo('vineyard-duo', 'Vineyard duo', [330, 280, 350, 120, 300, 20], PASTEL),
   duo('prism-duo', 'Prism duo', [0, 45, 90, 135, 180, 225, 270, 315], PASTEL, 0),
 ];
 
@@ -270,11 +270,9 @@ export function allThemes(): CsvTheme[] {
 }
 
 export function themeById(id: string | undefined): CsvTheme {
-  return allThemes().find((theme) => theme.id === id) ?? DEFAULT_THEME;
+  const wanted = id === 'forest' ? 'forest-duo' : id;
+  return allThemes().find((theme) => theme.id === wanted) ?? DEFAULT_THEME;
 }
-
-/** Les deux familles qu'un tirage peut produire. */
-export type RandomFamily = 'background' | 'text';
 
 /**
  * Les tirages au sort tracent un dégradé : un chemin dans l'espace des
@@ -292,9 +290,10 @@ export type RandomFamily = 'background' | 'text';
  * choisit la forme, le départ, le sens et l'amplitude. Tout se calcule en
  * OKLCH, où une même clarté se perçoit comme telle quelle que soit la teinte.
  */
-type PathKind = 'rise' | 'fade' | 'pastel' | 'diverging' | 'vivid' | 'saturate' | 'citrus' | 'sunny';
+type PathKind = 'rise' | 'fade' | 'pastel' | 'diverging' | 'vivid' | 'saturate' | 'tone';
 const PATH_KINDS: PathKind[] = [
-  'rise', 'rise', 'fade', 'pastel', 'pastel', 'diverging', 'vivid', 'vivid', 'saturate', 'citrus', 'citrus', 'sunny', 'sunny',
+  'rise', 'rise', 'fade', 'pastel', 'pastel', 'diverging', 'vivid', 'vivid', 'saturate',
+  'tone', 'tone', 'tone', 'tone',
 ];
 
 interface Point {
@@ -308,65 +307,6 @@ const MIN_APART = 12;
 
 const NEUTRAL_GROUNDS = { light: '#FBFBFC', dark: '#1E1F22' };
 
-/**
- * Où se tiennent les fonds de cellule : leur clarté est ramenée vers une
- * clarté cible, et leur saturation réduite. À pleine intensité, l'aplat était
- * trop fort (clarté jusqu'à 0,3, saturation 0,17) ; éclairci à mi-chemin vers
- * le blanc, trop lumineux (clarté médiane 0,87). Entre les deux, un ton
- * moyen-clair et sourd.
- */
-const CELL_TONE = { target: 0.72, pull: 0.65, chroma: 0.42 };
-
-/**
- * Clarté minimale d'un fond, selon sa teinte : un jaune ne se lit jaune que
- * très clair, un orange ou un citron vert un peu moins, un bleu à toute
- * clarté. Le plancher suit la teinte en douceur : le long d'un dégradé, il
- * monte et descend sans bond, là où éclaircir une seule couleur, ou rejeter
- * le chemin, privait les tirages de leurs jaunes, oranges et verts.
- */
-const HUE_FLOOR: Array<[number, number]> = [
-  [0, 0], [12, 0], [25, 0.72], [40, 0.75], [60, 0.79], [75, 0.86], [100, 0.88], [120, 0.85], [140, 0.82], [155, 0.74], [170, 0], [360, 0],
-];
-
-function hueFloor(hue: number): number {
-  const h = ((hue % 360) + 360) % 360;
-  for (let i = 1; i < HUE_FLOOR.length; i++) {
-    const [h1, l1] = HUE_FLOOR[i];
-    if (h <= h1) {
-      const [h0, l0] = HUE_FLOOR[i - 1];
-      return l0 + ((l1 - l0) * (h - h0)) / (h1 - h0);
-    }
-  }
-  return 0;
-}
-
-/** Pente maximale imposée autour d'un plancher de clarté, d'une colonne à l'autre. */
-const FLOOR_SLOPE = 0.025;
-
-/**
- * Les points du chemin en fonds de cellule : adoucis, et au-dessus du
- * plancher de leur teinte.
- *
- * Relever un jaune seul faisait une bosse dans le dégradé — sa clarté
- * minimale, 0,88, dépasse de loin celle de fonds ramenés vers 0,76. Ses
- * voisins sont donc relevés eux aussi, de moins en moins à mesure qu'ils
- * s'en éloignent : la bosse devient une colline.
- */
-function paleCells(points: Point[]): string[] {
-  const toned = points.map((point) => ({
-    l: point.l + (CELL_TONE.target - point.l) * CELL_TONE.pull,
-    c: point.c * CELL_TONE.chroma,
-    h: point.h,
-  }));
-  // Ce qu'il faut à chaque point : le plancher de sa teinte, et toutes les
-  // règles contre le brun — un orange terne doit être plus clair qu'un vif.
-  const needs = toned.map((point) => Math.max(0, hueFloor(point.h) - point.l, cleanLightness(point, true) - point.l));
-  return toned.map((point, i) => {
-    const lift = Math.max(...needs.map((need, j) => need - FLOOR_SLOPE * Math.abs(i - j)));
-    return clean({ ...point, l: point.l + Math.max(0, lift) }, true);
-  });
-}
-
 function between(low: number, high: number, random: () => number): number {
   return low + (high - low) * random();
 }
@@ -377,11 +317,10 @@ function sweep(from: number, span: number, t: number): number {
 }
 
 /** Les points d'un chemin, de cinq à sept. */
-function tracePath(kind: PathKind, random: () => number): Point[] {
-  // Le soleil s'en tient à cinq couleurs : pâlis, ses oranges et ses jaunes
-  // sont si proches qu'à sept, deux voisines se confondaient (écart 8 à 10).
-  const count = kind === 'sunny' ? 5 : 5 + Math.floor(random() * 3);
-  const start = random() * 360;
+function tracePath(kind: PathKind, random: () => number, from?: number): Point[] {
+  const count = 5 + Math.floor(random() * 3);
+  // La teinte de départ est imposée quand l'appelant la fixe : voir randomTheme.
+  const start = from ?? random() * 360;
   const direction = random() < 0.5 ? -1 : 1;
   const at = (build: (t: number) => Point) => Array.from({ length: count }, (_, i) => build(i / (count - 1)));
   switch (kind) {
@@ -420,19 +359,13 @@ function tracePath(kind: PathKind, random: () => number): Point[] {
       const span = direction * between(150, 260, random);
       return at((t) => ({ l: 0.6 + 0.18 * Math.sin(Math.PI * t), c: between(0.13, 0.17, random), h: sweep(start, span, t) }));
     }
-    case 'citrus': {
-      // Citron, citron vert, vert tendre : très clair, très frais.
-      const [top, bottom] = [between(0.94, 0.97, random), between(0.76, 0.84, random)];
-      const points = at((t) => ({ l: top + (bottom - top) * t, c: 0.12 + 0.05 * t, h: sweep(between(92, 102, random), between(45, 70, random), t) }));
-      return random() < 0.5 ? points : points.reverse();
-    }
-    case 'sunny': {
-      // Orange, ambre, citron : le soleil, de la fin d'après-midi à midi.
-      // Assez d'amplitude pour rester distinct une fois pâli : à 50°, avec un
-      // plancher de clarté qui rapproche oranges et jaunes, deux colonnes
-      // voisines se confondaient et le chemin n'était jamais retenu en fond.
-      const points = at((t) => ({ l: 0.8 + 0.16 * t, c: 0.18 - 0.03 * t, h: sweep(between(28, 36, random), between(75, 88, random), t) }));
-      return random() < 0.5 ? points : points.reverse();
+    case 'tone': {
+      // Du ton sur ton : une famille qui glisse sur 100 à 170°, un peu plus
+      // sombre à chaque pas. Assez de chroma pour rester vive, pas assez pour
+      // qu'une colonne l'emporte sur sa voisine — bleu vers violet, or vers rose.
+      const span = direction * between(100, 170, random);
+      const [top, bottom, chroma] = [between(0.84, 0.88, random), between(0.68, 0.74, random), between(0.1, 0.13, random)];
+      return at((t) => ({ l: top + (bottom - top) * t, c: chroma, h: sweep(start, span, t) }));
     }
     case 'saturate': {
       // Une seule famille, du gris pâle à la couleur pleine puis au sombre.
@@ -504,23 +437,62 @@ function apart(first: string, second: string): number {
 }
 
 /**
+ * Les teintes du chemin pour un fond clair : le même dégradé, déplacé en bloc dans
+ * la zone où une encre se lit sans virer au brun ni à l'olive — du vert (150°) au
+ * rouge (30°), en passant par le bleu et le violet. Le déplacement est le plus
+ * petit possible : un chemin déjà dans la zone ne bouge pas, et les pas entre
+ * teintes sont conservés, donc aucun saut. Le repli teinte par teinte qu'on
+ * faisait avant en créait un.
+ */
+function lightHues(points: Point[]): number[] {
+  const unwrapped: number[] = [];
+  points.forEach((point, i) => {
+    if (i === 0) return unwrapped.push(point.h);
+    let value = point.h;
+    const previous = unwrapped[i - 1];
+    while (value - previous > 180) value -= 360;
+    while (previous - value > 180) value += 360;
+    unwrapped.push(value);
+  });
+  const low = Math.min(...unwrapped);
+  const high = Math.max(...unwrapped);
+  const span = high - low;
+  // La zone permise : 150° à 390° (= 30°), soit 240°. Un chemin plus large est resserré.
+  const scale = span > 240 ? 240 / span : 1;
+  const half = (span * scale) / 2;
+  // Le centre du chemin, ramené au représentant de [150, 510) le plus proche du milieu de la zone.
+  let centre = (low + high) / 2;
+  while (centre < 150) centre += 360;
+  while (centre >= 510) centre -= 360;
+  const target = Math.min(390 - half, Math.max(150 + half, centre));
+  const middle = (low + high) / 2;
+  return unwrapped.map((value) => (((target + (value - middle) * scale) % 360) + 360) % 360);
+}
+
+/**
  * La même suite en couleur de texte sur fond neutre : la clarté est ramenée
  * dans une plage lisible, dans le même ordre, si bien que le dégradé demeure.
  */
-function asInk(points: Point[], dark: boolean): string[] {
+function asInk(points: Point[], dark: boolean, hues?: number[]): string[] {
   const lightness = points.map((point) => point.l);
   const [low, high] = [Math.min(...lightness), Math.max(...lightness)];
-  return points.map((point) => {
+  return points.map((point, index) => {
     const t = high > low ? (point.l - low) / (high - low) : 0.5;
     // Une plage large, pour que le dégradé se voie d'une colonne à l'autre.
     const l = dark ? 0.62 + 0.3 * t : 0.34 + 0.28 * t;
     // Sur fond clair, un texte jaune assez clair pour ne pas virer moutarde
     // ne se lirait plus : il glisse vers l'orange ou le vert, ses voisins.
-    const hue = !dark && point.h >= 75 && point.h < 145 ? (point.h < 110 ? 65 : 150) : point.h;
+    const hue = hues ? hues[index] : !dark && point.h >= 75 && point.h < 145 ? (point.h < 110 ? 65 : 150) : point.h;
     // Une encre peu saturée se lit grise, ou kaki dans les teintes chaudes.
     return clean({ l, c: Math.max(point.c, 0.12), h: hue }, false);
   });
 }
+
+/** Part des tirages en dégradé à fond voilé (le reste : fond uni) ; les mélanges gardent leur fond uni. */
+const VEIL_SHARE = 0.6;
+
+/** Part des tirages sans traits de séparation : les autres gardent leurs lignes. */
+const SEAMLESS_SHARE = 0.5;
 
 /** Part des tirages qui empruntent le style d'une palette de la liste. */
 const BLEND_SHARE = 0.5;
@@ -532,36 +504,7 @@ const BLEND_SHARE = 0.5;
 const SPECTRUM_SHARE = 0.3;
 
 /** Les palettes de la liste dont l'arc-en-ciel en texte coloré emprunte le style. */
-const SPECTRUM_BASES = { text: ['prism', 'syntax'], background: ['prism-duo', 'rainbow-duo'] };
-
-/**
- * Un arc-en-ciel en fonds colorés, à la manière de Prism duo.
- *
- * Il ne reprend pas le style de Prism duo : en thème sombre, celui-ci pose
- * chaque teinte sur un fond sombre, et un arc-en-ciel complet contient
- * toujours un jaune et un orange — bruns sur fond sombre, ou, éclaircis,
- * une colonne claire parmi des sombres. Aucun ne passait. Il prend donc les
- * fonds sourds des dégradés, chaque teinte au-dessus de son plancher de
- * clarté, et le texte de sa colonne en alternance.
- */
-function spectrumCells(id: string, label: string, random: () => number): CsvTheme {
-  let hues: number[] = [];
-  let cells: string[] = [];
-  for (let attempt = 0; attempt < 20; attempt++) {
-    hues = spectrumHues(random);
-    cells = paleCells(hues.map((h) => ({ l: 0.84, c: 0.14, h })));
-    const looped = [...cells, cells[0]];
-    if (looped.slice(1).every((cell, i) => apart(looped[i], cell) >= MIN_APART)) break;
-  }
-  const sample: Sample = {
-    source: 'spectrum',
-    tint: true,
-    loop: true,
-    light: { ground: NEUTRAL_GROUNDS.light, colours: cells },
-    dark: { ground: NEUTRAL_GROUNDS.dark, colours: cells },
-  };
-  return { id, label, hues, style: VIVID, spread: 0, spectrum: true, sample };
-}
+const SPECTRUM_BASES = ['prism', 'syntax'];
 
 /**
  * Un arc-en-ciel : six à huit teintes à pas régulier, départ et sens au
@@ -709,10 +652,10 @@ const BLEND_RAMP = 0.24;
  * Okabe-Ito et Tol Bright, dont les encres sont données une à une, ne s'y
  * prêtent pas.
  */
-function blendTheme(family: RandomFamily, id: string, label: string, random: () => number, spectrum = false): CsvTheme | null {
+function blendTheme(id: string, label: string, random: () => number, spectrum = false): CsvTheme | null {
   const bases = spectrum
-    ? THEMES.filter((theme) => SPECTRUM_BASES[family].includes(theme.id))
-    : THEMES.filter((theme) => !theme.inks && (family === 'text' ? theme.neutral : !theme.neutral));
+    ? THEMES.filter((theme) => SPECTRUM_BASES.includes(theme.id))
+    : THEMES.filter((theme) => !theme.inks && theme.neutral);
   for (let attempt = 0; attempt < 30; attempt++) {
     const base = bases[Math.floor(random() * bases.length)];
     const points = spectrum ? [] : tracePath(PATH_KINDS[Math.floor(random() * PATH_KINDS.length)], random);
@@ -775,7 +718,7 @@ function blendTheme(family: RandomFamily, id: string, label: string, random: () 
     );
     if (readable) {
       const loopHues = spectrum ? hues : pingPongHues(points);
-      return { ...base, id, label, hues: loopHues, spread: 0, blend: base.label, frozen, ...(spectrum ? { spectrum: true } : {}) };
+      return { ...base, id, label, hues: loopHues, spread: 0, blend: base.label, frozen, seamless: random() < SEAMLESS_SHARE, ...(spectrum ? { spectrum: true } : {}) };
     }
   }
   return null;
@@ -787,56 +730,85 @@ function blendTheme(family: RandomFamily, id: string, label: string, random: () 
  * retracé, plutôt que livré avec deux colonnes jumelles.
  */
 export function randomTheme(
-  family: RandomFamily,
   id: string,
   label: string,
   random: () => number = Math.random,
 ): CsvTheme {
   const roll = random();
   if (roll < SPECTRUM_SHARE) {
-    const rainbow = blendTheme(family, id, label, random, true);
+    const rainbow = blendTheme(id, label, random, true);
     if (rainbow) return rainbow;
-    if (family === 'background') return spectrumCells(id, label, random);
   } else if (roll < SPECTRUM_SHARE + (1 - SPECTRUM_SHARE) * BLEND_SHARE) {
-    const blended = blendTheme(family, id, label, random);
+    const blended = blendTheme(id, label, random);
     if (blended) return blended;
   }
-  const tint = family === 'background';
   let kind: PathKind = 'rise';
   let light: string[] = [];
   let darkColours: string[] = [];
-  // Le soleil et les agrumes ne se prêtent pas au texte coloré : leurs jaunes
-  // et leurs citrons verts, éclaircis ou décalés pour ne pas virer moutarde
-  // ou olive, finissaient par se ressembler — deux colonnes voisines
-  // indiscernables (mesuré : 1 agrume sur 400 passait). Ils restent aux fonds.
-  const TEXT_UNFIT: PathKind[] = ['sunny', 'citrus'];
-  const kinds = tint ? PATH_KINDS : PATH_KINDS.filter((candidate) => !TEXT_UNFIT.includes(candidate));
+  // Une part des tirages colore le fond : un voile de la couleur de chaque colonne,
+  // sur un fond qui prend lui-même une légère teinte au hasard. Les combinaisons :
+  // la forme du chemin, la force du voile, la teinte du fond, les traits.
+  const veiled = random() < VEIL_SHARE;
+  const veil = veiled ? between(0.06, 0.15, random) : undefined;
+  let start = random() * 360;
+  const groundHue = random() * 360;
+  const grounds = veiled
+    ? {
+        light: oklch(between(0.955, 0.985, random), between(0, 0.02, random), groundHue),
+        dark: oklch(between(0.19, 0.27, random), between(0, 0.025, random), groundHue),
+      }
+    : NEUTRAL_GROUNDS;
   for (let attempt = 0; attempt < 40; attempt++) {
-    kind = kinds[Math.floor(random() * kinds.length)];
-    const points = tracePath(kind, random);
-    light = tint ? paleCells(points) : asInk(points, false);
-    darkColours = tint ? light : asInk(points, true);
+    // La teinte de départ se tire d'abord, uniformément, et ne change qu'après
+    // huit échecs : sinon chaque essai en repioche une, les départs chauds — que
+    // les règles contre le brun rejettent le plus — s'éliminent, et les tirages
+    // finissent presque tous en bleu, cyan, rose et violet.
+    if (attempt % 8 === 0) start = random() * 360;
+    kind = PATH_KINDS[Math.floor(random() * PATH_KINDS.length)];
+    const points = tracePath(kind, random, start);
+    if (kind === 'tone') {
+      // Le ton sur ton se construit tel quel : le traitement des encres écrase la
+      // clarté et replie les teintes jaune-vert, ce qui casserait la continuité
+      // du dégradé. Sur fond sombre, la couleur du chemin ; sur fond clair, la
+      // même teinte assombrie, un peu plus à chaque pas.
+      // Le filtre anti-brun reste : un jaune ou un orange sombre n'est jamais montré.
+      const hues = lightHues(points);
+      light = points.map((point, i) => clean({ l: 0.56 - (0.12 * i) / Math.max(1, points.length - 1), c: point.c * 1.1, h: hues[i] }, false));
+      darkColours = points.map((point) => clean(point, false));
+    } else {
+      light = asInk(points, false, lightHues(points));
+      darkColours = asInk(points, true);
+    }
     const steps = [light, darkColours].flatMap((list) => list.slice(1).map((colour, i) => apart(list[i], colour)));
-    // En texte coloré, ce sont les encres elles-mêmes qui doivent se
-    // distinguer nettement d'une colonne à l'autre ; sur fond coloré, le
-    // texte alterne déjà sa clarté.
-    const inks = tint ? [] : [light, darkColours].flatMap((list) => list.slice(1).map((colour, i) => perceived(list[i], colour)));
+    // Ce sont les encres elles-mêmes qui doivent se distinguer nettement d'une
+    // colonne à l'autre.
+    const inks = [light, darkColours].flatMap((list) => list.slice(1).map((colour, i) => perceived(list[i], colour)));
     // Une encre doit aussi se lire sur le bandeau, un peu plus contrasté que
     // le fond : Missing, Distinct et le classement y sont écrits.
-    const onBand = tint || [false, true].every((dark) => {
-      const ground = dark ? NEUTRAL_GROUNDS.dark : NEUTRAL_GROUNDS.light;
-      const band = shiftBrightness(ground, dark ? 0.1 : -0.05);
-      return (dark ? darkColours : light).every((ink) => Math.abs(luma(ink) - luma(band)) >= 60);
+    const onBand = [false, true].every((dark) => {
+      const ground = dark ? grounds.dark : grounds.light;
+      return (dark ? darkColours : light).every((ink) => {
+        const band = veil === undefined ? shiftBrightness(ground, dark ? 0.1 : -0.05) : veilBand(ground, ink, veil);
+        return Math.abs(luma(ink) - luma(band)) >= 60;
+      });
     });
-    if (Math.min(...steps) >= MIN_APART && inks.every((gap) => gap >= MIN_TEXT_APART) && onBand) break;
+    // Un dégradé, pas une juxtaposition : aucun pas ne dépasse la moitié du
+    // chemin. Le repli des teintes jaune-vert sur fond clair peut en créer un.
+    const smooth = [light, darkColours].every((list) => {
+      const lab = list.map(toOklab);
+      const gaps = lab.slice(1).map((point, i) => Math.hypot(point[0] - lab[i][0], point[1] - lab[i][1], point[2] - lab[i][2]));
+      return Math.max(...gaps) <= gaps.reduce((sum, gap) => sum + gap, 0) / 2;
+    });
+    if (Math.min(...steps) >= MIN_APART && inks.every((gap) => gap >= MIN_TEXT_APART) && onBand && smooth) break;
   }
   const sample: Sample = {
     source: kind,
-    tint,
-    light: { ground: NEUTRAL_GROUNDS.light, colours: light },
-    dark: { ground: NEUTRAL_GROUNDS.dark, colours: darkColours },
+    tint: false,
+    ...(veil === undefined ? {} : { veil }),
+    light: { ground: grounds.light, colours: light },
+    dark: { ground: grounds.dark, colours: darkColours },
   };
-  return { id, label, hues: darkColours.map(hueOf), style: VIVID, spread: 0, sample };
+  return { id, label, hues: darkColours.map(hueOf), style: VIVID, spread: 0, sample, seamless: random() < SEAMLESS_SHARE };
 }
 
 /** Rang de la couleur d'une colonne : le dégradé, puis le chemin inverse. */
@@ -848,10 +820,37 @@ function pingPong(column: number, count: number): number {
 }
 
 
+/** Un mélange de deux couleurs « #rrggbb » : `amount` de la seconde dans la première. */
+function mixHex(first: string, second: string, amount: number): string {
+  const channel = (at: number) => parseInt(first.slice(at, at + 2), 16) * (1 - amount) + parseInt(second.slice(at, at + 2), 16) * amount;
+  return quietWarm(toHex(channel(1) / 255, channel(3) / 255, channel(5) / 255));
+}
+
+/**
+ * Un fond sombre teinté de rouge, d'orange, de jaune ou de vert-jaune vire au
+ * brun ou à l'olive : pour ces teintes, la teinte du voile reste à peine
+ * perceptible (chroma sous 0,014) — le fond reste gris, jamais brun.
+ */
+function quietWarm(hex: string): string {
+  const [l, a, b] = toOklab(hex);
+  const chroma = Math.hypot(a, b);
+  const hue = ((Math.atan2(b, a) * 180) / Math.PI + 360) % 360;
+  if (l >= 0.86 || chroma <= 0.0135 || hue > 145) return hex;
+  return oklch(l, 0.0135, hue);
+}
+
+/** Le bandeau d'une colonne voilée : le même voile, un peu plus marqué. */
+function veilBand(ground: string, colour: string, veil: number): string {
+  return mixHex(ground, colour, Math.min(0.3, veil * 1.7));
+}
+
 /** Couleurs d'une colonne pour une palette tirée. */
 function samplePalette(sample: Sample, column: number, dark: boolean): Palette {
   const mode = dark ? sample.dark : sample.light;
   const colour = mode.colours[sample.loop ? column % mode.colours.length : pingPong(column, mode.colours.length)];
+  if (sample.veil !== undefined) {
+    return { cell: mixHex(mode.ground, colour, sample.veil), band: veilBand(mode.ground, colour, sample.veil), accent: colour, text: colour };
+  }
   if (!sample.tint) {
     return { cell: mode.ground, band: shiftBrightness(mode.ground, dark ? 0.1 : -0.05), accent: colour, text: colour };
   }
@@ -899,7 +898,7 @@ export function paletteFor(theme: CsvTheme, column: number, dark: boolean): Pale
     const uniform = dark ? theme.neutral.dark : theme.neutral.light;
     if (theme.inks) {
       const list = dark ? theme.inks.dark : theme.inks.light;
-      const ink = list[column % list.length];
+      const ink = list[theme.gradient ? pingPong(column, list.length) : column % list.length];
       return {
         cell: uniform,
         band: shiftBrightness(uniform, dark ? 0.1 : -0.05),
@@ -957,6 +956,27 @@ export function gradientFor(theme: CsvTheme, dark: boolean, alpha = 0.3): string
   if (stops.length === 1) return `linear-gradient(90deg, ${stops[0]}, ${stops[0]})`;
   const steps = stops.map((colour, index) => `${colour} ${Math.round((index / (stops.length - 1)) * 100)}%`);
   return `linear-gradient(90deg, ${steps.join(', ')})`;
+}
+
+/**
+ * La couleur la plus sobre de la palette : la teinte de son accent le moins
+ * saturé, adoucie.
+ * C'est celle des menus et panneaux qui parlent du fichier entier (Clean,
+ * Dataset, la palette) : une couleur du thème choisi, sans tirer l'œil vers une
+ * colonne plutôt qu'une autre.
+ */
+export function neutralAccent(theme: CsvTheme, dark: boolean): string {
+  const size = theme.frozen ? (dark ? theme.frozen.dark : theme.frozen.light).length : theme.hues.length;
+  let best: [number, number, number] = toOklab(paletteFor(theme, 0, dark).accent);
+  for (let index = 1; index < Math.max(1, size); index++) {
+    const lab = toOklab(paletteFor(theme, index, dark).accent);
+    if (Math.hypot(lab[1], lab[2]) < Math.hypot(best[1], best[2])) best = lab;
+  }
+  // La même teinte, à la même clarté — donc aussi lisible —, mais adoucie : une
+  // palette dont tous les accents sont vifs donne quand même une couleur sobre.
+  const [lightness, a, b] = best;
+  const hue = (Math.atan2(b, a) * 180) / Math.PI;
+  return oklch(lightness, Math.hypot(a, b) * 0.4, (hue + 360) % 360);
 }
 
 // ------------------------------------------------------------------ OKLCH

@@ -1,3 +1,4 @@
+import { similarValues } from '../../core/insights';
 import { describeEffect, describeStep, type Step } from '../../core/steps';
 import { isMeasurable } from '../../core/types';
 import { closePicker, setOpenPanel } from '../actions';
@@ -6,6 +7,8 @@ import { COLUMN_TYPES, TYPE_LABELS } from '../constants';
 import { elements, textSpan } from '../dom';
 import { floating, positionFloating } from '../floating-setup';
 import { palette, state } from '../state';
+import { allValueCounts, valuesFilter } from '../table';
+import { findingRow } from './details-extras';
 import { footer, panelTitle, sectionTitle, tintPanel } from './shared';
 
 /**
@@ -16,7 +19,7 @@ import { footer, panelTitle, sectionTitle, tintPanel } from './shared';
  * lignes vides). Les étapes se lisent dans l'ordre où elles se rejouent sur
  * l'original, chacune avec ce qu'elle a touché, et se retirent d'un clic.
  */
-export function openClean(anchor: HTMLElement): void {
+export function openClean(anchor: HTMLElement, only: number | null = null): void {
   const panel = elements.picker;
   panel.textContent = '';
   panel.classList.add('wide');
@@ -42,14 +45,14 @@ export function openClean(anchor: HTMLElement): void {
     remove.title = 'Remove this step: the steps after it replay without it';
     remove.addEventListener('click', () => {
       removeStep(position);
-      openClean(anchor);
+      openClean(anchor, only);
     });
     row.appendChild(remove);
     list.appendChild(row);
   });
   if (state.steps.length === 0) {
     list.appendChild(
-      Object.assign(textSpan('No steps yet. Use the broom on a column header, or the catalogue below.'), { className: 'picker-note' }),
+      Object.assign(textSpan('No steps yet. Right-click a column header, or use the catalogue below.'), { className: 'picker-note' }),
     );
   }
   panel.appendChild(list);
@@ -58,8 +61,25 @@ export function openClean(anchor: HTMLElement): void {
   // qu'on la voie arriver dans la liste avec ce qu'elle a touché.
   const then = (action: () => void | Promise<void>) => async () => {
     await action();
-    openClean(anchor);
+    openClean(anchor, only);
   };
+
+  // Les graphies d'une même valeur (`Lyon`, `Lyons`) : un nettoyage qu'on propose, pas qu'on devine.
+  const similar = similarSpellings(only).slice(0, 8);
+  if (similar.length > 0) {
+    panel.appendChild(sectionTitle(only === null ? 'Similar spellings' : `Similar spellings · ${state.stats[only]?.name ?? ''}`));
+    for (const { column, group } of similar) {
+      const variants = group.variants.map((variant) => `${variant.value.trim()} ×${variant.count}`);
+      const shown = variants.slice(0, 3).join(', ') + (variants.length > 3 ? ` +${variants.length - 3}` : '');
+      const target = group.canonical.trim();
+      const step: Step = { kind: 'merge', column, from: group.variants.map((variant) => variant.value), to: target };
+      panel.appendChild(
+        findingRow(`${state.stats[column]?.name}: ${target} ← ${shown}`, valuesFilter(column, [group.canonical, ...group.variants.map((variant) => variant.value)]), column, [
+          [`Merge into ${target}`, then(() => addStep(step))],
+        ]),
+      );
+    }
+  }
 
   panel.appendChild(sectionTitle('Rows'));
   panel.appendChild(
@@ -120,6 +140,19 @@ export function openClean(anchor: HTMLElement): void {
   positionFloating(panel, anchor);
   setOpenPanel('clean');
   elements.cleanButton.classList.add('active');
+}
+
+/** Les graphies proches de toutes les colonnes de texte, les plus touchées d'abord. */
+function similarSpellings(only: number | null) {
+  const found: Array<{ column: number; group: ReturnType<typeof similarValues>[number] }> = [];
+  for (const index of state.order) {
+    if (only !== null && index !== only) continue;
+    const stats = state.stats[index];
+    if (!stats || stats.type !== 'text' || stats.temporal || stats.distinct < 2 || stats.distinct > 2500) continue;
+    for (const group of similarValues(allValueCounts(index))) found.push({ column: index, group });
+  }
+  const weight = (entry: (typeof found)[number]) => entry.group.variants.reduce((sum, variant) => sum + variant.count, 0);
+  return found.sort((left, right) => weight(right) - weight(left));
 }
 
 type ButtonSpec = [string, () => void, (() => boolean)?];

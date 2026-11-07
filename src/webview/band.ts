@@ -25,6 +25,7 @@ export function bandCell(modelIndex: number): HTMLElement {
   const column = state.stats[modelIndex];
   const colours = palette(modelIndex);
   const cell = document.createElement('div');
+  cell.dataset.column = String(modelIndex);
   cell.className = 'band-cell';
   cell.style.width = `${state.widths[modelIndex]}px`;
   cell.style.background = colours.band;

@@ -128,6 +128,36 @@ legible. Free text gets neither — every value occurring once ranks nothing —
 the distribution of its **lengths**, which is what reveals fields truncated at
 fifty characters and padding spaces.
 
+**Placeholder values.** A value that stands in for a missing one — `-999`, `9999`,
+`1900-01-01` — is flagged at the top of the panel, with *Treat as empty* beside it. A
+number counts as one if it falls outside the rest of the column (beyond 1.5 × IQR) and
+repeats, three times at least, or twice for the usual suspects. The statistics are shown
+again without it. Past about a quarter of the rows the placeholder drags the quartiles
+with it and is no longer caught.
+
+**The column in row order.** A curve of the values from the first row displayed to the
+last, outliers as yellow dots, empty cells as red marks on the axis, and a dashed line
+where the level changes — a sensor that shifts, a batch that differs. The axis gives the
+line numbers of the file, those of the table's margin; the outliers and empty cells in the
+legend are buttons that filter the table on them.
+
+**By category.** For a measure, the average per category — the weight of an egg by
+colour — with the share of the variation the category explains. The column that explains
+most is proposed, a menu offers the others, and a click on a bar filters the table.
+
+**Gaps in a series.** An identifier or a date series with a regular step lists where
+values are missing and how many. **Repeated values** in an almost-unique column offer
+*Keep the first of each*, which removes the rows that repeat it. **Garbled characters**
+(`CafÃ©`, UTF-8 read as Windows-1252) are fixed in one click.
+
+**Similar spellings** — `Lyon`, `Lyons`, `lyon ` — are merged from the column's menu, or
+all at once from *Clean*, into the most frequent spelling. Words of four letters or more
+may differ by one letter; a short word only by case or accents.
+
+**Advice for pandas**, never applied for you: `Int64` for integers with empty cells, a
+narrower integer or `float32`, `category` — only when it matters. *Dataset…* adds the
+**related columns**, the pairs of numeric columns that move together.
+
 **What pandas would make of the column**, and what stands in the way: `int64`,
 `float64` or `object`, with notes such as *leading zeros are lost unless dtype is
 "string"* or *would be numeric if NULL, - counted as missing*.
@@ -152,8 +182,8 @@ worry.
 ## Column menu and cleaning
 
 Each band has a **chart** button at its top right: it opens *Column details*.
-Each column header has a **broom**, next to filter and sort — right-clicking the
-header opens the same menu. The broom is for acting on the column: text (trim,
+Each column header has a **sparkle icon**, next to filter and sort — right-clicking the
+header opens the same menu. The sparkle icon is for acting on the column: text (trim,
 invisible characters, case), values (replace, treat as empty, fill down), type,
 rename, remove. The **Clean** button in the toolbar holds the full catalogue,
 including what concerns no single column (duplicate and blank rows), and the
@@ -164,7 +194,7 @@ at it — filters, sort, widths, palette — is not. The original file is kept i
 memory exactly as read and never written; the steps replay on it after every
 change, like Power Query's *Applied steps*. Removing a step replays the list
 without it. Each step says what it touched (*20 cells*, *−3 rows*), a column with
-steps lights its broom in its accent colour, and every changed cell is
+steps lights its sparkle icon in its accent colour, and every changed cell is
 underlined — hover it to read the value it had in the file.
 
 **Save cleaned copy…** writes the cleaned table (all rows, not just the filtered
@@ -226,61 +256,34 @@ Until you click, nothing is decided: the toolbar button and the tick still name
 your current palette, and leaving the picker any way at all — a click elsewhere,
 Escape, the button again — puts it back.
 
-A picker offers **twenty-nine palettes** in three families: coloured background
-with uniform text, uniform background with text coloured per column the way
-syntax highlighting does, and both at once. Your choice is remembered from one
-session to the next.
+A picker offers **twenty palettes**: coloured background with uniform text,
+uniform background with text coloured per column the way syntax highlighting does,
+and both at once. Your choice is remembered from one session to the next.
 
-Two of them — **Okabe-Ito** and **Tol Bright** — come from palettes designed so
-that categories stay distinguishable, including for a colour-blind reader. That is exactly the problem a table with one colour per
-column has. Their colours are given one by one rather than derived from a hue:
-Okabe-Ito tells its sky blue from its blue by lightness, not by hue, and a
-hue-derived model would collapse the two. The published values are calibrated
-for marks in a chart rather than for text — its yellow on white reads at a
-contrast of 39 against a threshold of 60 — so they are darkened in light mode
-and lightened in dark mode by just what it takes, the hues left untouched.
+**Random palette**, at the foot of the list, draws a new one on every click:
+coloured text, on a plain background or on one veiled with each column's colour (a light tint, about one draw in five), with or without grid lines between cells and columns (about half each).
+It applies at once without closing the picker, so you can keep drawing until one
+suits; **Keep** then adds it to your own list, which survives restarts. Drawn
+palettes and kept ones both carry a cross; the ones shipped with the extension do
+not, and cannot be removed.
 
-**Random palette**, at the foot of the list, draws a new one on every click,
-alternating coloured background and coloured text. It applies at once without
-closing the picker, so you can keep drawing until one suits; **Keep** then adds
-it to your own list, which survives restarts. Drawn palettes and kept ones both
-carry a cross; the ones shipped with the extension do not, and cannot be
-removed.
+A draw traces a **gradient**: a path through colour space where lightness and hue
+move together, step by step — cream, mint, sea green; indigo, lavender, pink. Seven
+shapes of path: dark to light, light to medium, a pastel walk, two ramps meeting in a
+light centre, a vivid walk, a rise in saturation, and **tone on tone**, one family of
+colour gliding over 100 to 170° and a little darker at each step. As it lightens a
+colour drifts warm, as it darkens it drifts cool — what illustrators call hue
+shifting. A path with a jump in it is drawn again.
 
-A draw traces a **gradient**: a path through colour space where lightness and
-hue move together, step by step — cream, mint, sea green; indigo, lavender,
-pink; navy, red, amber, beige. Eight shapes of path, mostly taken from thirteen
-palettes judged harmonious: dark to light, light to medium, a pastel walk, two
-ramps meeting in a light centre, a vivid walk, a rise in saturation, citrus
-(lemon, lime, fresh green) and sunshine (orange, amber, lemon). As it lightens
-a colour drifts warm, as it darkens it drifts cool — what illustrators call hue
-shifting. Earlier versions did the opposite, holding every column at the same
-lightness and jumping from hue to hue: colours side by side, never a gradient.
-
-About a third of the draws are full rainbows in the manner of Prism and Prism
-duo — six to eight hues at even steps around the wheel, from a random start.
-Many of the others blend the two worlds: a palette from the list keeps its style —
-its ground, its ink, its saturation — and takes the hues of a random gradient.
-Its colours are worked out once and repaired rather than discarded: any that
-would turn brown is lightened, and coloured backgrounds get a gentle lightness
-ramp along the gradient so neighbouring columns stay apart.
+About a third of the draws are full rainbows in the manner of Prism — six to eight
+hues at even steps around the wheel, from a random start. Many of the others take the
+style of a palette from the list — its ground and its ink — and the hues of a random
+gradient. Brown never appears, nor its relatives: ochre, tan, terracotta, khaki,
+mustard, olive and burgundy; a colour that would turn brown is lightened. Two hundred
+draws are put through the same thresholds as the shipped palettes.
 
 When the columns outnumber the colours, the table walks the gradient back
 (a b c d e d c b a…) instead of jumping from its last colour to its first.
-Coloured background and coloured text still alternate. Background colours are
-drawn towards a muted mid-light tone with reduced saturation, so a large area
-stays gentle without glaring, and the text takes each
-column's hue in a deep shade, so the gradient reads in the text too — near-black
-on yellows and oranges, where a deep shade of their own hue would be brown. Or
-the gradient colours the text itself, on a plain ground, across a wide enough
-range of lightness to be seen from one column to the next.
-
-Brown never appears, nor its relatives: ochre, tan, taupe, terracotta, khaki,
-mustard, olive and burgundy. They are not only a matter of darkness — a yellow
-reads yellow only when very light, a dull orange reads tan even when fairly
-light — so each hue has a minimum lightness, which rises and falls smoothly
-along a gradient instead of rejecting yellows, oranges and greens. Two hundred draws are put through the same thresholds as the
-shipped palettes, and must show every path shape in both families.
 
 ## How files are read
 

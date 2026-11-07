@@ -8,7 +8,7 @@
  */
 import { type ColumnDetails } from '../../core/details';
 import { type Filter } from '../../core/filters';
-import { count, percent } from '../../core/format';
+import { count, num, percent } from '../../core/format';
 import { type ColumnStats } from '../../core/stats';
 import { type Step } from '../../core/steps';
 import { parseTemporal } from '../../core/temporal';
@@ -20,7 +20,7 @@ import { palette, state } from '../state';
 import { setColumnFilter, valuesFilter } from '../table';
 import { finding } from './dataset';
 import { barChart } from './column-details';
-import { sectionTitle } from './shared';
+import { addRow, grid, sectionTitle } from './shared';
 
 type Action = [string, () => void];
 
@@ -58,7 +58,7 @@ const KIND_TYPE = { number: 'numeric', date: 'date', time: 'time' } as const;
  * date, sa répartition dans le temps. `reopen` rouvre le panneau après une étape,
  * pour qu'on en voie l'effet.
  */
-export function detailsExtras(column: ColumnStats, details: ColumnDetails, reopen: () => void): HTMLElement[] {
+export function detailsExtras(column: ColumnStats, details: ColumnDetails, reopen: () => void, outliersShown = false): HTMLElement[] {
   const index = column.index;
   const name = column.name;
   const parts: HTMLElement[] = [];
@@ -98,7 +98,8 @@ export function detailsExtras(column: ColumnStats, details: ColumnDetails, reope
   }
 
   // 2. Les outliers, au-delà de 1,5 écart interquartile : un clic les montre.
-  if (column.outliers > 0 && column.q1 !== null && column.q3 !== null) {
+  // Sauf si la courbe par ligne les porte déjà dans sa légende, cliquable.
+  if (!outliersShown && column.outliers > 0 && column.q1 !== null && column.q3 !== null) {
     const spread = column.q3 - column.q1;
     const low = column.q1 - 1.5 * spread;
     const high = column.q3 + 1.5 * spread;
@@ -130,7 +131,93 @@ export function detailsExtras(column: ColumnStats, details: ColumnDetails, reope
 
   // 4. Une date se lit aussi par année, mois, jour de la semaine et heure.
   if (column.temporal) parts.push(...timeBreakdown(column));
+
+  // 5. Les accents mal décodés : du texte à corriger.
+  if (details.garbled.length > 0) {
+    const total = details.garbled.reduce((sum, entry) => sum + entry.count, 0);
+    const example = details.garbled[0];
+    parts.push(sectionTitle('Garbled characters'));
+    parts.push(
+      findingRow(`${count(total)} values · ${example.value} → ${example.fixed}`, valuesFilter(index, details.garbled.map((entry) => entry.value)), index, [
+        ['Fix them', step({ kind: 'fixEncoding', column: index })],
+      ]),
+    );
+  }
+
+  // 6. Les trous d'une suite régulière : un chargement incomplet se voit ici.
+  if (details.gaps) {
+    const { gaps, every, missing, step: size } = details.gaps;
+    parts.push(sectionTitle('Gaps in the series'));
+    parts.push(
+      Object.assign(textSpan(`${count(missing)} missing, in ${count(gaps.length)} gap${gaps.length === 1 ? '' : 's'} · ${every ? `one per ${every}` : `step of ${count(size)}`}`), {
+        className: 'picker-note',
+      }),
+    );
+    const list = grid();
+    for (const gap of gaps.slice(0, 5)) addRow(list, `${gap.after} → ${gap.before}`, `${count(gap.missing)} missing`);
+    parts.push(list);
+    if (gaps.length > 5) parts.push(Object.assign(textSpan(`and ${count(gaps.length - 5)} more`), { className: 'picker-note' }));
+  }
+
+  // 7. Une colonne presque unique dont quelques valeurs se répètent : une clé qui s'ignore.
+  if (details.repeats) {
+    const { values, rows, distinct } = details.repeats;
+    parts.push(sectionTitle('Repeated values'));
+    parts.push(
+      findingRow(
+        `${count(values.length)} value${values.length === 1 ? '' : 's'} repeat${values.length === 1 ? 's' : ''}, on ${count(rows)} rows (${count(distinct)} distinct in all)`,
+        valuesFilter(index, values),
+        index,
+        [['Keep the first of each', step({ kind: 'removeDuplicates', columns: [index] })]],
+      ),
+    );
+  }
+
+  // 8. Ce que pandas gagnerait à lire autrement : des conseils, jamais appliqués d'office.
+  if (details.hints.length > 0) {
+    parts.push(sectionTitle('In pandas'));
+    for (const hint of details.hints) parts.push(Object.assign(textSpan(hint), { className: 'picker-note' }));
+  }
   return parts;
+}
+
+/**
+ * Les valeurs qui tiennent la place d'une absence : en tête du panneau, parce
+ * qu'elles faussent tout ce qui suit (moyenne, histogramme, corrélations).
+ */
+export function placeholderSection(column: ColumnStats, details: ColumnDetails, reopen: () => void): HTMLElement[] {
+  if (details.placeholders.length === 0) return [];
+  const index = column.index;
+  const parts: HTMLElement[] = [sectionTitle('Looks like missing values')];
+  for (const entry of details.placeholders) {
+    const share = percent(column.total === 0 ? 0 : entry.count / column.total);
+    parts.push(
+      findingRow(`${entry.value} ×${count(entry.count)} · ${share} of the rows`, valuesFilter(index, entry.raws), index, [
+        [
+          `Treat ${entry.value} as empty`,
+          () => {
+            addStep({ kind: 'empty', column: index, tokens: entry.tokens });
+            reopen();
+          },
+        ],
+      ]),
+    );
+  }
+  const note = column.temporal ? 'A filler date, often written where a date is missing.' : 'Far from the other values and repeated: often written where a measure is missing.';
+  parts.push(Object.assign(textSpan(note), { className: 'picker-note' }));
+  return parts;
+}
+
+/** « Sans −999 : min 12.9 · moyenne 49.1 · écart-type 8.4 », sous les statistiques. */
+export function withoutNote(column: ColumnStats, details: ColumnDetails): HTMLElement | null {
+  const summary = details.withoutPlaceholders;
+  if (!summary) return null;
+  const show = (value: number) => formatValue(column, value);
+  const list = details.placeholders.map((entry) => entry.value).join(', ');
+  return Object.assign(
+    textSpan(`Without ${list}: min ${show(summary.min)} · max ${show(summary.max)} · mean ${show(summary.mean)} · std ${num(summary.deviation)}`),
+    { className: 'picker-note' },
+  );
 }
 
 /** Les boutons d'étapes, sous les constats qu'ils corrigent. */

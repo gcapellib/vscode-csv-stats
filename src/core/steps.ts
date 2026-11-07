@@ -14,6 +14,7 @@
  * Les colonnes sont désignées par leur index dans le fichier : un renommage ou
  * un retrait ne décale jamais les étapes qui suivent.
  */
+import { fixMojibake } from './insights';
 import { parseTemporal, temporalFormatFor } from './temporal';
 import { parseNumber, type ColumnType } from './types';
 
@@ -28,10 +29,12 @@ export type Step =
   | { kind: 'case'; column: number; mode: CaseMode }
   | { kind: 'replace'; column: number; from: string; to: string }
   | { kind: 'empty'; column: number; tokens: string[] }
+  | { kind: 'merge'; column: number; from: string[]; to: string }
+  | { kind: 'fixEncoding'; column: number }
   | { kind: 'fillDown'; column: number }
   | { kind: 'dropEmpty'; column: number }
   | { kind: 'round'; column: number; digits: number }
-  | { kind: 'removeDuplicates' }
+  | { kind: 'removeDuplicates'; columns?: number[] }
   | { kind: 'removeBlankRows' };
 
 export interface Cleaned {
@@ -75,9 +78,21 @@ function cellTransform(step: Step): ((raw: string) => string) | null {
       const tokens = new Set(step.tokens.map((token) => token.trim()));
       return (raw) => (tokens.has(raw.trim()) ? '' : raw);
     }
+    case 'merge': {
+      const from = new Set(step.from);
+      return (raw) => (from.has(raw) ? step.to : raw);
+    }
+    case 'fixEncoding':
+      return (raw) => fixMojibake(raw) ?? raw;
     default:
       return null;
   }
+}
+
+/** Ce qui fait qu'une ligne en répète une autre : la ligne entière, ou les colonnes choisies. */
+function duplicateKey(row: string[], step: Step): string {
+  const columns = step.kind === 'removeDuplicates' ? step.columns : undefined;
+  return columns ? columns.map((column) => row[column] ?? '').join(ROW_JOIN) : row.join(ROW_JOIN);
 }
 
 export function applySteps(original: string[][], headers: string[], steps: Step[], decimalComma: boolean): Cleaned {
@@ -181,7 +196,7 @@ export function applySteps(original: string[][], headers: string[], steps: Step[
                 ? row.every((cell) => cell.trim() === '')
                 : step.kind === 'dropEmpty'
                   ? (row[step.column] ?? '').trim() === ''
-                  : seen.has(row.join(ROW_JOIN)) || (seen.add(row.join(ROW_JOIN)), false);
+                  : seen.has(duplicateKey(row, step)) || (seen.add(duplicateKey(row, step)), false);
             if (!drop) keep.push(index);
           });
           effect = rows.length - keep.length;
@@ -222,6 +237,10 @@ export function describeStep(step: Step, nameOf: (column: number) => string): st
       return `Replace « ${step.from} » with « ${step.to} » in ${name}`;
     case 'empty':
       return `Treat ${step.tokens.join(', ')} as empty in ${name}`;
+    case 'merge':
+      return `Merge ${step.from.length} spelling${step.from.length === 1 ? '' : 's'} into « ${step.to} » in ${name}`;
+    case 'fixEncoding':
+      return `Fix garbled characters in ${name}`;
     case 'fillDown':
       return `Fill down ${name}`;
     case 'dropEmpty':
@@ -229,7 +248,7 @@ export function describeStep(step: Step, nameOf: (column: number) => string): st
     case 'round':
       return `Round ${name} to ${step.digits} decimal${step.digits === 1 ? '' : 's'}`;
     case 'removeDuplicates':
-      return 'Remove duplicate rows';
+      return step.columns ? `Remove rows repeating ${step.columns.map(nameOf).join(' + ')}` : 'Remove duplicate rows';
     case 'removeBlankRows':
       return 'Remove blank rows';
   }
@@ -286,6 +305,17 @@ export function stepsToPandas(steps: Step[], headers: string[], dayFirst: (colum
       case 'empty':
         lines.push(`${column} = ${column}.replace(${JSON.stringify(step.tokens)}, pd.NA)`);
         break;
+      case 'merge':
+        lines.push(`${column} = ${column}.replace(${JSON.stringify(step.from)}, ${JSON.stringify(step.to)})`);
+        break;
+      case 'fixEncoding':
+        // `.loc` : l'affectation en chaîne `df[col][masque] = …` ne fait plus rien avec
+        // pandas 3 (copy-on-write).
+        lines.push(
+          `_garbled = ${column}.str.contains("Ã|Â|â", na=False)`,
+          `df.loc[_garbled, ${JSON.stringify(names[step.column])}] = ${column}[_garbled].str.encode("cp1252", errors="ignore").str.decode("utf-8", errors="ignore")`,
+        );
+        break;
       case 'fillDown':
         lines.push(`${column} = ${column}.ffill()`);
         break;
@@ -296,7 +326,9 @@ export function stepsToPandas(steps: Step[], headers: string[], dayFirst: (colum
         lines.push(`${column} = ${column}.round(${step.digits})`);
         break;
       case 'removeDuplicates':
-        lines.push('df = df.drop_duplicates()');
+        lines.push(
+          step.columns ? `df = df.drop_duplicates(subset=[${step.columns.map((column) => JSON.stringify(names[column])).join(', ')}])` : 'df = df.drop_duplicates()',
+        );
         break;
       case 'removeBlankRows':
         lines.push('df = df.dropna(how="all")');

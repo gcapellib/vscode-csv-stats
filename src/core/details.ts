@@ -6,6 +6,18 @@
  * coûterait cher pour une information qu'on ne regarde qu'à la demande.
  */
 import type { CsvTable } from './csv';
+import {
+  garbledValues,
+  numericPlaceholders,
+  pandasHints,
+  sequenceGaps,
+  summaryWithout,
+  temporalPlaceholders,
+  type Garbled,
+  type Gaps,
+  type Placeholder,
+  type Summary,
+} from './insights';
 import { parseTemporal, type TemporalFormat } from './temporal';
 import { parseNumber, type ColumnType } from './types';
 
@@ -80,6 +92,21 @@ export interface ColumnDetails {
    * sienne.
    */
   patterns: Array<{ pattern: string; count: number; values: string[] }>;
+  /** Des valeurs qui tiennent la place d'une absence (`-999`), si la colonne en a. */
+  placeholders: Placeholder[];
+  /** Les chiffres de la colonne sans ces valeurs ; null s'il n'y en a pas. */
+  withoutPlaceholders: Summary | null;
+  /** Des valeurs dont les accents sont devenus deux caractères (`CafÃ©`), avec leur correction. */
+  garbled: Garbled[];
+  /** Les trous d'une suite régulière (identifiants, jours) ; null si ce n'en est pas une. */
+  gaps: Gaps | null;
+  /** Ce que pandas gagnerait à lire autrement : type entier, plus petit, catégorie. */
+  hints: string[];
+  /**
+   * Pour une colonne presque unique (un identifiant, une clé) : les valeurs qui
+   * s'y répètent malgré tout, et le nombre de lignes concernées.
+   */
+  repeats: { values: string[]; rows: number; distinct: number } | null;
 }
 
 /**
@@ -189,7 +216,8 @@ export function computeDetails(
     pandasType = temporal.order === 'time' ? 'timedelta64[ns]' : 'datetime64[ns]';
   } else if (type === 'numeric') {
     const anyDecimal = [...counts.keys()].some((raw) => !Number.isInteger(parseNumber(raw, decimalComma) ?? 0.5));
-    pandasType = anyDecimal ? 'float64' : 'int64';
+    // Des entiers et une cellule vide : pandas n'a pas d'entier sans valeur, il lit des flottants.
+    pandasType = anyDecimal || empty + whitespaceOnly > 0 ? 'float64' : 'int64';
   } else if (nullTotal > 0 && present > nullTotal) {
     const restIsNumeric = [...counts.keys()]
       .filter((raw) => !isNullToken(raw))
@@ -238,7 +266,70 @@ export function computeDetails(
       ? []
       : [...byPattern.entries()].map(([pattern, entry]) => ({ pattern, ...entry })).sort((left, right) => right.count - left.count);
 
+  const entries = [...counts.entries()];
+  const reader = (raw: string) => parseNumber(raw, decimalComma);
+  let placeholders: Placeholder[] = [];
+  if (type === 'numeric' && !temporal) placeholders = numericPlaceholders(entries, reader);
+  else if (temporal) placeholders = temporalPlaceholders(entries);
+  const excluded = new Set(placeholders.flatMap((entry) => entry.tokens));
+  const withoutPlaceholders = placeholders.length > 0 && type === 'numeric' && !temporal ? summaryWithout(entries, reader, excluded) : null;
+
+  const garbled = type === 'text' && !temporal ? garbledValues(entries) : [];
+  const gaps = temporal
+    ? sequenceGaps(entries, (raw) => parseTemporal(raw, temporal.order), true)
+    : type === 'numeric'
+      ? sequenceGaps(entries, reader, false)
+      : null;
+
+  let hints: string[] = [];
+  let repeats: ColumnDetails['repeats'] = null;
+  if (!temporal) {
+    let integersOnly = true;
+    let low = Infinity;
+    let high = -Infinity;
+    let digits = 0;
+    if (type === 'numeric') {
+      for (const raw of counts.keys()) {
+        const value = parseNumber(raw, decimalComma);
+        if (value === null) continue;
+        if (!Number.isInteger(value)) integersOnly = false;
+        if (value < low) low = value;
+        if (value > high) high = value;
+        digits = Math.max(digits, raw.replace(/[^0-9]/g, '').replace(/^0+/, '').length);
+      }
+    }
+    hints = pandasHints({
+      kind: type === 'numeric' ? 'numeric' : nullTotal === 0 && !offenderKind ? 'text' : 'other',
+      rows: table.rows.length,
+      present,
+      gaps: empty + whitespaceOnly,
+      distinct: counts.size,
+      integersOnly,
+      min: low,
+      max: high,
+      digits,
+    });
+    // Une colonne presque unique est une clé qui s'ignore : ses répétitions sont l'intérêt.
+    const keyLike = (type !== 'numeric' || integersOnly) && present >= 20 && counts.size >= present * 0.9;
+    if (keyLike) {
+      const repeated = entries.filter(([raw, occurrences]) => occurrences > 1 && !excluded.has(raw.trim()));
+      if (repeated.length > 0) {
+        repeats = {
+          values: repeated.map(([raw]) => raw),
+          rows: repeated.reduce((sum, [, occurrences]) => sum + occurrences, 0),
+          distinct: counts.size,
+        };
+      }
+    }
+  }
+
   return {
+    garbled,
+    gaps,
+    placeholders,
+    withoutPlaceholders,
+    hints,
+    repeats,
     empty,
     whitespaceOnly,
     nullTokens,
@@ -277,7 +368,7 @@ export interface Finding {
   text: string;
   values: string[];
   /** Le genre du constat, pour proposer l'étape qui le corrige. */
-  fix: 'case' | 'trim' | 'empty';
+  fix: 'case' | 'trim' | 'empty' | 'encoding';
 }
 
 export interface DatasetDetails {
@@ -349,6 +440,22 @@ export function computeDataset(table: CsvTable, details: ColumnDetails[]): Datas
         text: `${name}: ${column.spacePadded} values padded with spaces`,
         values: column.spacePaddedValues,
         fix: 'trim',
+      });
+    }
+    if (column.garbled.length > 0) {
+      findings.push({
+        column: index,
+        text: `${name}: ${column.garbled.reduce((sum, entry) => sum + entry.count, 0)} values with garbled characters (${column.garbled[0].value} → ${column.garbled[0].fixed})`,
+        values: column.garbled.map((entry) => entry.value),
+        fix: 'encoding',
+      });
+    }
+    for (const placeholder of column.placeholders) {
+      findings.push({
+        column: index,
+        text: `${name}: ${placeholder.value} ×${placeholder.count} looks like a missing value`,
+        values: placeholder.raws,
+        fix: 'empty',
       });
     }
     if (column.nullTokens.length > 0) {

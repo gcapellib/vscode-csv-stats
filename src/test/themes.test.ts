@@ -33,15 +33,15 @@ function difference(first: string, second: string): number {
 }
 
 describe('palettes', () => {
-  it('en compte vingt-neuf, aux identifiants et libellés uniques', () => {
-    assert.equal(THEMES.length, 29);
-    assert.equal(new Set(THEMES.map((theme) => theme.id)).size, 29);
-    assert.equal(new Set(THEMES.map((theme) => theme.label)).size, 29);
+  it('en compte vingt, aux identifiants et libellés uniques', () => {
+    assert.equal(THEMES.length, 20);
+    assert.equal(new Set(THEMES.map((theme) => theme.id)).size, 20);
+    assert.equal(new Set(THEMES.map((theme) => theme.label)).size, 20);
   });
 
   it('range chaque palette dans une famille et une seule', () => {
-    // Le sélecteur groupe par ces deux champs : une palette qui porterait les
-    // deux, ou aucun des deux par erreur, apparaîtrait deux fois ou pas du tout.
+    // L'aperçu et l'encre se déduisent de ces deux champs : une palette qui
+    // porterait les deux serait dessinée deux fois.
     const familles = { fond: 0, encre: 0, duo: 0 };
     for (const theme of THEMES) {
       if (theme.uniformInk && theme.neutral) assert.fail(`« ${theme.label} » porte les deux familles`);
@@ -49,7 +49,7 @@ describe('palettes', () => {
       else if (theme.neutral) familles.encre++;
       else familles.duo++;
     }
-    assert.deepEqual(familles, { fond: 10, encre: 14, duo: 5 });
+    assert.deepEqual(familles, { fond: 5, encre: 12, duo: 3 });
   });
 
   it('gardent leur modèle d’origine', () => {
@@ -61,6 +61,8 @@ describe('palettes', () => {
   it('retombe sur la palette par défaut pour un identifiant inconnu', () => {
     assert.equal(themeById('palette-qui-n-existe-pas'), DEFAULT_THEME);
     assert.equal(themeById(undefined), DEFAULT_THEME);
+    // Forest a été remplacée par sa version duo : qui l'avait choisie la retrouve.
+    assert.equal(themeById('forest').id, 'forest-duo');
     assert.equal(themeById(THEMES[3].id), THEMES[3]);
   });
 
@@ -119,13 +121,13 @@ describe('gradientFor', () => {
   });
 
   it('respecte l’opacité donnée', () => {
-    const theme = themeById('rainbow');
+    const theme = themeById('ocean');
     const gradient = gradientFor(theme, false, 0.5);
     assert.ok(gradient.includes(', 0.5)'), gradient);
   });
 
   it('change avec le thème', () => {
-    const a = gradientFor(themeById('sunset'), false);
+    const a = gradientFor(themeById('syntax'), false);
     const b = gradientFor(themeById('ocean'), false);
     assert.notEqual(a, b);
   });
@@ -151,25 +153,17 @@ describe('formats', () => {
 
 describe('palettes à encres données', () => {
   it('utilise ses couleurs exactes, sans les dériver d’une teinte', () => {
-    // Tout l'intérêt d'Okabe-Ito : son bleu ciel et son bleu ont la même
-    // teinte et ne se distinguent que par la clarté. Un modèle qui dériverait
-    // la couleur de la teinte seule les confondrait, et perdrait précisément
-    // ce qui rend la palette lisible par un œil daltonien.
-    const okabe = themeById('okabe');
-    assert.ok(okabe.inks, 'Okabe-Ito doit porter des encres explicites');
-    const first = paletteFor(okabe, 0, false);
-    assert.equal(first.text, okabe.inks!.light[0]);
-    assert.equal(first.accent, okabe.inks!.light[0], 'histogramme et texte partagent la couleur');
-
-    const ciel = paletteFor(okabe, 1, false).text;
-    const bleu = paletteFor(okabe, 4, false).text;
-    assert.notEqual(ciel, bleu, 'deux couleurs de même teinte doivent rester distinctes');
+    const fjord = themeById('fjord');
+    assert.ok(fjord.inks, 'Fjord doit porter des encres explicites');
+    const first = paletteFor(fjord, 0, true);
+    assert.equal(first.text, fjord.inks!.dark[0]);
+    assert.equal(first.accent, fjord.inks!.dark[0], 'histogramme et texte partagent la couleur');
   });
 
   it('cycle sur ses encres au-delà de la palette', () => {
-    const okabe = themeById('okabe');
-    const taille = okabe.inks!.light.length;
-    assert.equal(paletteFor(okabe, 0, false).text, paletteFor(okabe, taille, false).text);
+    const fjord = themeById('fjord');
+    const taille = fjord.inks!.light.length;
+    assert.equal(paletteFor(fjord, 0, false).text, paletteFor(fjord, taille, false).text);
   });
 });
 
@@ -196,22 +190,61 @@ describe('palettes tirées au sort', () => {
     return Math.max(...left.map((value, index) => Math.abs(value - right[index])));
   }
 
-  it('alterne vraiment fond coloré et texte coloré', () => {
-    // Le bouton alterne les deux familles : il faut que ça se voie. Un tirage
-    // « fond » colore ses cellules colonne par colonne ; un tirage « texte »
-    // garde un fond uni et colore son encre.
-    for (let seed = 1; seed <= 50; seed++) {
+  it('ne tire que du texte coloré, sur fond uni ou voilé, avec ou sans traits', () => {
+    // Plus d'aplats pastel : le fond est le fond du tableau, ou ce fond voilé de
+    // la couleur de chaque colonne ; l'encre porte toujours la couleur.
+    const traits = new Set<boolean>();
+    let voiles = 0;
+    for (let seed = 1; seed <= 300; seed++) {
       for (const dark of [false, true]) {
-        const fond = randomTheme('background', 'x', 'X', seeded(seed));
-        const cellules = new Set([0, 1, 2, 3].map((column) => paletteFor(fond, column, dark).cell));
-        assert.ok(cellules.size > 1, `fond coloré sans fonds différents (${fond.sample?.source})`);
-        const texte = randomTheme('text', 'y', 'Y', seeded(seed));
-        const unis = new Set([0, 1, 2, 3].map((column) => paletteFor(texte, column, dark).cell));
-        const encres = new Set([0, 1, 2, 3].map((column) => paletteFor(texte, column, dark).text));
-        assert.equal(unis.size, 1, `texte coloré sans fond uni (${texte.sample?.source})`);
-        assert.ok(encres.size > 1, `texte coloré sans encres différentes (${texte.sample?.source})`);
+        const theme = randomTheme('y', 'Y', seeded(seed));
+        const fonds = new Set([0, 1, 2, 3].map((column) => paletteFor(theme, column, dark).cell));
+        const encres = new Set([0, 1, 2, 3].map((column) => paletteFor(theme, column, dark).text));
+        const voile = theme.sample?.veil;
+        if (voile === undefined) assert.equal(fonds.size, 1, `fond coloré tiré (${theme.sample?.source ?? theme.blend})`);
+        else {
+          assert.ok(fonds.size > 1, 'voile sans fonds différents');
+          assert.ok(voile >= 0.06 && voile <= 0.15, `voile hors bornes : ${voile}`);
+          if (!dark) voiles++;
+        }
+        assert.ok(encres.size > 1, `encres identiques (${theme.sample?.source ?? theme.blend})`);
+        assert.equal(theme.sample?.tint ?? false, false);
+        traits.add(theme.seamless === true);
       }
     }
+    assert.deepEqual([...traits].sort(), [false, true], 'des tirages avec traits, et d’autres sans');
+    assert.ok(voiles >= 20, `trop peu de fonds voilés : ${voiles} sur 300`);
+  });
+
+  it('couvre tout le cercle des teintes, pas seulement le bleu, le violet et le rose', () => {
+    // Le défaut vu à l'usage : près de la moitié des couleurs tirées tombaient entre
+    // le cyan et le violet, les oranges, jaunes et verts presque jamais — les règles de
+    // lisibilité sur fond clair rejetaient les chemins qui restaient en zone chaude.
+    const secteurs = new Array(6).fill(0);
+    let total = 0;
+    for (let seed = 1; seed <= 600; seed++) {
+      const { sample } = randomTheme('h', 'H', seeded(seed * 13));
+      if (!sample) continue;
+      for (const hex of sample.dark.colours) {
+        const { h } = oklch(hex);
+        secteurs[Math.floor(h / 60) % 6]++;
+        total++;
+      }
+    }
+    secteurs.forEach((n, i) => assert.ok(n / total >= 0.09, `teintes ${i * 60}–${i * 60 + 59}° : ${((100 * n) / total).toFixed(1)} % seulement`));
+  });
+
+  it('varie la force du voile et la teinte du fond d’un tirage à l’autre', () => {
+    const forces = new Set<number>();
+    const fonds = new Set<string>();
+    for (let seed = 1; seed <= 400; seed++) {
+      const { sample } = randomTheme('v', 'V', seeded(seed));
+      if (sample?.veil === undefined) continue;
+      forces.add(Math.round(sample.veil * 100));
+      fonds.add(sample.dark.ground);
+    }
+    assert.ok(forces.size >= 7, `${forces.size} forces de voile seulement`);
+    assert.ok(fonds.size >= 30, `${fonds.size} fonds différents seulement`);
   });
 
   it('tient les mêmes seuils de lisibilité que les palettes livrées', () => {
@@ -226,7 +259,7 @@ describe('palettes tirées au sort', () => {
     let pireContraste = Infinity;
     for (let seed = 1; seed <= 100; seed++) {
       for (const family of ['background', 'text'] as const) {
-        const theme = randomTheme(family, `r${seed}`, `R${seed}`, seeded(seed * 7 + (family === 'text' ? 1 : 0)));
+        const theme = randomTheme(`r${seed}`, `R${seed}`, seeded(seed * 7 + (family === 'text' ? 1 : 0)));
         for (const dark of [false, true]) {
           for (let column = 0; column < 16; column++) {
             const left = paletteFor(theme, column, dark);
@@ -249,7 +282,7 @@ describe('palettes tirées au sort', () => {
     // sur seize, ne s'écartent jamais plus qu'un pas du chemin lui-même.
     for (let seed = 1; seed <= 200; seed++) {
       for (const family of ['background', 'text'] as const) {
-        const theme = randomTheme(family, 'c', 'C', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
+        const theme = randomTheme('c', 'C', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
         if (theme.spectrum) {
           // Un arc-en-ciel fait le tour du cercle à pas régulier : la dernière
           // teinte rejoint la première d'un pas ordinaire, comme Prism.
@@ -301,7 +334,7 @@ describe('palettes tirées au sort', () => {
   function shown(seed: number): Array<{ hex: string; dark: boolean; role: string }> {
     const out: Array<{ hex: string; dark: boolean; role: string }> = [];
     for (const family of ['background', 'text'] as const) {
-      const theme = randomTheme(family, 'v', 'V', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
+      const theme = randomTheme('v', 'V', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
       for (const dark of [false, true]) {
         for (let column = 0; column < 8; column++) {
           const p = paletteFor(theme, column, dark);
@@ -355,26 +388,17 @@ describe('palettes tirées au sort', () => {
   });
 
   it('varie vraiment d’un tirage à l’autre', () => {
-    // Le reproche constant : « les thèmes se ressemblent ». Les huit formes
-    // de chemin — dont agrumes et soleil, ajoutées parce que jaunes, oranges
-    // et verts manquaient — doivent toutes sortir, dans les deux familles, et
-    // les mélanges avec le style d'une palette de la liste aussi.
+    // Le reproche constant : « les thèmes se ressemblent ». Les sept formes de
+    // chemin — dont le ton sur ton — doivent toutes sortir, et les mélanges avec le
+    // style d'une palette de la liste, et les arcs-en-ciel, aussi.
     const vues = new Map<string, number>();
-    for (let seed = 1; seed <= 200; seed++) {
-      for (const family of ['background', 'text'] as const) {
-        const { sample, blend, spectrum } = randomTheme(family, 'd', 'D', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
-        const side = family === 'background' ? 'fond' : 'texte';
-        const key = spectrum ? `arc-en-ciel/${side}` : blend ? `liste/${side}` : `${sample?.source}/${sample?.tint ? 'fond' : 'texte'}`;
-        vues.set(key, (vues.get(key) ?? 0) + 1);
-      }
+    for (let seed = 1; seed <= 400; seed++) {
+      const { sample, blend, spectrum } = randomTheme('d', 'D', seeded(seed * 7 + 1));
+      const key = spectrum ? 'arc-en-ciel' : blend ? 'liste' : String(sample?.source);
+      vues.set(key, (vues.get(key) ?? 0) + 1);
     }
-    // Soleil et agrumes ne sortent qu'en fond coloré : en texte, leurs encres
-    // se confondent.
-    assert.ok(!vues.has('sunny/texte') && !vues.has('citrus/texte'));
-    // Les arcs-en-ciel à la manière de Prism et Prism duo, dans les deux familles.
-    assert.ok(vues.has('arc-en-ciel/fond') && vues.has('arc-en-ciel/texte'));
-    assert.equal(vues.size, 18, [...vues.keys()].sort().join(', '));
-    assert.ok(Math.max(...vues.values()) <= 400 * 0.4, `combinaison la plus fréquente : ${Math.max(...vues.values())} sur 400`);
+    assert.equal(vues.size, 9, [...vues.keys()].sort().join(', '));
+    assert.ok(Math.max(...vues.values()) <= 400 * 0.5, `forme la plus fréquente : ${Math.max(...vues.values())} sur 400`);
   });
 
   it('garde le bandeau lisible : histogramme, pourcentages et texte', () => {
@@ -384,7 +408,7 @@ describe('palettes tirées au sort', () => {
     let pire = Infinity;
     for (let seed = 1; seed <= 200; seed++) {
       for (const family of ['background', 'text'] as const) {
-        const theme = randomTheme(family, 'a', 'A', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
+        const theme = randomTheme('a', 'A', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
         for (const dark of [false, true]) {
           for (let column = 0; column < 8; column++) {
             const colours = paletteFor(theme, column, dark);
@@ -411,7 +435,7 @@ describe('palettes tirées au sort', () => {
     };
     for (let seed = 1; seed <= 200; seed++) {
       for (const family of ['background', 'text'] as const) {
-        const theme = randomTheme(family, 't', 'T', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
+        const theme = randomTheme('t', 'T', seeded(seed * 7 + (family === 'text' ? 1 : 0)));
         for (const dark of [false, true]) {
           for (let column = 0; column < 16; column++) {
             const [p, q] = [paletteFor(theme, column, dark).text, paletteFor(theme, column + 1, dark).text].map(lab);
@@ -434,7 +458,7 @@ describe('palettes tirées au sort', () => {
       return [l, c * Math.cos((h * Math.PI) / 180), c * Math.sin((h * Math.PI) / 180)];
     };
     for (let seed = 1; seed <= 200; seed++) {
-      const { sample } = randomTheme('background', 'g', 'G', seeded(seed));
+      const { sample } = randomTheme('g', 'G', seeded(seed));
       const points = (sample?.light.colours ?? []).map(lab);
       const pas = points.slice(1).map((p, i) => Math.hypot(p[0] - points[i][0], p[1] - points[i][1], p[2] - points[i][2]));
       const total = pas.reduce((sum, step) => sum + step, 0);
@@ -448,7 +472,7 @@ describe('palette en cours de tirage', () => {
     // Le défaut réel : le brouillon vivait dans la vue, pas dans ce point de
     // résolution. themeById ne le trouvait donc pas et retombait sur la palette
     // par défaut — quatre tirages de suite donnaient exactement la même couleur.
-    const draft = randomTheme('background', 'custom-draft', 'Brouillon');
+    const draft = randomTheme('custom-draft', 'Brouillon');
     setDraftTheme(draft);
     assert.equal(themeById('custom-draft').id, 'custom-draft');
     assert.equal(draftTheme()?.id, 'custom-draft');
@@ -459,15 +483,90 @@ describe('palette en cours de tirage', () => {
 
 describe('palettes personnelles', () => {
   it('s’ajoutent aux palettes livrées sans les remplacer', () => {
-    const mine = randomTheme('background', 'custom-1', 'Custom 1');
+    const mine = randomTheme('custom-1', 'Custom 1');
     setCustomThemes([mine]);
     assert.equal(allThemes().length, THEMES.length + 1);
     assert.equal(customThemes().length, 1);
     assert.equal(themeById('custom-1').id, 'custom-1');
     // Les livrées restent joignables.
-    assert.equal(themeById('rainbow').id, 'rainbow');
+    assert.equal(themeById('ocean').id, 'ocean');
     setCustomThemes([]);
     // Une palette supprimée retombe sur la palette par défaut, sans casser.
     assert.equal(themeById('custom-1'), DEFAULT_THEME);
+  });
+});
+
+/** Clarté, chroma et teinte OKLCH d'un « #rrggbb », calculées ici indépendamment du code testé. */
+function lchOf(hex: string): { l: number; c: number; h: number } {
+  const lin = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  const [r, g, b] = [1, 3, 5].map((at) => lin(parseInt(hex.slice(at, at + 2), 16) / 255));
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  const A = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
+  const B = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+  return { l: 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, c: Math.hypot(A, B), h: ((Math.atan2(B, A) * 180) / Math.PI + 360) % 360 };
+}
+
+describe('palettes ton sur ton', () => {
+  it('reviennent en arrière au-delà de la dernière couleur, sans saut', () => {
+    const theme = themeById('blue-violet');
+    const texts = Array.from({ length: 9 }, (_, column) => paletteFor(theme, column, true).text);
+    // 5 couleurs : 0 1 2 3 4 3 2 1 0 — deux colonnes voisines ne sont jamais jumelles.
+    assert.deepEqual(texts.slice(0, 5).reverse().slice(1), texts.slice(5));
+    for (let i = 1; i < texts.length; i++) assert.notEqual(texts[i], texts[i - 1]);
+  });
+
+  it('se passent de traits de séparation, les autres non', () => {
+    for (const id of ['blue-violet', 'dusk', 'woodland', 'deep-sea']) assert.equal(themeById(id).seamless, true, id);
+    for (const id of ['fjord', 'bordeaux-gold', 'syntax', 'ocean']) assert.notEqual(themeById(id).seamless, true, id);
+  });
+
+  it('ne montrent ni brun ni olive sur fond clair', () => {
+    // Même définition, indépendante du code, que pour les tirages : un or ou un orange
+    // assombri est un brun, un vert-jaune assombri un olive.
+    for (const id of ['blue-violet', 'dusk', 'woodland', 'deep-sea', 'fjord', 'bordeaux-gold']) {
+      for (let column = 0; column < 5; column++) {
+        const { text } = paletteFor(themeById(id), column, false);
+        const { l, c, h } = lchOf(text);
+        const orange = c >= 0.015 && h >= 30 && h < 75 && (l < 0.68 || (l < 0.8 && c < 0.1) || (l < 0.86 && c < 0.05));
+        const moutarde = c >= 0.015 && h >= 75 && h < 110 && l < 0.84;
+        const vertJaune = c >= 0.015 && h >= 110 && h <= 145 && (l < 0.6 || (c >= 0.1 && l < 0.8) || (l < 0.78 && c < 0.1));
+        const bordeaux = c >= 0.015 && ((h >= 15 && h < 30 && l < 0.45) || (h < 30 && l < 0.76 && c < 0.06));
+        assert.ok(!(orange || moutarde || vertJaune || bordeaux), `${id}, colonne ${column} : ${text} (l ${l.toFixed(2)}, c ${c.toFixed(2)}, h ${h.toFixed(0)})`);
+      }
+    }
+  });
+
+  it('gardent une encre lisible sur fond clair', () => {
+    const luminance = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((at) => {
+        const channel = parseInt(hex.slice(at, at + 2), 16) / 255;
+        return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    for (const id of ['blue-violet', 'dusk', 'woodland', 'deep-sea', 'fjord', 'bordeaux-gold']) {
+      const theme = themeById(id);
+      for (let column = 0; column < 5; column++) {
+        const palette = paletteFor(theme, column, false);
+        const ratio = (luminance(palette.cell) + 0.05) / (luminance(palette.text) + 0.05);
+        assert.ok(ratio >= 3.5, `${id}, colonne ${column} : contraste ${ratio.toFixed(2)}`);
+      }
+    }
+  });
+});
+
+describe('couleur sobre du thème', () => {
+  it('donne une couleur plus sobre que tous les accents de la palette', async () => {
+    const { neutralAccent, paletteFor, themeById } = await import('../core/themes');
+    const theme = themeById('syntax');
+    const spread = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16));
+      return Math.max(r, g, b) - Math.min(r, g, b);
+    };
+    const accent = neutralAccent(theme, true);
+    assert.match(accent, /^#[0-9a-f]{6}$/i);
+    for (const [index] of theme.hues.entries()) assert.ok(spread(accent) < spread(paletteFor(theme, index, true).accent));
   });
 });

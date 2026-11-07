@@ -315,6 +315,8 @@ export function paintHead(): void {
     const cell = document.createElement('div');
     cell.className = 'head-cell';
     cell.style.width = `${state.widths[modelIndex]}px`;
+    // Le filet et le voile de l'en-tête reprennent la couleur de la colonne.
+    cell.style.setProperty('--col', palette(modelIndex).accent);
     if (state.selectedColumn === modelIndex) cell.classList.add('selected');
     // Comme un clic sur une cellule marque sa ligne : un clic sur l'en-tête
     // marque sa colonne. Les boutons et la poignée gardent leur propre geste.
@@ -451,6 +453,7 @@ export function paintRows(onlyIfMoved = false): void {
       const cell = document.createElement('div');
       const isActive = state.active?.row === rowIndex && state.active.column === modelIndex;
       cell.className = isMeasurable(state.stats[modelIndex].type) ? 'cell num' : 'cell';
+      cell.dataset.column = String(modelIndex);
       if (isActive) cell.classList.add('active');
       if (state.selectedColumn === modelIndex) cell.classList.add('column-selected');
       cell.style.width = `${state.widths[modelIndex]}px`;
@@ -613,12 +616,6 @@ elements.scroller.addEventListener('scroll', () => {
   closeMenu();
 });
 
-export function applySort(modelIndex: number, ascending: boolean): void {
-  state.sort = { index: modelIndex, ascending };
-  rebuildView();
-  paint();
-}
-
 /**
  * Construit la condition « la colonne vaut l'une de ces valeurs ».
  *
@@ -669,6 +666,22 @@ export function valueCounts(columnIndex: number): Array<[string, number]> {
     counts.set(raw, (counts.get(raw) ?? 0) + 1);
   }
   return [...counts.entries()].sort((left, right) => right[1] - left[1] || (left[0] < right[0] ? -1 : 1));
+}
+
+/**
+ * Les valeurs d'une colonne sur **toutes** les lignes nettoyées, filtres ignorés.
+ *
+ * Une étape de nettoyage porte sur tout le fichier, pas sur ce qui est affiché :
+ * ce qu'elle « touche » se compte donc ici — le menu de colonne et le panneau Clean
+ * donnent ainsi les mêmes chiffres, quels que soient les filtres actifs.
+ */
+export function allValueCounts(columnIndex: number): Array<[string, number]> {
+  const counts = new Map<string, number>();
+  for (const cells of state.rows) {
+    const raw = cells[columnIndex] ?? '';
+    counts.set(raw, (counts.get(raw) ?? 0) + 1);
+  }
+  return [...counts.entries()];
 }
 
 /** La table telle qu'elle est après filtrage : c'est sur elle qu'on analyse. */

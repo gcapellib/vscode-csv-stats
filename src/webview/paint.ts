@@ -1,3 +1,4 @@
+import { themeById } from '../core/themes';
 import { elements } from './dom';
 import { palette, state } from './state';
 import { paintBand } from './band';
@@ -42,6 +43,8 @@ export function paint(): void {
   if (!state.ready) return;
   // Le liseré des menus et des panneaux : l'accent de la première colonne.
   document.documentElement.style.setProperty('--float-accent', palette(state.order[0] ?? 0).accent);
+  // Les palettes ton sur ton se passent des traits de séparation.
+  document.documentElement.toggleAttribute('data-seamless', themeById(state.themeId).seamless === true);
   elements.sheet.style.width = `${totalWidth()}px`;
   alignBars();
   paintBand();

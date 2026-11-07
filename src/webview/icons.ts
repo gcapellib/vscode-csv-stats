@@ -14,12 +14,7 @@ interface Glyph {
   paths: string[];
 }
 
-const GLYPHS: Record<'broom' | 'sparkles' | 'chart' | 'copy', Glyph> = {
-  // Le manche en diagonale, la ligature, puis la brosse évasée et ses brins.
-  broom: {
-    viewBox: '0 0 16 16',
-    paths: ['M14 2 9 7', 'M6.5 5.5l4 4', 'M7.2 6.2C5 8 2.8 9.2 1.8 14.2 6.8 13.2 8 11 9.8 8.8', 'M4.6 10 3.4 12.6', 'M6.4 11.2 5 13.4'],
-  },
+const GLYPHS: Record<'sparkles' | 'chart' | 'copy', Glyph> = {
   // Tabler « sparkles » : l'icône de nettoyage de la maquette validée.
   sparkles: {
     viewBox: '0 0 24 24',

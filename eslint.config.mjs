@@ -7,6 +7,11 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    // Les scripts d'aperçu tournent sous Node, hors du navigateur et de TypeScript.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: { globals: { process: 'readonly', URL: 'readonly', console: 'readonly' } },
+  },
+  {
     rules: {
       // La faute la plus coûteuse de ce projet, à plusieurs reprises : une
       // variable déclarée, jamais lue — signe d'une extraction ou d'un

@@ -7,7 +7,6 @@ import {
   setDraftTheme,
   themeById,
   type CsvTheme,
-  type RandomFamily,
 } from '../core/themes';
 import { byId, elements, textSpan } from './dom';
 import { floating, positionFloating } from './floating-setup';
@@ -15,24 +14,10 @@ import { paint } from './paint';
 import { paintRaw } from './raw';
 import { isDark, state } from './state';
 import { paintChrome } from './toolbar';
+import { panelTitle } from './panels/shared';
 import { vscode } from './vscode-api';
 import { THEMES } from '../core/themes';
 
-/**
- * Les trois familles, déduites de la palette elle-même plutôt que de sa position
- * dans la liste.
- *
- * Un découpage par indices figés était un piège : ajouter une palette au milieu
- * de la liste l'aurait rangée en silence dans la mauvaise famille, sans qu'aucun
- * test ne s'en aperçoive. Chaque palette sait déjà ce qu'elle est — une encre
- * unique pour un fond coloré, un fond uni pour une encre colorée, ni l'un ni
- * l'autre quand les deux portent la couleur.
- */
-const THEME_GROUPS: Array<[string, typeof THEMES]> = [
-  ['Coloured background', THEMES.filter((theme) => theme.uniformInk !== undefined)],
-  ['Coloured text', THEMES.filter((theme) => theme.neutral !== undefined)],
-  ['Both', THEMES.filter((theme) => theme.uniformInk === undefined && theme.neutral === undefined)],
-];
 
 /**
  * Aperçu d'une palette : une pastille par teinte, chacune portant son fond et un
@@ -59,9 +44,6 @@ export function swatch(theme: CsvTheme): HTMLElement {
   }
   return element;
 }
-
-/** Les deux familles s'alternent d'un tirage à l'autre, comme demandé. */
-let nextFamily: RandomFamily = 'background';
 
 function themeItem(theme: CsvTheme, removable: boolean): HTMLElement {
   const item = document.createElement('button');
@@ -123,30 +105,24 @@ export function buildThemePicker(): void {
   elements.themePopup.textContent = '';
 
   // Seule la liste défile : la rangée de boutons reste visible, sinon tirer
-  // une palette demande d'abord de dérouler vingt-neuf lignes pour retrouver
+  // une palette demande d'abord de dérouler vingt lignes pour retrouver
   // le bouton.
   const list = document.createElement('div');
   list.className = 'theme-list';
 
-  const groups: Array<[string, CsvTheme[], boolean]> = THEME_GROUPS.map(
-    ([label, themes]) => [label, themes, false] as [string, CsvTheme[], boolean],
-  );
+  // Une seule liste, sans familles : on choisit une palette en la voyant, pas en
+  // lisant sa catégorie. Les palettes gardées ou tirées suivent, retirables.
+  for (const theme of THEMES) list.appendChild(themeItem(theme, false));
   const mine = [...customThemes()];
   const draft = draftTheme();
   if (draft !== null) mine.push(draft);
-  if (mine.length > 0) groups.push(['My palettes', mine, true]);
+  for (const theme of mine) list.appendChild(themeItem(theme, true));
 
-  for (const [label, themes, removable] of groups) {
-    const heading = document.createElement('div');
-    heading.className = 'theme-group';
-    heading.textContent = label;
-    list.appendChild(heading);
-    for (const theme of themes) {
-      list.appendChild(themeItem(theme, removable));
-    }
-  }
-
-  elements.themePopup.append(list, randomRow());
+  // Le même titre que les autres panneaux.
+  elements.themePopup.classList.add('file-panel');
+  const title = panelTitle('Palette', '');
+  title.className = 'popup-title';
+  elements.themePopup.append(title, list, randomRow());
   list.scrollTop = scrolled;
   showCurrentTheme();
 }
@@ -174,10 +150,8 @@ function randomRow(): HTMLElement {
   draw.title = 'Draw a new palette, alternating coloured background and coloured text';
   draw.addEventListener('click', (event) => {
     event.stopPropagation();
-    const family = nextFamily;
-    nextFamily = family === 'background' ? 'text' : 'background';
     const id = `custom-${Date.now()}`;
-    setDraftTheme(randomTheme(family, id, `Palette ${customThemes().length + 1}`));
+    setDraftTheme(randomTheme(id, `Palette ${customThemes().length + 1}`));
     state.themeId = id;
     chosenThemeId = id;
     paintChrome();

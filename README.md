@@ -13,10 +13,23 @@ Right-click a `.csv` file in the explorer → **Open in CSV Stats**.
 
 ## What's new
 
+- **Random palettes, much more varied** (0.29). *Random palette* draws coloured text, on a
+  plain background or on one veiled with each column's colour, with or without grid lines,
+  and over the whole colour wheel instead of mostly blues and violets.
+- **Palettes and headers** (0.28). Six palettes — four *tone on tone*, where one family of
+  colour glides from column to column, and two with distinct colours — and a column header
+  that wears its column's colour: a rule on top, a light veil behind.
+- **Spelling, encoding, gaps** (0.27). *Merge* similar spellings (`Lyon`, `Lyons`, `lyon `)
+  from the column's menu or *Clean*; fix garbled characters (`CafÃ©` → `Café`); see where
+  an id or date series has holes; and read a measure's **average by category**.
+- **Column details tells what is wrong** (0.26). Placeholder values (`-999`, `1900-01-01`) with
+  *Treat as empty* beside them, the column **in row order** with its outliers and empty
+  cells, repeated values in an identifier column, advice for pandas (`Int64`, `category`…),
+  and **related columns** in *Dataset…*.
 - **Column details leads to the fix** (0.25.1). Outliers, values that break the
   column's type and inconsistent formats (`A-9999` against `A-999`) are one click
   from their rows, with the cleaning step that fixes them right beside.
-- **Clean, without touching the original** (0.25.0). A broom on every column
+- **Clean, without touching the original** (0.25.0). A sparkle icon on every column
   header (or right-click it) trims, fixes case, replaces values, changes the
   type, renames or removes the column; the **Clean** button lists the applied
   steps, holds the full catalogue — duplicate and blank rows included — and
@@ -51,12 +64,13 @@ Every version is listed in the [changelog](https://github.com/gcapellib/vscode-c
   duplicate or blank rows. Each step shows what it changed and can be removed;
   the original is never modified, and every save keeps a new copy.
 - **Column details** — the chart button on each band: empty cells, cells of spaces and `NULL` counted apart,
-  what pandas would make of the column and what stands in the way.
+  placeholder values, the distribution and the column in row order, outliers, formats, gaps in a
+  series, average by category, what pandas would make of the column and what stands in the way.
 - **Dataset** — the matching `pd.read_csv`, followed by every rename, drop,
   filter and sort you made, in order — plus duplicated rows and values that
   differ only by case or padding, each one click away.
 - **Raw view** — the file exactly as written, each field in its column's colour.
-- **29 palettes**, two of them colour-blind-safe, and random ones to draw —
+- **20 palettes**, and random ones to draw —
   hover to preview on your own data.
 - **Fast** — 100,000 rows scroll smoothly; the file itself is never modified.
 

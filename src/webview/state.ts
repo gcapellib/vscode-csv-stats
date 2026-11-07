@@ -1,6 +1,6 @@
 import { type ColumnStats } from '../core/stats';
 import { type ColumnType } from '../core/types';
-import { paletteFor, THEMES, themeById, type Palette } from '../core/themes';
+import { DEFAULT_THEME, paletteFor, themeById, type Palette } from '../core/themes';
 import { type Filter } from '../core/filters';
 import { type Step } from '../core/steps';
 
@@ -87,7 +87,7 @@ export const state: State = {
   selected: new Set<number>(),
   active: null,
   selectedColumn: null,
-  themeId: THEMES[0].id,
+  themeId: DEFAULT_THEME.id,
   ready: false,
   rawLines: null,
   rawLoading: false,

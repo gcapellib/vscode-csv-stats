@@ -194,14 +194,6 @@ body {
   padding: 4px 0;
 }
 
-.theme-group {
-  padding: 6px 12px 2px;
-  color: var(--vscode-descriptionForeground);
-  text-transform: uppercase;
-  font-size: 0.85em;
-  letter-spacing: 0.04em;
-}
-
 .theme-item {
   display: flex;
   align-items: center;
@@ -624,10 +616,6 @@ body {
   background: var(--vscode-list-hoverBackground);
 }
 
-.arrow {
-  opacity: 0.7;
-}
-
 #body {
   position: relative;
 }
@@ -745,14 +733,20 @@ body {
 }
 
 #picker.wide {
-  width: 380px;
+  width: 480px;
+}
+
+/* Le panneau défile quand il dépasse sa limite : ses blocs ne doivent pas se
+   comprimer pour y tenir (le code pandas réduit à une ligne, les constats écrasés). */
+#picker > * {
+  flex-shrink: 0;
 }
 
 .section-title {
   margin-top: 4px;
   padding-top: 6px;
   border-top: 1px solid var(--vscode-panel-border);
-  color: var(--vscode-descriptionForeground);
+  color: var(--column-accent, var(--vscode-descriptionForeground));
   text-transform: uppercase;
   font-size: 0.85em;
   letter-spacing: 0.05em;
@@ -892,7 +886,86 @@ body {
   display: block;
   flex: 0 0 auto;
   width: 100%;
-  aspect-ratio: 340 / 192;
+  aspect-ratio: 340 / 206;
+  color: var(--vscode-foreground);
+}
+
+.category-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.category-select {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border));
+  border-radius: 4px;
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  font: inherit;
+}
+
+.pickable-row {
+  cursor: pointer;
+}
+
+.pickable-row:hover {
+  background: rgb(128 128 128 / 14%);
+}
+
+.legend-link {
+  margin: 0 6px 4px 0;
+  padding: 2px 10px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 999px;
+  background: rgb(128 128 128 / 12%);
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.legend-link:hover {
+  background: rgb(128 128 128 / 28%);
+  border-color: var(--column-accent, var(--vscode-focusBorder));
+}
+
+.related-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.related-bar {
+  flex: 1;
+  height: 6px;
+  min-width: 40px;
+  border-radius: 3px;
+  background: var(--vscode-panel-border);
+  overflow: hidden;
+}
+
+.related-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+
+.related-value {
+  min-width: 42px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.row-strip {
+  display: block;
+  flex: 0 0 auto;
+  width: 100%;
+  aspect-ratio: 400 / 134;
   color: var(--vscode-foreground);
 }
 
@@ -916,13 +989,6 @@ body {
 .detail-value {
   text-align: right;
   font-weight: 600;
-}
-
-.boxplot {
-  display: block;
-  width: 100%;
-  height: auto;
-  color: var(--vscode-foreground);
 }
 
 #picker {
@@ -978,22 +1044,6 @@ body {
 
 /* Les deux modes de saisie s'excluent : le dire, plutôt que de le laisser
    découvrir en tapant. */
-.picker-or {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 2px 6px;
-  color: var(--vscode-descriptionForeground);
-  font-size: 0.9em;
-}
-
-.picker-or::before,
-.picker-or::after {
-  content: '';
-  flex: 1;
-  border-top: 1px solid var(--vscode-panel-border);
-}
-
 .picker-list {
   flex: 1;
   min-height: 0;
@@ -1121,11 +1171,6 @@ body.resizing * {
   align-items: center;
   gap: 6px;
   margin: 8px 0 4px;
-}
-
-.picker-only-blank {
-  width: 100%;
-  margin-bottom: 6px;
 }
 
 .stat.pickable {
@@ -1262,24 +1307,35 @@ body.resizing * {
    de la colonne, une colonne de repères (icône ou coche), le compte de ce que
    l'action toucherait en gris à côté, et les variantes d'un geste en pastilles. */
 #menu.clean-menu {
-  min-width: 270px;
+  min-width: 300px;
+  max-width: 400px;
   padding: 6px 0 8px;
   border-radius: 8px;
   border-top-width: 3px;
 }
 
+/* Les titres de section : la couleur de la colonne et un filet au-dessus, comme
+   dans Column details — on repère d'un coup d'œil où commence chaque groupe. */
 #menu.clean-menu .menu-heading {
-  padding: 10px 14px 3px;
+  margin: 8px 14px 2px;
+  padding: 8px 0 2px;
+  border-top: 1px solid var(--vscode-panel-border);
+  color: var(--column-accent, var(--vscode-descriptionForeground));
   text-transform: none;
   letter-spacing: 0;
-  font-size: 0.85em;
+  font-size: 0.9em;
+  font-weight: 600;
+}
+
+#menu.clean-menu > div:first-child {
+  padding: 0 14px 4px;
 }
 
 #menu.clean-menu .menu-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 14px;
+  padding: 6px 14px;
 }
 
 #menu.clean-menu .menu-item.idle {
@@ -1293,9 +1349,20 @@ body.resizing * {
   font-weight: 600;
 }
 
+.cmenu-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Le compte à droite, aligné d'une ligne à l'autre : on le lit sans chercher. */
 .cmenu-hint {
+  margin-left: auto;
+  padding-left: 12px;
   color: var(--vscode-descriptionForeground);
   white-space: nowrap;
+  font-size: 0.9em;
 }
 
 .cmenu-chips {
@@ -1343,7 +1410,9 @@ body.resizing * {
 #theme-popup,
 #picker {
   border-radius: 8px;
-  border-top: 3px solid var(--float-accent, var(--vscode-focusBorder, #4a8fe0));
+  /* Le liseré du haut : la couleur la plus sobre du thème (posée par toolbar.ts).
+     Un menu ou un panneau propre à une colonne y pose sa couleur, qui l'emporte. */
+  border-top: 3px solid var(--file-accent, var(--float-accent, var(--vscode-focusBorder, #4a8fe0)));
 }
 
 #menu {
@@ -1372,15 +1441,10 @@ body.resizing * {
 
 /* Les titres de section ne crient plus : sentence case, comme les menus. */
 .menu-heading,
-.theme-group,
 .section-title {
   text-transform: none;
   letter-spacing: 0;
   font-size: 0.85em;
-}
-
-.theme-group {
-  padding: 10px 14px 3px;
 }
 
 .section-title {
@@ -1405,4 +1469,96 @@ body.resizing * {
 
 .flag {
   border-radius: 0 4px 4px 0;
+}
+
+
+/* ── Une seule hiérarchie pour tous les menus et panneaux ─────────────────────
+   Un titre (15 px, gras) et sa ligne de contexte ; des titres de section en gras
+   avec un filet au-dessus. Le menu d'une colonne, Column details, Clean, Dataset
+   et la palette parlent pareil. Les titres prennent la couleur de la colonne
+   quand il y en a une ; sinon la couleur la plus sobre du thème. */
+.picker-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* Sans colonne, la couleur est la plus sobre du thème : titres, sections et
+   bouton principal la prennent comme ils prendraient celle d'une colonne. */
+.file-panel {
+  --column-accent: var(--file-accent);
+}
+
+.section-title,
+.popup-title {
+  flex: 0 0 auto;
+  padding: 0 14px 4px;
+}
+
+#menu.clean-menu .menu-heading {
+  color: var(--column-accent, var(--vscode-foreground));
+}
+
+/* Le modèle est le menu d'une colonne. Tout titre porte la couleur de ce dont il
+   parle : la colonne, ou, pour le fichier entier, la couleur sobre du thème. Les
+   boutons sont des pastilles détourées ; le bouton principal est plein, dans
+   cette même couleur. */
+.picker-title {
+  color: var(--column-accent, inherit);
+}
+
+.picker-button {
+  padding: 3px 12px;
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border));
+  border-radius: 11px;
+  background: transparent;
+  color: inherit;
+}
+
+.picker-button:hover {
+  background: var(--vscode-list-hoverBackground);
+  border-color: var(--column-accent, var(--vscode-focusBorder));
+}
+
+.picker-button.primary {
+  border-color: transparent;
+  background: var(--column-accent, var(--vscode-button-background));
+  color: var(--vscode-editor-background, #1f1f1f);
+  font-weight: 600;
+}
+
+/* Un bouton seul dans le panneau (Copy) garde sa taille, au lieu de s'étirer. */
+#picker > .picker-button {
+  align-self: flex-start;
+}
+
+/* L'en-tête de chaque colonne : un filet de 2 px à sa couleur au-dessus, et un fond
+   qui en garde un voile léger. Le filet est une ombre intérieure : il ne décale rien. */
+.head-cell {
+  box-shadow: inset 0 2px 0 var(--col, transparent);
+}
+
+#head .head-cell:not(:hover):not(.selected) {
+  background: color-mix(in srgb, var(--col, transparent) 14%, var(--vscode-editorGroupHeader-tabsBackground));
+}
+
+/* Palettes sans traits : les couleurs seules séparent les colonnes, comme les
+   cellules d'un tableau dessiné d'un seul tenant. */
+:root[data-seamless] .cell,
+:root[data-seamless] .head-cell,
+:root[data-seamless] .band-cell {
+  border-right-color: transparent;
+}
+
+:root[data-seamless] .cell,
+:root[data-seamless] #head {
+  border-bottom-color: transparent;
+}
+
+/* Les boutons de la barre du haut : les coins un peu arrondis, comme le reste. */
+#insights-toggle,
+#theme-button,
+#dataset-button,
+#clean-button,
+#raw-toggle {
+  border-radius: 6px;
 }

@@ -5,7 +5,8 @@ import { elements, textSpan } from '../dom';
 import { floating, positionFloating } from '../floating-setup';
 import { gradientFor, themeById } from '../../core/themes';
 import { isDark, palette, state } from '../state';
-import { currentTable, setColumnFilter, valuesFilter } from '../table';
+import { currentTable, parserOf, setColumnFilter, valuesFilter } from '../table';
+import { topCorrelations } from '../../core/insights';
 import { openDetails } from './column-details';
 import { footer, panelTitle, sectionTitle, tintPanel } from './shared';
 import { datasetTransformLines as coreDatasetTransformLines } from '../../core/filters';
@@ -119,6 +120,22 @@ export function openDataset(anchor: HTMLElement): void {
   }
   elements.picker.appendChild(info);
 
+  // Les colonnes numériques qui varient ensemble — ce qu'on cherche juste après
+  // avoir regardé chacune. Les valeurs-balises sont écartées : -999 casserait tout.
+  const numeric = state.order
+    .filter((index) => state.stats[index]?.type === 'numeric' && !state.stats[index]?.temporal)
+    .map((index) => ({
+      index,
+      name: state.headers[index],
+      parse: parserOf(index),
+      excluded: new Set(details[index].placeholders.flatMap((entry) => entry.tokens)),
+    }));
+  const related = topCorrelations(table.rows, numeric);
+  if (related.length > 0) {
+    elements.picker.appendChild(sectionTitle('Related columns'));
+    for (const pair of related) elements.picker.appendChild(relatedRow(pair.left, pair.right, pair.r, anchor));
+  }
+
   elements.picker.appendChild(sectionTitle('Findings'));
   const list = document.createElement('div');
   list.className = 'findings';
@@ -148,8 +165,10 @@ export function openDataset(anchor: HTMLElement): void {
       entry.fix === 'trim'
         ? ['Trim', { kind: 'trim', column: entry.column }]
         : entry.fix === 'empty'
-          ? ['Treat as empty', { kind: 'empty', column: entry.column, tokens: entry.values }]
-          : ['Capitalize', { kind: 'case', column: entry.column, mode: 'title' }];
+          ? ['Treat as empty', { kind: 'empty', column: entry.column, tokens: [...new Set(entry.values.map((value) => value.trim()))] }]
+          : entry.fix === 'encoding'
+            ? ['Fix characters', { kind: 'fixEncoding', column: entry.column }]
+            : ['Capitalize', { kind: 'case', column: entry.column, mode: 'title' }];
     list.appendChild(
       withFix(
         finding(
@@ -173,6 +192,35 @@ export function openDataset(anchor: HTMLElement): void {
   positionFloating(elements.picker, anchor);
   setOpenPanel('dataset');
   elements.datasetButton.classList.add('active');
+}
+
+/** Deux colonnes qui varient ensemble : leurs noms, leur coefficient, une barre. */
+function relatedRow(left: number, right: number, r: number, anchor: HTMLElement): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'related-row';
+  const name = (index: number) => {
+    const button = document.createElement('button');
+    button.className = 'info-name';
+    button.textContent = state.headers[index];
+    button.style.color = palette(index).accent;
+    button.title = 'Open this column';
+    button.addEventListener('click', () => {
+      closePicker();
+      openDetails(index, anchor);
+    });
+    return button;
+  };
+  const bar = document.createElement('span');
+  bar.className = 'related-bar';
+  const fill = document.createElement('span');
+  fill.style.width = `${Math.round(Math.abs(r) * 100)}%`;
+  fill.style.background = r > 0 ? palette(left).accent : 'var(--vscode-editorError-foreground, #d03b3b)';
+  bar.appendChild(fill);
+  const value = textSpan(`${r > 0 ? '+' : '−'}${Math.abs(r).toFixed(2)}`);
+  value.className = 'related-value';
+  row.title = r > 0 ? 'They rise together' : 'One rises when the other falls';
+  row.append(name(left), textSpan('↔'), name(right), bar, value);
+  return row;
 }
 
 export function head(text: string): HTMLElement {

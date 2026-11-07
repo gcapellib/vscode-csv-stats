@@ -1,5 +1,5 @@
 import { count } from '../core/format';
-import { gradientFor, themeById } from '../core/themes';
+import { gradientFor, neutralAccent, themeById } from '../core/themes';
 import { clearFilters, closePicker, getOpenPanel, refilter } from './actions';
 import { FOLD_MS } from './constants';
 import { elements } from './dom';
@@ -22,6 +22,8 @@ export function paintChrome(): void {
   const gradient = gradientFor(themeById(state.themeId), isDark());
   elements.toolbar.style.backgroundImage = gradient;
   elements.filterBar.style.backgroundImage = gradient;
+  // Les menus et panneaux du fichier entier prennent la couleur la plus sobre du thème.
+  document.documentElement.style.setProperty('--file-accent', neutralAccent(themeById(state.themeId), isDark()));
 }
 
 export function paintFilterBar(): void {

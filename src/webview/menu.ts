@@ -1,13 +1,17 @@
 import { computeDetails } from '../core/details';
 import { count } from '../core/format';
+import { similarValues } from '../core/insights';
 import { applySteps, type Step } from '../core/steps';
 import { isMeasurable, type ColumnType } from '../core/types';
 import { addStep, changeType, renameColumn, replaceValue, roundColumn, treatAsEmpty } from './cleaning';
 import { elements } from './dom';
 import { floating, positionFloating } from './floating-setup';
 import { icon } from './icons';
+import { openClean } from './panels/clean';
 import { openDetails } from './panels/column-details';
+import { panelTitle } from './panels/shared';
 import { palette, state } from './state';
+import { allValueCounts } from './table';
 import { vscode } from './vscode-api';
 
 /**
@@ -45,6 +49,9 @@ export function openMenu(modelIndex: number, anchor: HTMLElement): void {
   menu.textContent = '';
   menu.classList.add('clean-menu');
   menu.style.borderTopColor = accent;
+  // Les titres de section prennent la couleur de la colonne, comme dans Column details.
+  menu.style.setProperty('--column-accent', accent);
+  menu.appendChild(panelTitle(column.name, `${column.type} · ${count(column.distinct)} distinct`, modelIndex));
 
   const applied = (kind: Step['kind']) => state.steps.some((step) => step.kind === kind && 'column' in step && step.column === modelIndex);
   const effect = (step: Step) => applySteps(state.rows, state.headers, [step], state.delimiter === ';').effects[0] ?? 0;
@@ -64,12 +71,13 @@ export function openMenu(modelIndex: number, anchor: HTMLElement): void {
     if (options.mark === 'check') mark.textContent = '✓';
     else if (options.mark) mark.appendChild(options.mark);
     const name = document.createElement('span');
+    name.className = 'cmenu-label';
     name.textContent = label;
     button.append(mark, name);
     if (options.hint) {
       const hint = document.createElement('span');
       hint.className = 'cmenu-hint';
-      hint.textContent = `· ${options.hint}`;
+      hint.textContent = options.hint;
       button.appendChild(hint);
     }
     button.addEventListener('click', run(action));
@@ -115,6 +123,27 @@ export function openMenu(modelIndex: number, anchor: HTMLElement): void {
       ['UPPERCASE', () => addStep({ kind: 'case', column: modelIndex, mode: 'upper' })],
       ['Capitalize', () => addStep({ kind: 'case', column: modelIndex, mode: 'title' })],
     ]);
+  }
+
+  // Les graphies d'une même valeur, fusionnables d'un clic : la ligne dit ce qui
+  // sera fusionné et combien de cellules changent, comme les autres actions.
+  if (text && !column.temporal && column.distinct >= 2 && column.distinct <= 2500) {
+    const groups = similarValues(allValueCounts(modelIndex)).sort((left, right) => cellsOf(right) - cellsOf(left));
+    if (groups.length > 0) {
+      heading('Similar spellings');
+      for (const group of groups.slice(0, 3)) {
+        const target = group.canonical.trim();
+        const names = group.variants.slice(0, 2).map((variant) => variant.value.trim());
+        const more = group.variants.length > 2 ? ', …' : '';
+        item(`${names.join(', ')}${more} → ${target}`, () => addStep({ kind: 'merge', column: modelIndex, from: group.variants.map((variant) => variant.value), to: target }), {
+          hint: cells(cellsOf(group)),
+        });
+      }
+      if (groups.length > 3) {
+        const rest = groups.length - 3;
+        item('More…', () => openClean(anchor, modelIndex), { hint: `${rest} other group${rest === 1 ? '' : 's'}` });
+      }
+    }
   }
 
   heading('Values');
@@ -165,6 +194,11 @@ export function openMenu(modelIndex: number, anchor: HTMLElement): void {
   positionFloating(menu, anchor);
 }
 
+/** Les cellules qu'une fusion change : toutes celles des variantes. */
+function cellsOf(group: { variants: Array<{ count: number }> }): number {
+  return group.variants.reduce((sum, variant) => sum + variant.count, 0);
+}
+
 export function closeMenu(): void {
   floating.close();
 }
@@ -174,4 +208,5 @@ export function resetMenuColumn(): void {
   menuColumn = null;
   elements.menu.classList.remove('clean-menu');
   elements.menu.style.borderTopColor = '';
+  elements.menu.style.removeProperty('--column-accent');
 }

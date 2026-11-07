@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { openHarness } from './harness';
 
-test('les outliers de Column details se cliquent et filtrent le tableau', async ({ page }) => {
+test('les outliers de la courbe de Column details se cliquent et filtrent le tableau', async ({ page }) => {
   await openHarness(page, 'samples/wines.csv');
   const shape = page.locator('#shape');
   await expect(shape).toHaveText('423 rows × 12 columns');
@@ -12,8 +12,10 @@ test('les outliers de Column details se cliquent et filtrent le tableau', async 
   // panneaux flottants, par conception. On la met d'abord en vue, comme on le fait.
   await column.scrollIntoViewIfNeeded();
   await column.locator('.dots').click();
-  const row = page.locator('#picker .finding-row .flag', { hasText: 'values below' });
+  // La légende de la courbe par ligne porte les outliers : une pastille cliquable.
+  const row = page.locator('#picker .legend-link', { hasText: 'outliers' });
   await expect(row).toBeVisible();
+  await expect(row).toContainText('13 outliers');
   await row.click();
 
   await expect(page.locator('#picker')).toBeHidden();

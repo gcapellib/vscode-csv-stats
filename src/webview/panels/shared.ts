@@ -8,25 +8,35 @@ import { palette } from '../state';
  * sans quoi un panneau garde la couleur du précédent.
  */
 export function tintPanel(columnIndex: number | null): void {
-  elements.picker.style.borderTopColor = columnIndex === null ? '' : palette(columnIndex).accent;
+  const accent = columnIndex === null ? '' : palette(columnIndex).accent;
+  elements.picker.style.borderTopColor = accent;
+  // Sans colonne (Dataset, Clean) : le titre prend le dégradé de l'en-tête.
+  elements.picker.classList.toggle('file-panel', columnIndex === null);
+  // Les titres de section reprennent la couleur de la colonne : on ne s'y perd pas.
+  if (accent) elements.picker.style.setProperty('--column-accent', accent);
+  else elements.picker.style.removeProperty('--column-accent');
 }
 
-export function panelTitle(title: string, subtitle: string): HTMLElement {
+export function panelTitle(title: string, subtitle: string, columnIndex: number | null = null): HTMLElement {
   const wrapper = document.createElement('div');
   const main = document.createElement('div');
   main.className = 'picker-title';
   main.textContent = title;
+  if (columnIndex !== null) main.style.color = palette(columnIndex).accent;
   const sub = document.createElement('div');
   sub.className = 'picker-note';
   sub.textContent = subtitle;
-  wrapper.append(main, sub);
+  wrapper.append(main);
+  if (subtitle) wrapper.append(sub);
   return wrapper;
 }
 
 export function sectionTitle(text: string): HTMLElement {
   const element = document.createElement('div');
   element.className = 'section-title';
-  element.textContent = text;
+  // Le texte dans son propre élément : un dégradé posé dessus couvre le mot, pas
+  // toute la largeur du panneau.
+  element.appendChild(Object.assign(document.createElement('span'), { textContent: text }));
   return element;
 }
 
