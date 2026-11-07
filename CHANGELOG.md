@@ -4,6 +4,39 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.24.3
+
+(0.24.0 to 0.24.2 were trial builds of a cleaning panel, since withdrawn; this
+version follows 0.23.11.)
+
+**Unique values.** Each band gains a *Unique* line under *Distinct*: the values
+that occur exactly once, what Power Query calls unique. In a list of categories
+they are often typos the ranking hides under *Other*. Clicking the line keeps
+only those rows, and the generated pandas reads
+`df[df[col].notna() & ~df[col].duplicated(keep=False)]`. It replaces the note
+*every value occurs once*, which is now simply *Unique* equal to *Distinct*.
+
+**Dates and times.** A column whose every value reads as a date or a time gets
+its own type — `date` or `time` — with a timeline instead of a ranking, *Min /
+Max*, mean and median written as dates in the file's own convention, a
+chronological sort, a *before / after / between* filter, and `parse_dates` (with
+`dayfirst=True` when needed) in the generated `pd.read_csv`. Times alone become
+durations with `pd.to_timedelta`. Recognised: `2015-01-31` and `2015/01/31`, with
+or without a time; `31/01/2015`, `31.01.2015` and `31-01-2015` only when a day
+above 12 settles the order; `12:52` and `12:52:01`. The American `01/31/2015` is
+not read. *Read this column as* offers Date and Time too.
+
+**Fixes.**
+- A column no longer changes type under a filter. Keeping only the empty cells
+  of a numeric column turned it into text, and its filter into a value list.
+- *Read this column as* is recomputed on the filtered rows, like every other
+  band, and is no longer lost at the next filter change or undone by a rename.
+- Reopening a numeric filter shows *Only empty cells* or *Hide them* when one is
+  active, instead of *Follow the condition*.
+
+**Listing.** The description is shorter — what it does, the screenshots, what's
+new — and the detailed explanations moved to `docs/guide.md` on GitHub.
+
 ## 0.23.11
 
 Copying a marked row now also answers the browser's own `copy` event, not just

@@ -15,3 +15,4 @@ playwright.config.ts
 eslint.config.mjs
 .github/**
 REFACTOR-PLAN.md
+docs/**
