@@ -1,8 +1,9 @@
 # CSV Stats
 
-**See what's in a CSV before you load it into pandas.** Per-column statistics,
-one-click cross-filtering, and a `pd.read_csv` call that matches what is really
-in the file — separator, decimal comma, missing-value tokens, dates.
+**See what's in a CSV, clean it, and load it into pandas.** Per-column
+statistics, one-click cross-filtering, cleaning steps that never touch the
+original, and a `pd.read_csv` call that matches what is really in the file —
+separator, decimal comma, missing-value tokens, dates.
 
 Right-click a `.csv` file in the explorer → **Open in CSV Stats**.
 
@@ -12,6 +13,15 @@ Right-click a `.csv` file in the explorer → **Open in CSV Stats**.
 
 ## What's new
 
+- **Column details leads to the fix** (0.25.1). Outliers, values that break the
+  column's type and inconsistent formats (`A-9999` against `A-999`) are one click
+  from their rows, with the cleaning step that fixes them right beside.
+- **Clean, without touching the original** (0.25.0). A broom on every column
+  header (or right-click it) trims, fixes case, replaces values, changes the
+  type, renames or removes the column; the **Clean** button lists the applied
+  steps, holds the full catalogue — duplicate and blank rows included — and
+  saves a cleaned copy next to the file, `name.clean.csv`, never over it.
+  Changed cells are underlined; hover one to see what it was.
 - **Duplicated rows, side by side** (0.24.4). Every occurrence, original
   included, grouped one under the other on alternating shades of the palette;
   hover a row number to see where the others are.
@@ -36,7 +46,11 @@ Every version is listed in the [changelog](https://github.com/gcapellib/vscode-c
   removes each.
 - **Filter panel per column** — a value list with search, like Excel; *contains*
   / *starts with* for text; *greater than* / *between* for numbers and dates.
-- **Column details** — empty cells, cells of spaces and `NULL` counted apart,
+- **Cleaning steps** — trim, invisible characters, case, replace values, treat
+  tokens as empty, fill down, change type, rename, remove a column, remove
+  duplicate or blank rows. Each step shows what it changed and can be removed;
+  the original is never modified, and every save keeps a new copy.
+- **Column details** — the chart button on each band: empty cells, cells of spaces and `NULL` counted apart,
   what pandas would make of the column and what stands in the way.
 - **Dataset** — the matching `pd.read_csv`, followed by every rename, drop,
   filter and sort you made, in order — plus duplicated rows and values that
@@ -44,7 +58,7 @@ Every version is listed in the [changelog](https://github.com/gcapellib/vscode-c
 - **Raw view** — the file exactly as written, each field in its column's colour.
 - **29 palettes**, two of them colour-blind-safe, and random ones to draw —
   hover to preview on your own data.
-- **Fast** — 100,000 rows scroll smoothly; the file is never modified.
+- **Fast** — 100,000 rows scroll smoothly; the file itself is never modified.
 
 ![The palette picker open, with the sheet already recoloured to Frost from hovering it in the list](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-theme-preview.png)
 
@@ -71,5 +85,5 @@ Every version is listed in the [changelog](https://github.com/gcapellib/vscode-c
 Extensions view → `…` → **Install from VSIX…**, or:
 
 ```bash
-code --install-extension csv-stats-0.24.4.vsix
+code --install-extension csv-stats-0.25.8.vsix
 ```

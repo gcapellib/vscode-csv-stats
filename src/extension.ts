@@ -2,6 +2,7 @@ import { statSync } from 'node:fs';
 import * as vscode from 'vscode';
 import { decode, parse } from './core/csv';
 import { computeAll } from './core/stats';
+import { cleanCopyName } from './core/steps';
 
 const VIEW_TYPE = 'csvStats.editor';
 const THEME_KEY = 'csvStats.theme';
@@ -114,12 +115,36 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
           void panel.webview.postMessage({ type: 'promptResult', token: message.token, value: answer ?? null });
           break;
         }
+        case 'saveCopy':
+          await this.saveCopy(document.uri, String(message.text ?? ''));
+          break;
         case 'requestRaw':
           if (rawText !== null) void panel.webview.postMessage({ type: 'raw', text: rawText });
           else rawRequested = true;
           break;
       }
     });
+  }
+
+  /**
+   * Écrit le tableau nettoyé dans un nouveau fichier à côté de l'original :
+   * `nom.clean.csv`, puis `nom.clean-2.csv`… L'original n'est jamais réécrit,
+   * et une copie déjà là n'est jamais écrasée : chaque sauvegarde en garde une.
+   */
+  private async saveCopy(original: vscode.Uri, text: string): Promise<void> {
+    const folder = vscode.Uri.joinPath(original, '..');
+    const fileName = basename(original);
+    let target = vscode.Uri.joinPath(folder, cleanCopyName(fileName));
+    for (let attempt = 2; await exists(target); attempt++) {
+      target = vscode.Uri.joinPath(folder, cleanCopyName(fileName, attempt));
+    }
+    if (target.toString() === original.toString()) return;
+    await vscode.workspace.fs.writeFile(target, new TextEncoder().encode(text));
+    const choice = await vscode.window.showInformationMessage(
+      `Saved ${basename(target)} — ${fileName} is untouched.`,
+      'Open in CSV Stats',
+    );
+    if (choice) await vscode.commands.executeCommand('vscode.openWith', target, VIEW_TYPE);
   }
 
   private async load(
@@ -232,9 +257,10 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
     <span class="chevron">▾</span> Insights
   </button>
   <button id="dataset-button" type="button" title="Duplicates, findings and the matching pandas call">Dataset…</button>
-  <button id="raw-toggle" type="button" title="Show the file exactly as written, unparsed">Raw</button>
+  <button id="clean-button" type="button" title="Cleaning steps, the full catalogue, and saving a cleaned copy">Clean</button>
   <span id="selection"></span>
   <span id="notice"></span>
+  <button id="raw-toggle" type="button" title="Show the file exactly as written, unparsed">Raw</button>
 </div>
 <div id="filters" hidden></div>
 <div id="scroller"><div id="sheet">
@@ -251,6 +277,15 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
 <script nonce="${nonce}" src="${script}"></script>
 </body>
 </html>`;
+  }
+}
+
+async function exists(uri: vscode.Uri): Promise<boolean> {
+  try {
+    await vscode.workspace.fs.stat(uri);
+    return true;
+  } catch {
+    return false;
   }
 }
 

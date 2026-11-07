@@ -27,14 +27,14 @@ test.describe('filtrer les vides', () => {
 
   test('un téléphone est lu comme du texte : liste de valeurs, pas de bornes numériques', async ({ page }) => {
     await openHarness(page, file);
-    await page.locator('.head-cell', { hasText: 'telephone' }).locator('.head-button').first().click();
+    await page.locator('.head-cell', { hasText: 'telephone' }).locator('.head-button[aria-label="Filter this column"]').click();
     await expect(page.locator('.picker-tab')).toHaveText(['Values', 'Text']);
     await expect(page.locator('.picker-number')).toHaveCount(0);
   });
 
   test('« Only empty cells » ne garde que les vides', async ({ page }) => {
     await openHarness(page, file);
-    await page.locator('.head-cell', { hasText: 'telephone' }).locator('.head-button').first().click();
+    await page.locator('.head-cell', { hasText: 'telephone' }).locator('.head-button[aria-label="Filter this column"]').click();
     await page.locator('.picker-tab', { hasText: 'Text' }).click();
     await page.locator('.picker-empties').selectOption('only');
     await page.locator('.picker-button.primary').click();
@@ -43,7 +43,7 @@ test.describe('filtrer les vides', () => {
 
   test('« Keep them too » ajoute les vides à une condition', async ({ page }) => {
     await openHarness(page, 'samples/wines.csv');
-    const button = page.locator('.head-cell', { hasText: 'quality_score' }).locator('.head-button').first();
+    const button = page.locator('.head-cell', { hasText: 'quality_score' }).locator('.head-button[aria-label="Filter this column"]');
     await button.scrollIntoViewIfNeeded();
     await page.waitForTimeout(100);
     await button.click();

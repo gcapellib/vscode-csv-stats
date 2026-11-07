@@ -1,4 +1,15 @@
-import { textSpan } from '../dom';
+import { elements, textSpan } from '../dom';
+import { palette } from '../state';
+
+/**
+ * Le liseré du panneau flottant : l'accent de la colonne dont il parle — filtre,
+ * Column details — comme le menu de cette colonne ; sans colonne (Dataset,
+ * Clean), celui de la première, posé par paint.ts. À appeler à chaque ouverture,
+ * sans quoi un panneau garde la couleur du précédent.
+ */
+export function tintPanel(columnIndex: number | null): void {
+  elements.picker.style.borderTopColor = columnIndex === null ? '' : palette(columnIndex).accent;
+}
 
 export function panelTitle(title: string, subtitle: string): HTMLElement {
   const wrapper = document.createElement('div');

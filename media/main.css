@@ -29,7 +29,13 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  /* Le texte commence là où commence celui des bandeaux : une marge de cellule
+     après le bord de la première colonne (voir alignBars). */
+  margin: 0 var(--bar-right, 0) 0 var(--bar-left, 0);
+  padding: 6px 12px;
+  /* Les coins arrondis de la barre, aux bords des colonnes : le même rayon que
+     les menus, et la barre se lit comme le haut du tableau. */
+  border-radius: 8px 8px 0 0;
   border-bottom: 1px solid var(--vscode-panel-border);
   /* Même traitement que la barre de filtres juste en dessous : une base opaque,
      teintée par le dégradé que JavaScript pose selon la palette choisie. */
@@ -51,7 +57,8 @@ body {
   background: var(--vscode-panel-border);
 }
 
-#dataset-button {
+#dataset-button,
+#clean-button {
   padding: 3px 10px;
   border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border));
   background: var(--vscode-dropdown-background);
@@ -60,11 +67,14 @@ body {
   cursor: pointer;
 }
 
-#dataset-button:hover {
+#dataset-button:hover,
+#clean-button:hover {
   background: var(--vscode-list-hoverBackground);
 }
 
 #raw-toggle {
+  /* À droite de la barre, à l'écart des outils d'analyse : il change de vue. */
+  margin-left: auto;
   padding: 3px 10px;
   border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border));
   background: var(--vscode-dropdown-background);
@@ -78,6 +88,7 @@ body {
 }
 
 #dataset-button.active,
+#clean-button.active,
 #raw-toggle.active {
   background: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
@@ -297,7 +308,8 @@ body {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  margin: 0 var(--bar-right, 0) 0 var(--bar-left, 0);
+  padding: 6px 12px;
   border-bottom: 1px solid var(--vscode-panel-border);
   /* La couleur unie reste la base ; le dégradé posé par JavaScript
      (background-image) la teinte des couleurs du thème actif sans jamais la
@@ -705,7 +717,9 @@ body {
 
 #tooltip {
   position: fixed;
-  z-index: 10;
+  /* Au-dessus des panneaux flottants (40) : l'infobulle d'une barre de
+     Column details s'affiche dans un panneau. */
+  z-index: 60;
   max-width: 320px;
   padding: 5px 8px;
   border: 1px solid var(--vscode-editorHoverWidget-border);
@@ -724,6 +738,10 @@ body {
   background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
   color: var(--vscode-menu-foreground, var(--vscode-foreground));
   box-shadow: 0 4px 12px rgb(0 0 0 / 35%);
+  /* Le menu de nettoyage est long : sur une petite fenêtre, positionFloating
+     plafonne sa hauteur, et le reste défile au lieu de sortir de l'écran. */
+  max-height: 85vh;
+  overflow-y: auto;
 }
 
 #picker.wide {
@@ -874,7 +892,7 @@ body {
   display: block;
   flex: 0 0 auto;
   width: 100%;
-  aspect-ratio: 316 / 150;
+  aspect-ratio: 340 / 192;
   color: var(--vscode-foreground);
 }
 
@@ -1154,4 +1172,237 @@ body.resizing * {
   background: var(--vscode-dropdown-background, var(--vscode-input-background));
   color: var(--vscode-dropdown-foreground, var(--vscode-input-foreground));
   font: inherit;
+}
+
+/* Le balai de l'en-tête et le graphique du bandeau : des icônes tracées,
+   centrées dans leur bouton comme les caractères ▾ et ⇅. */
+.head-button.clean,
+.dots {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Une cellule qu'une étape de nettoyage a changée : soulignée à l'accent de sa
+   colonne (posé par table.ts), sans toucher à son fond. */
+.cell.changed {
+  text-decoration-line: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+/* Le panneau Clean : une étape par ligne, l'accent de sa colonne à gauche,
+   ce qu'elle a touché à droite, puis le catalogue en grille de boutons. */
+.clean-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.clean-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 8px;
+  border-left: 4px solid var(--vscode-descriptionForeground);
+  background: rgb(128 128 128 / 12%);
+}
+
+.clean-step > span:first-child {
+  flex: 1;
+}
+
+.clean-effect {
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+}
+
+.clean-remove {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.clean-remove:hover {
+  opacity: 1;
+}
+
+.clean-catalogue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 6px;
+}
+
+.clean-catalogue .picker-button {
+  margin: 0;
+}
+
+/* Un constat de Column details : la ligne cliquable, puis ses boutons d'étapes. */
+.finding-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 3px;
+}
+
+.finding-row .flag {
+  flex: 1;
+}
+
+.finding-action {
+  margin: 0;
+  white-space: nowrap;
+}
+
+/* Le menu de nettoyage, comme la maquette : coins arrondis, un liseré à l'accent
+   de la colonne, une colonne de repères (icône ou coche), le compte de ce que
+   l'action toucherait en gris à côté, et les variantes d'un geste en pastilles. */
+#menu.clean-menu {
+  min-width: 270px;
+  padding: 6px 0 8px;
+  border-radius: 8px;
+  border-top-width: 3px;
+}
+
+#menu.clean-menu .menu-heading {
+  padding: 10px 14px 3px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.85em;
+}
+
+#menu.clean-menu .menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+}
+
+#menu.clean-menu .menu-item.idle {
+  opacity: 0.55;
+}
+
+.cmenu-mark {
+  display: inline-flex;
+  flex: 0 0 16px;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.cmenu-hint {
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+}
+
+.cmenu-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 4px 14px 4px 38px;
+}
+
+.cmenu-chip {
+  padding: 2px 10px;
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border));
+  border-radius: 11px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.95em;
+  cursor: pointer;
+}
+
+.cmenu-chip:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.cmenu-chip.on {
+  border-color: transparent;
+  color: var(--vscode-editor-background, #1f1f1f);
+  font-weight: 600;
+}
+
+/* L'échelle d'un histogramme de Column details, sous le dessin et non dedans. */
+.chart-scale {
+  display: block;
+  margin-top: 2px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+}
+
+/* ── Un seul style pour tout ce qui flotte ────────────────────────────────────
+   Celui du menu de colonne : coins arrondis, un liseré à l'accent en haut, des
+   titres de section en minuscules, des lignes aérées, des pastilles pour les
+   boutons. Le liseré prend l'accent de la première colonne (posé par paint.ts) ;
+   le menu d'une colonne garde le sien. */
+#menu,
+#theme-popup,
+#picker {
+  border-radius: 8px;
+  border-top: 3px solid var(--float-accent, var(--vscode-focusBorder, #4a8fe0));
+}
+
+#menu {
+  padding: 6px 0 8px;
+}
+
+#theme-popup {
+  padding-top: 4px;
+}
+
+#picker {
+  padding: 12px 14px;
+}
+
+#menu .menu-item,
+.theme-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+}
+
+.theme-item {
+  gap: 10px;
+}
+
+/* Les titres de section ne crient plus : sentence case, comme les menus. */
+.menu-heading,
+.theme-group,
+.section-title {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.85em;
+}
+
+.theme-group {
+  padding: 10px 14px 3px;
+}
+
+.section-title {
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.picker-title {
+  font-size: 1.05em;
+}
+
+.picker-button {
+  border-radius: 11px;
+}
+
+.picker-select,
+.picker-text,
+.picker-search,
+.picker-number {
+  border-radius: 6px;
+}
+
+.flag {
+  border-radius: 0 4px 4px 0;
 }

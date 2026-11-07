@@ -6,13 +6,15 @@ import { formatValue, valueParser } from '../core/values';
 import { closePicker, getOpenPanel, refilter } from './actions';
 import { HEAD_BUTTONS, MAX_WIDTH, MIN_WIDTH, MIN_WIDTH_FOLDED, OVERSCAN, RESIZE_MAX, RESIZE_MIN, ROW_HEIGHT, WIDTH_SAMPLE_ROWS } from './constants';
 import { elements } from './dom';
-import { closeMenu } from './menu';
+import { stepsOn } from './cleaning';
+import { icon } from './icons';
+import { closeMenu, openMenu } from './menu';
 import { paint } from './paint';
 import { openFilterPanel } from './panels/filter-panel';
 import { distinctText, uniqueText } from './band';
 import { resizeHandle } from './resize';
 import { palette, state } from './state';
-import { hideTooltip } from './tooltip';
+import { hideTooltip, quickTip } from './tooltip';
 
 /**
  * Largeur de chaque colonne.
@@ -351,7 +353,25 @@ export function paintHead(): void {
     );
     sort.classList.toggle('on', sorted);
 
-    cell.append(name, filter, sort, resizeHandle(modelIndex));
+    // Agir sur la colonne : le balai ouvre son menu de nettoyage, comme le
+    // clic droit sur l'en-tête (voir main.ts).
+    const clean = headButton('', 'Clean this column', (event) => {
+      event.stopPropagation();
+      openMenu(modelIndex, clean);
+    });
+    clean.classList.add('clean');
+    clean.appendChild(icon('sparkles'));
+    // Une colonne déjà nettoyée le montre : son balai prend l'accent de la colonne.
+    const steps = stepsOn(modelIndex);
+    if (steps > 0) {
+      clean.classList.add('on');
+      clean.style.color = palette(modelIndex).accent;
+      quickTip(clean, `Clean this column — ${steps} step${steps === 1 ? '' : 's'} applied`);
+    }
+    cell.dataset.column = String(modelIndex);
+
+    // Le nettoyage d'abord, à gauche du filtre et du tri.
+    cell.append(name, clean, filter, sort, resizeHandle(modelIndex));
     elements.head.appendChild(cell);
   }
 }
@@ -361,7 +381,7 @@ export function headButton(glyph: string, title: string, action: (event: MouseEv
   button.className = 'head-button';
   button.type = 'button';
   button.textContent = glyph;
-  button.title = title;
+  quickTip(button, title);
   button.addEventListener('click', action);
   return button;
 }
@@ -439,6 +459,14 @@ export function paintRows(onlyIfMoved = false): void {
       cell.style.background = shaded ? colours.band : colours.cell;
       cell.style.color = colours.text;
       cell.textContent = cells[modelIndex] ?? '';
+      // Une cellule qu'une étape a changée se souligne à l'accent de sa
+      // colonne, et dit au survol ce qu'elle valait dans le fichier.
+      const before = changedFrom(rowIndex, modelIndex);
+      if (before !== null) {
+        cell.classList.add('changed');
+        cell.style.textDecorationColor = colours.accent;
+        cell.title = before === '' ? 'Was empty' : `Was « ${before} »`;
+      }
       // Au `click` et non au `mousedown` : repeindre les lignes dès l'appui
       // remplaçait la cellule sous le curseur et détruisait la sélection de
       // texte avant même qu'elle commence (ni glissé, ni double-clic, ni Ctrl+C).
@@ -452,6 +480,16 @@ export function paintRows(onlyIfMoved = false): void {
   }
   elements.body.textContent = '';
   elements.body.appendChild(fragment);
+}
+
+/** La valeur d'origine d'une cellule qu'une étape a changée, ou null si elle est intacte. */
+function changedFrom(rowIndex: number, column: number): string | null {
+  if (state.steps.length === 0) return null;
+  const original = state.original[state.source[rowIndex] ?? rowIndex];
+  const now = state.rows[rowIndex];
+  if (!original || original === now) return null;
+  const before = original[column] ?? '';
+  return before === (now?.[column] ?? '') ? null : before;
 }
 
 /** Vrai quand l'utilisateur vient de sélectionner du texte : le clic n'est alors qu'un geste de copie. */

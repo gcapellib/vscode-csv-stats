@@ -54,8 +54,11 @@ export interface ColumnStats {
   deviation: number | null;
   /** Valeurs hors de [Q1 − 1,5 IQR ; Q3 + 1,5 IQR]. */
   outliers: number;
-  /** 20 classes entre min et max ; vide pour une colonne texte. */
+  /** 20 classes sur la plage normale (voir binBounds) ; vide pour une colonne texte. */
   histogram: number[];
+  /** La plage des tranches régulières : les moustaches, ou min et max sans outlier. */
+  histLow: number | null;
+  histHigh: number | null;
   /** Valeurs les plus fréquentes ; vide pour une colonne mesurable. */
   top: ValueShare[];
   /** Ce que le palmarès laisse de côté, pour que les parts totalisent 100 %. */
@@ -158,6 +161,8 @@ export function compute(table: CsvTable, columnIndex: number, forced?: ColumnTyp
     deviation: null,
     outliers: 0,
     histogram: [],
+    histLow: null,
+    histHigh: null,
     top: [],
     otherCount: 0,
     otherShare: 0,
@@ -192,17 +197,51 @@ function fillDistribution(stats: ColumnStats, counts: Map<string, number>, parse
 
   stats.min = min;
   stats.max = max;
-  const span = max - min;
+  fillDescriptive(stats, counts, parse);
+
+  // Les tranches couvrent la plage normale — celle des moustaches, de
+  // Q1 − 1,5 IQR à Q3 + 1,5 IQR — et non tout l'écart du minimum au maximum :
+  // une seule valeur à 38 parmi des 2 à 7 comprimait toute la masse dans trois
+  // barres. Les outliers rejoignent les barres des bords, dont les bornes
+  // s'étendent jusqu'au minimum et au maximum (voir binBounds).
+  const [low, high] = histogramRange(stats);
+  stats.histLow = low;
+  stats.histHigh = high;
+  const span = high - low;
   const histogram = new Array<number>(HISTOGRAM_BINS).fill(0);
   for (const [raw, occurrences] of counts) {
     const value = parse(raw);
     if (value === null) continue;
-    const bin =
-      span <= 0 ? 0 : Math.min(HISTOGRAM_BINS - 1, Math.floor(((value - min) / span) * HISTOGRAM_BINS));
+    const bin = span <= 0 ? 0 : Math.max(0, Math.min(HISTOGRAM_BINS - 1, Math.floor(((value - low) / span) * HISTOGRAM_BINS)));
     histogram[bin] += occurrences;
   }
   stats.histogram = histogram;
-  fillDescriptive(stats, counts, parse);
+}
+
+/** La plage des tranches : les moustaches, bornées par le minimum et le maximum. */
+function histogramRange(stats: ColumnStats): [number, number] {
+  const min = stats.min ?? 0;
+  const max = stats.max ?? 0;
+  if (stats.q1 === null || stats.q3 === null || stats.outliers === 0) return [min, max];
+  const spread = stats.q3 - stats.q1;
+  const low = Math.max(min, stats.q1 - 1.5 * spread);
+  const high = Math.min(max, stats.q3 + 1.5 * spread);
+  return high > low ? [low, high] : [min, max];
+}
+
+/**
+ * Les bornes de la tranche `index` : régulières dans la plage normale, sauf aux
+ * deux bords, qui vont jusqu'au minimum et au maximum puisque les outliers y
+ * sont rangés. Les bornes affichées et les filtres disent ainsi la vérité.
+ */
+export function binBounds(stats: ColumnStats, index: number): [number, number] {
+  const bins = stats.histogram.length;
+  const low = stats.histLow ?? stats.min ?? 0;
+  const high = stats.histHigh ?? stats.max ?? 0;
+  const width = (high - low) / bins;
+  const from = index === 0 ? (stats.min ?? low) : low + width * index;
+  const to = index === bins - 1 ? (stats.max ?? high) : low + width * (index + 1);
+  return [from, to];
 }
 
 /**

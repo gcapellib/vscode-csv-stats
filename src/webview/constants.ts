@@ -19,7 +19,7 @@ export const MIN_WIDTH_FOLDED = 90;
  * rognaient — invisible tant que le plancher de 210 px absorbait l'écart,
  * flagrant dès que replier les bandeaux le fait tomber.
  */
-export const HEAD_BUTTONS = 46;
+export const HEAD_BUTTONS = 66;
 export const MAX_WIDTH = 460;
 /**
  * Bornes d'une largeur choisie à la main : plus étroite, la colonne ne

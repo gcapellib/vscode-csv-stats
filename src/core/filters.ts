@@ -64,7 +64,13 @@ export type Filter =
    * Les lignes dont la valeur n'apparaît qu'une fois dans la colonne, vides
    * exclus. Se juge, comme `distinct`, sur les lignes déjà retenues.
    */
-  | { kind: 'unique'; column: number; label: string };
+  | { kind: 'unique'; column: number; label: string }
+  /**
+   * Les valeurs hors de [low ; high] — les outliers d'une colonne mesurable,
+   * au-delà de 1,5 écart interquartile. Une seule condition, « < low ou > high »,
+   * que ni une plage ni une comparaison ne savent dire.
+   */
+  | { kind: 'outside'; column: number; low: number; high: number; temporal?: TemporalFormat; label: string };
 
 /** Les conditions qui se jugent sur une seule cellule. */
 export type CellFilter = Exclude<Filter, { kind: 'duplicates' | 'distinct' | 'unique' }>;
@@ -102,6 +108,8 @@ export function filterToPandas(filter: Filter, columnName: string): string {
       }
       return `df = df[${valuesCondition(name, named, hasBlank)}]`;
     }
+    case 'outside':
+      return `df = df[(df[${name}] < ${literal(filter.low, filter.temporal)}) | (df[${name}] > ${literal(filter.high, filter.temporal)})]`;
     case 'range': {
       // Une borne unique et fermée désigne une seule valeur : « == 7 » se lit,
       // « between(7, 7) » se déchiffre. Une classe d'histogramme exclut sa
@@ -305,6 +313,11 @@ export function cellMatches(raw: string, filter: CellFilter, parse: (raw: string
       const listed = filter.values.includes(raw) || (blank && filter.values.includes(''));
       return filter.exclude ? !listed : listed;
     }
+    case 'outside': {
+      if (blank) return false;
+      const value = parse(raw);
+      return value !== null && (value < filter.low || value > filter.high);
+    }
     case 'range': {
       if (blank) return filter.blank === true;
       const value = parse(raw);
@@ -329,6 +342,10 @@ export interface DatasetTransformInput {
   /** Chaque filtre actif, avec le nom de colonne déjà résolu. */
   filters: Array<{ filter: Filter; columnName: string }>;
   sort: { columnName: string; ascending: boolean } | null;
+  /** Les lignes pandas des étapes de nettoyage (voir steps.ts). */
+  cleaning?: string[];
+  /** Le nom de la copie nettoyée, pour le `to_csv` qui suit les étapes. */
+  copyName?: string;
 }
 
 /**
@@ -351,6 +368,13 @@ export function datasetTransformLines(input: DatasetTransformInput): string[] {
   if (input.dropped.length > 0) {
     const names = input.dropped.map((name) => JSON.stringify(name)).join(', ');
     lines.push('', '# Columns dropped from the table', `df = df.drop(columns=[${names}])`);
+  }
+
+  // Les étapes de nettoyage, puis la copie — avant les filtres et le tri, qui
+  // servent à regarder et n'entrent pas dans la copie.
+  if (input.cleaning && input.cleaning.length > 0) {
+    lines.push('', '# Cleaning steps', ...input.cleaning);
+    if (input.copyName) lines.push('', '# The cleaned copy; the original file is untouched', `df.to_csv(${JSON.stringify(input.copyName)}, index=False)`);
   }
 
   if (input.filters.length > 0) {

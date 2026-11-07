@@ -1,14 +1,15 @@
 import { count, percent } from '../core/format';
-import { foldRanking, type ColumnStats } from '../core/stats';
+import { binBounds, foldRanking, type ColumnStats } from '../core/stats';
 import { formatValue } from '../core/values';
 import { type Palette } from '../core/themes';
-import { toggleFilter } from './actions';
+import { closePicker, getOpenPanel, toggleFilter } from './actions';
 import { HIST_HEIGHT } from './constants';
 import { elements, textSpan } from './dom';
-import { openMenu } from './menu';
+import { icon } from './icons';
+import { openDetails } from './panels/column-details';
 import { palette, state } from './state';
 import { gutterCell, valuesFilter } from './table';
-import { hideTooltip, showTooltip } from './tooltip';
+import { hideTooltip, quickTip, showTooltip } from './tooltip';
 
 export function paintBand(): void {
   elements.band.hidden = !state.bandVisible;
@@ -30,15 +31,22 @@ export function bandCell(modelIndex: number): HTMLElement {
   cell.style.color = colours.text;
   cell.style.borderTopColor = colours.accent;
 
-  const dots = document.createElement('button');
-  dots.className = 'dots';
-  dots.textContent = '⋯';
-  dots.title = 'Column actions';
-  dots.addEventListener('click', (event) => {
+  // Le bandeau sert à comprendre la colonne : son bouton en ouvre la version
+  // longue. Agir sur la colonne passe par le balai de l'en-tête.
+  const details = document.createElement('button');
+  details.className = 'dots';
+  details.appendChild(icon('chart'));
+  quickTip(details, 'Column details');
+  details.addEventListener('click', (event) => {
     event.stopPropagation();
-    openMenu(modelIndex, dots);
+    // Un second clic sur le bouton qui a ouvert le panneau le referme.
+    if (getOpenPanel() === `details:${modelIndex}`) {
+      closePicker();
+      return;
+    }
+    openDetails(modelIndex, details);
   });
-  cell.appendChild(dots);
+  cell.appendChild(details);
 
   // L'index de la colonne dans le tableau tel qu'il est, compté depuis 0
   // comme pandas : une colonne retirée renumérote les suivantes, comme
@@ -238,8 +246,7 @@ export function histogram(column: ColumnStats, colours: Palette, width: number):
     target.setAttribute('width', String(Math.max(1, right - left)));
     target.setAttribute('height', String(height));
     target.setAttribute('fill', 'transparent');
-    const low = (column.min ?? 0) + (span * index) / bins;
-    const high = index === bins - 1 ? (column.max ?? 0) : (column.min ?? 0) + (span * (index + 1)) / bins;
+    const [low, high] = binBounds(column, index);
     const range =
       span <= 0 ? formatValue(column, column.min ?? 0) : `${formatValue(column, low)} – ${formatValue(column, high)}`;
     const share = column.present === 0 ? 0 : value / column.present;

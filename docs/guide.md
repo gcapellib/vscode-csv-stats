@@ -149,15 +149,32 @@ case, values padded with spaces. Clicking one filters the table down to the
 offending rows, because a diagnosis you cannot go and look at only causes
 worry.
 
-## Column menu
+## Column menu and cleaning
 
-Three dots at the top right of each band: sort ascending or descending, a
-contains-filter, rename, drop the column, and read the column as another type.
+Each band has a **chart** button at its top right: it opens *Column details*.
+Each column header has a **broom**, next to filter and sort — right-clicking the
+header opens the same menu. The broom is for acting on the column: text (trim,
+invisible characters, case), values (replace, treat as empty, fill down), type,
+rename, remove. The **Clean** button in the toolbar holds the full catalogue,
+including what concerns no single column (duplicate and blank rows), and the
+list of applied steps.
 
-These are all **view actions**: the file is never rewritten. Reopening the tab
-restores the original state. Forcing a type keeps only the values that read that
-way, without requiring that all of them do — that is the whole point of a manual
-override.
+**One rule:** what changes the data is a *step*; what changes only how you look
+at it — filters, sort, widths, palette — is not. The original file is kept in
+memory exactly as read and never written; the steps replay on it after every
+change, like Power Query's *Applied steps*. Removing a step replays the list
+without it. Each step says what it touched (*20 cells*, *−3 rows*), a column with
+steps lights its broom in its accent colour, and every changed cell is
+underlined — hover it to read the value it had in the file.
+
+**Save cleaned copy…** writes the cleaned table (all rows, not just the filtered
+ones: a filter is for looking) next to the original as `name.clean.csv`, then
+`name.clean-2.csv`, and so on — never over the original, never over an earlier
+copy. The pandas code in *Dataset…* replays the same steps and ends with the
+matching `to_csv`.
+
+Changing the type is a step too, and behaves like Power Query's: a value that
+does not read in the new type becomes empty, and the step says how many.
 
 **Only the types that change what you see.** A CSV carries none — everything in
 it is text — so any typology is an inference, and an inference can be wrong. The

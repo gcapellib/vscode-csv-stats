@@ -249,3 +249,15 @@ describe('colonnes identifiants', () => {
     assert.equal(decideType(['1', '2'], 2, false, 'interval'), 'numeric');
   });
 });
+
+describe('outliers', () => {
+  it('garde ce qui sort des bornes, en une condition pandas', () => {
+    const outside: Filter = { kind: 'outside', column: 0, low: 0, high: 10, label: '' };
+    const parse = (raw: string) => parseNumber(raw, false);
+    assert.equal(cellMatches('-1', outside, parse), true);
+    assert.equal(cellMatches('5', outside, parse), false);
+    assert.equal(cellMatches('11', outside, parse), true);
+    assert.equal(cellMatches('', outside, parse), false);
+    assert.equal(filterToPandas(outside, 'prix'), 'df = df[(df["prix"] < 0) | (df["prix"] > 10)]');
+  });
+});

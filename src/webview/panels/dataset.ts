@@ -7,8 +7,10 @@ import { gradientFor, themeById } from '../../core/themes';
 import { isDark, palette, state } from '../state';
 import { currentTable, setColumnFilter, valuesFilter } from '../table';
 import { openDetails } from './column-details';
-import { footer, panelTitle, sectionTitle } from './shared';
+import { footer, panelTitle, sectionTitle, tintPanel } from './shared';
 import { datasetTransformLines as coreDatasetTransformLines } from '../../core/filters';
+import { cleanCopyName, stepsToPandas, type Step } from '../../core/steps';
+import { addStep } from '../cleaning';
 
 /**
  * Panneau du fichier entier.
@@ -32,20 +34,16 @@ import { datasetTransformLines as coreDatasetTransformLines } from '../../core/f
 export function datasetTransformLines(): string[] {
   const nameOf = (index: number): string => state.stats[index]?.name ?? `column ${index + 1}`;
 
-  const renamed = state.headers
-    .map((original, index) => ({ original, current: nameOf(index) }))
-    .filter(({ original, current }) => current !== original);
-
-  const dropped = state.headers
-    .map((_, index) => index)
-    .filter((index) => !state.order.includes(index))
-    .map(nameOf);
+  // Renommages et retraits de colonnes sont désormais des étapes : ils
+  // passent par `cleaning`, dans l'ordre où on les a faits.
+  const cleaning = stepsToPandas(state.steps, state.headers, (column) => state.stats[column]?.temporal?.order === 'dmy');
+  const copyName = state.steps.length > 0 ? cleanCopyName(state.fileName || 'data.csv') : undefined;
 
   const filters = state.filters.map((filter) => ({ filter, columnName: nameOf(filter.column) }));
 
   const sort = state.sort ? { columnName: nameOf(state.sort.index), ascending: state.sort.ascending } : null;
 
-  return coreDatasetTransformLines({ renamed, dropped, filters, sort });
+  return coreDatasetTransformLines({ renamed: [], dropped: [], filters, sort, cleaning, copyName });
 }
 
 export function openDataset(anchor: HTMLElement): void {
@@ -57,6 +55,7 @@ export function openDataset(anchor: HTMLElement): void {
 
   elements.picker.textContent = '';
   elements.picker.classList.add('wide');
+  tintPanel(null);
   const filtered = state.filters.length > 0;
   elements.picker.appendChild(
     panelTitle(
@@ -129,7 +128,7 @@ export function openDataset(anchor: HTMLElement): void {
     const groups = dataset.duplicateGroups.map((group) => group.map((index) => state.view[index] ?? index));
     const involved = groups.reduce((sum, group) => sum + group.length, 0);
     list.appendChild(
-      finding(
+      withFix(finding(
         `${count(dataset.duplicateRows)} rows are exact duplicates of another (${count(involved)} rows involved)`,
         () => {
           closePicker();
@@ -141,18 +140,28 @@ export function openDataset(anchor: HTMLElement): void {
             label: `${count(involved)} duplicated rows (${count(dataset.duplicateRows)} extra copies)`,
           });
         },
-      ),
+      ), ['Remove duplicates', { kind: 'removeDuplicates' }], anchor),
     );
   }
   for (const entry of dataset.findings) {
+    const fix: [string, Step] =
+      entry.fix === 'trim'
+        ? ['Trim', { kind: 'trim', column: entry.column }]
+        : entry.fix === 'empty'
+          ? ['Treat as empty', { kind: 'empty', column: entry.column, tokens: entry.values }]
+          : ['Capitalize', { kind: 'case', column: entry.column, mode: 'title' }];
     list.appendChild(
-      finding(
-        entry.text,
-        () => {
-          closePicker();
-          setColumnFilter(entry.column, valuesFilter(entry.column, entry.values));
-        },
-        entry.column,
+      withFix(
+        finding(
+          entry.text,
+          () => {
+            closePicker();
+            setColumnFilter(entry.column, valuesFilter(entry.column, entry.values));
+          },
+          entry.column,
+        ),
+        fix,
+        anchor,
       ),
     );
   }
@@ -178,6 +187,24 @@ export function head(text: string): HTMLElement {
  * constat sur le fichier entier (lignes dupliquées) prend le dégradé de la
  * barre d'outils.
  */
+/**
+ * Un constat, suivi du bouton de l'étape qui le corrige : le panneau se rouvre
+ * aussitôt, et le constat corrigé n'y figure plus.
+ */
+function withFix(flag: HTMLElement, [label, step]: [string, Step], anchor: HTMLElement): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'finding-row';
+  const button = document.createElement('button');
+  button.className = 'picker-button finding-action';
+  button.textContent = label;
+  button.addEventListener('click', () => {
+    addStep(step);
+    openDataset(anchor);
+  });
+  row.append(flag, button);
+  return row;
+}
+
 export function finding(text: string, onPick: () => void, columnIndex = -1): HTMLElement {
   const item = document.createElement('button');
   item.className = 'flag pickable';

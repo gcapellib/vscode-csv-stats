@@ -4,6 +4,7 @@ import { setOpenPanel } from '../actions';
 import { elements } from '../dom';
 import { floating, positionFloating } from '../floating-setup';
 import { state } from '../state';
+import { tintPanel } from './shared';
 import { renderNumberTab } from './number-tab';
 import { renderTextTab } from './text-tab';
 import { renderValuesTab } from './value-picker';
@@ -42,6 +43,7 @@ export function openFilterPanel(columnIndex: number, anchor: HTMLElement, prefer
   let active: Tab = preferred && tabs.includes(preferred) ? preferred : fallback;
 
   const panel = elements.picker;
+  tintPanel(columnIndex);
   const render = (): HTMLElement => {
     panel.textContent = '';
     const title = document.createElement('div');

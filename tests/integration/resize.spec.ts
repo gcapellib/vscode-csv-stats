@@ -83,10 +83,11 @@ test.describe('largeur des colonnes à la main', () => {
   test('bandeau replié, le double-clic resserre autour du titre', async ({ page }) => {
     // Une colonne dont les valeurs sont plus larges que le titre : sinon sa
     // largeur automatique est déjà celle du titre, et il n'y a rien à
-    // resserrer — le cas de grape_variety, essayé d'abord.
-    await openHarness(page);
+    // resserrer — le cas de grape_variety, puis de producer une fois le
+    // balai ajouté à l'en-tête. Les adresses de ventes.csv restent longues.
+    await openHarness(page, 'samples/ventes.csv');
     await toggleBand(page);
-    const name = 'producer';
+    const name = 'adresse';
     const handle = page.locator('.head-cell', { hasText: name }).locator('.col-resizer');
     const folded = await widthOf(page, name);
     await handle.dblclick();

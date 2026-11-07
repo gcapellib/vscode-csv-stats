@@ -1,12 +1,9 @@
 import { type Filter } from '../core/filters';
-import { type ColumnType } from '../core/types';
 import { floating } from './floating-setup';
 import { paint } from './paint';
-import { elements } from './dom';
 import { state } from './state';
 import { rebuildView, recomputeStats } from './table';
 import { paintFilterBar } from './toolbar';
-import { ask } from './prompt';
 
 /**
  * Ce que le panneau montre en ce moment.
@@ -61,32 +58,3 @@ export function refilter(): void {
   paint();
 }
 
-/**
- * Lit la colonne avec un autre type, sur les lignes affichées : sous un filtre,
- * son bandeau doit décrire le même sous-ensemble que ses voisins. Le type est
- * retenu dans `forcedTypes`, que chaque recalcul réapplique.
- */
-export function forceType(modelIndex: number, type: ColumnType): void {
-  state.forcedTypes.set(modelIndex, type);
-  const column = state.stats[modelIndex];
-  // Le tri de rebuildView lit le type avant le recalcul : il doit déjà être le bon.
-  if (column) state.stats[modelIndex] = { ...column, type };
-  refilter();
-}
-
-export function applyDrop(modelIndex: number): void {
-  state.order = state.order.filter((index) => index !== modelIndex);
-  if (state.selectedColumn === modelIndex) {
-    state.selectedColumn = null;
-    elements.selection.textContent = '';
-  }
-  paint();
-}
-
-export async function applyRename(modelIndex: number): Promise<void> {
-  const column = state.stats[modelIndex];
-  const entered = await ask('Rename Column', 'New name for this column:', column.name);
-  if (entered === null || entered.trim() === '') return;
-  column.name = entered.trim();
-  paint();
-}

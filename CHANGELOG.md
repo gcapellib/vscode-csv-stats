@@ -4,6 +4,144 @@ The Marketplace listing was last updated at 0.2.4. Everything below shipped to
 GitHub in between and is now reaching the Marketplace in one deposit — this
 file exists so that jump has an explanation.
 
+## 0.25.8
+
+**The histogram in *Column details*, simplified.**
+- **The counts are off the bars.** They told little, and *real count* was not
+  obvious. Hovering a bar now shows its range, its count and its share
+  (*5.399 – 5.606 · 46 values (7.6%)*); the outlier bars say *Outliers above 7.051*.
+- **A scale on the left**, with round graduations (0, 50, 100) and faint guide
+  lines: the order of magnitude of the bars reads without a number on them.
+- **The fences are legible.** *2.921* and *7.051* are drawn larger and brighter,
+  tied to the axis by a tick at the foot of the normal range; the minimum and the
+  maximum sit under their own hatched bar, labelled *min* and *max*.
+
+**Fixed:** a tooltip opened from a panel appeared underneath it.
+
+## 0.25.7
+
+**The histogram in *Column details* reads at a glance.**
+- **Q1, Median and Q3 are written at the top, with their value**, centred on
+  their line; a name that would touch its neighbour drops to a second row.
+- **The count is written on every bar** that is wide enough to hold it.
+- **Outliers get their own hatched bar at each end**, with their real count,
+  instead of being folded into the first and last bars of the normal range. The
+  axis says *min 2.2* and *max 38* in the corners and marks, under the junctions,
+  the fences where the outliers begin (2.68 and 7.22) — the scale no longer
+  starts at a fence that looked like the minimum.
+
+**Fixed:** with one or two columns, the toolbar was squeezed to their width; it
+now keeps a minimum width.
+
+## 0.25.6
+
+**The toolbar keeps its rounded corners.** 0.25.5 aligned it with the columns but
+hid the rounded corner it used to show; the bar now has its own, at the left edge
+of the first column and the right edge of the last.
+
+## 0.25.5
+
+**The top bars cover exactly the columns.** The toolbar and the filter bar ran
+the full width of the window, showing the webview's rounded corner above a dark
+line-number gutter like something foreign next to the table. They now start at
+the left edge of the first column and end at the right edge of the last — or at
+the window's edge when the columns run past it — and their text lines up with
+the bands'.
+
+## 0.25.4
+
+**The filter and *Column details* panels keep their column's colour.** Their top
+edge took the first column's accent, whatever column they were about; it now
+takes the column's own, like its menu. *Dataset…* and *Clean*, which belong to
+no single column, keep the first column's.
+
+## 0.25.3
+
+**One style for everything that floats.** The palette picker, the panels
+(filter, *Column details*, *Dataset…*, *Clean*) and the menus now share the column
+menu's look: rounded corners, a coloured edge on top, sentence-case section
+titles, airier rows, pill buttons.
+
+**The column menu gains the cleaning most files need.**
+- **Remove rows where empty** — the common one, and until now the only way to
+  drop rows rather than change cells. It says how many rows it would remove.
+- **Round…** for number columns, keeping the file's decimal separator
+  (`df[c].round(n)` in the generated pandas).
+
+**One click closes.** A second click on the button that opened *Column details*,
+*Clean* or *Dataset…* closes it, like the filter, the broom and the palette
+already did.
+
+## 0.25.2
+
+**Histograms no longer crushed by an outlier.** The 20 bins spanned the whole
+range, minimum to maximum: one weight of 38 among values from 2 to 7 packed
+everything into three or four bars. They now cover the normal range — the
+whiskers, from Q1 − 1.5 IQR to Q3 + 1.5 IQR — and the outliers join the edge
+bars, whose bounds (tooltip and click filter) reach the minimum and maximum. A
+column without outliers draws as before. In *Column details*, the scale moves
+below the chart on its own line and says where the outliers went, so it no
+longer runs into the Q1 / Median / Q3 labels.
+
+## 0.25.1
+
+**Column details leads to the rows, and to the fix.**
+- **Outliers are clickable**: *13 values below -4.2 or above 9.4* keeps those
+  rows — one condition, `(df[c] < low) | (df[c] > high)` in pandas.
+- **What stops a column from having its type** is listed, value by value and
+  clickable — also for a text column that is *almost* numbers or dates (80 % or
+  more), with *Treat these as empty* and *Change type* next to it.
+- **Formats**: the shapes of the values, `A-9999` against `A-999`,
+  `99/99/9999` against `9999-99-99`, each one click away from its rows. Not for
+  numbers, where `9.9` against `99.9` is a magnitude, not a typo.
+- **Dates over time**: by year, month, day of the week and hour.
+- **Shortcuts to the cleaning steps** beside what they fix, in Column details
+  (*Treat NULL, - as empty*, *Trim 20 padded values*) and in Dataset (*Remove
+  duplicates*, *Trim*, *Treat as empty*).
+
+**The column menu, redesigned** after the validated mockup: sentence-case
+sections, what each action would touch beside it (*Trim spaces · 20 cells*,
+greyed when there is nothing to do), a tick on what is already applied, case and
+type as one row of chips, the current type in the column's accent.
+
+**Header and toolbar.** The cleaning button is the mockup's sparkles, placed
+left of filter and sort; the band's details button is the mockup's bar chart.
+Column buttons show their tooltip at once instead of after a second. The
+toolbar text lines up with the first column, and **Raw** sits at the right end.
+
+**Fixed:** Q1, Median and Q3 no longer overlap under the histogram — each is
+centred under its line and steps down a row when it would touch its neighbour.
+
+## 0.25.0
+
+**Cleaning, with the original kept intact.** What changes the data is now a
+*step*, replayed on the file as it was read — which is never modified:
+
+- **A broom on every column header**, next to filter and sort (right-clicking
+  the header opens the same menu): trim spaces, clean invisible characters,
+  lowercase / UPPERCASE / Capitalize Each Word, replace values, treat tokens as
+  empty, fill down, change type, rename, remove the column. Entries that make no
+  sense for the column (trim on numbers) are not shown.
+- **The Clean button** in the toolbar: the applied steps in order, each with
+  what it touched (*20 cells*, *−3 rows*) and a cross to remove it — the list
+  then replays without it; the full catalogue, including duplicate and blank
+  rows; and **Save cleaned copy…**, which writes `name.clean.csv` next to the
+  file, then `name.clean-2.csv`, never over the original or an earlier copy.
+- **Changed cells are underlined** in their column's accent; hovering one tells
+  what it was. A column with steps lights its broom.
+- **pandas:** *Dataset…* replays the steps (`str.strip()`, `drop_duplicates()`,
+  `to_numeric(errors="coerce")`…) and writes the copy with `to_csv`, before the
+  filters and sort, which are only for looking.
+
+Rename, remove and *read this column as* were view settings; they are steps now,
+listed and undoable like the others. Changing the type empties the values that
+do not read in it, as Power Query does, and says how many.
+
+**Column details** moves to a chart button at the top right of each band, where
+the `⋯` was. **Fixed:** a panel opened from a header button no longer covers that
+button — it went up to fit on screen and swallowed the click meant to close it —
+and a long menu now scrolls instead of running off screen.
+
 ## 0.24.4
 
 **Duplicated rows, side by side.** Clicking *N rows are exact duplicates of

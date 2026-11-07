@@ -16,6 +16,7 @@ export const elements = {
   toolbar: byId('toolbar'),
   insightsToggle: byId('insights-toggle'),
   datasetButton: byId('dataset-button'),
+  cleanButton: byId('clean-button'),
   themeButton: byId('theme-button'),
   themeSwatch: byId('theme-swatch'),
   themeLabel: byId('theme-label'),

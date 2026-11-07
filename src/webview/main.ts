@@ -17,7 +17,7 @@ import { paint } from './paint';
 import { resolvePrompt } from './prompt';
 import { measureWidths, rebuildView, select, selectedRowsText } from './table';
 import { paintRaw } from './raw';
-import { resetMenuColumn } from './menu';
+import { openMenu, resetMenuColumn } from './menu';
 import { setOpenPanel } from './actions';
 import { paintChrome, toggleInsights } from './toolbar';
 import { buildThemePicker, commitThemeChoice } from './theme-picker';
@@ -39,6 +39,7 @@ floating.register('picker', {
   onClose: () => {
     elements.picker.classList.remove('wide');
     elements.datasetButton.classList.remove('active');
+    elements.cleanButton.classList.remove('active');
     setOpenPanel(null);
   },
 });
@@ -78,8 +79,15 @@ window.addEventListener('message', (event: MessageEvent) => {
       const chunk = message.rows as string[][];
       const lines = message.lines as number[] | undefined;
       for (let i = 0; i < chunk.length; i++) {
+        // L'original et l'affiché partagent les mêmes lignes tant qu'aucune
+        // étape n'a rien changé : une étape copie une ligne avant d'y toucher.
+        state.original[start + i] = chunk[i];
         state.rows[start + i] = chunk[i];
-        if (lines) state.lines[start + i] = lines[i];
+        state.source[start + i] = start + i;
+        if (lines) {
+          state.originalLines[start + i] = lines[i];
+          state.lines[start + i] = lines[i];
+        }
       }
       if (!state.ready && state.rows.length > 0) {
         measureWidths();
@@ -140,6 +148,14 @@ document.addEventListener(
 // chemin fiable. Sans sélection sur la valeur visée, c'est la valeur entière qui
 // est copiée ; un clic droit dans une sélection faite à la main copie celle-ci.
 document.addEventListener('contextmenu', (event) => {
+  // Sur un en-tête : le menu de la colonne, comme dans Excel et Power Query.
+  // Copier son nom y reste possible.
+  const head = (event.target as HTMLElement).closest<HTMLElement>('.head-cell');
+  if (head?.dataset.column !== undefined) {
+    event.preventDefault();
+    openMenu(Number(head.dataset.column), head);
+    return;
+  }
   const gutter = (event.target as HTMLElement).closest('.row > .gutter');
   if (gutter) {
     event.preventDefault();

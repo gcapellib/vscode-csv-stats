@@ -4,6 +4,7 @@ import { clearFilters, closePicker, getOpenPanel, refilter } from './actions';
 import { FOLD_MS } from './constants';
 import { elements } from './dom';
 import { paint } from './paint';
+import { openClean } from './panels/clean';
 import { openDataset } from './panels/dataset';
 import { isDark, state } from './state';
 import { measureWidths } from './table';
@@ -164,4 +165,12 @@ elements.datasetButton.addEventListener('click', () => {
     return;
   }
   openDataset(elements.datasetButton);
+});
+
+elements.cleanButton.addEventListener('click', () => {
+  if (getOpenPanel() === 'clean') {
+    closePicker();
+    return;
+  }
+  openClean(elements.cleanButton);
 });

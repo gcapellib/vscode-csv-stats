@@ -12,7 +12,7 @@ import { openHarness } from './harness';
  * qu'il vient d'ouvrir : on amène donc d'abord le bouton à l'écran.
  */
 const openFilter = async (page: Page, column: string) => {
-  const button = page.locator('.head-cell', { hasText: column }).locator('.head-button').first();
+  const button = page.locator('.head-cell', { hasText: column }).locator('.head-button[aria-label="Filter this column"]');
   await button.scrollIntoViewIfNeeded();
   await page.waitForTimeout(100);
   await button.click();
@@ -118,9 +118,9 @@ test.describe('panneau de filtre', () => {
     await expect(page.locator('.snippet')).toContainText('df = df.drop_duplicates(subset=["producer"])');
   });
 
-  test('le menu « ⋯ » ne répète ni le tri ni le filtre des boutons de l’en-tête', async ({ page }) => {
+  test('le menu du balai ne répète ni le tri ni le filtre des boutons de l’en-tête', async ({ page }) => {
     await openHarness(page, 'samples/wines.csv');
-    await page.locator('.band-cell .dots').nth(2).click();
+    await page.locator('.head-button.clean').nth(2).click();
     await expect(page.locator('#menu')).toContainText('Column details…');
     await expect(page.locator('#menu')).not.toContainText('Filter');
     await expect(page.locator('#menu')).not.toContainText('Sort');

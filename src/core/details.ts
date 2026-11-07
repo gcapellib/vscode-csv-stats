@@ -66,7 +66,36 @@ export interface ColumnDetails {
   blockers: string[];
   /** Répartition des longueurs, pour les colonnes à forte cardinalité. */
   lengths: Array<{ length: number; count: number }>;
+  /**
+   * Les valeurs qui ne se lisent pas dans le type de la colonne — ou dans celui
+   * qu'elle aurait presque : une colonne de texte dont 80 % des valeurs sont des
+   * nombres liste les autres. `offenderKind` dit lequel ; null s'il n'y a rien.
+   */
+  offenders: Array<{ value: string; count: number }>;
+  offenderKind: 'number' | 'date' | 'time' | null;
+  /**
+   * Les formes des valeurs — `A-9999`, `99/99/9999` —, de la plus fréquente à
+   * la plus rare : deux formes dans une colonne de codes ou de dates trahissent
+   * une saisie incohérente. Vide pour du texte libre, où chaque valeur a la
+   * sienne.
+   */
+  patterns: Array<{ pattern: string; count: number; values: string[] }>;
 }
+
+/**
+ * La forme d'une valeur : chaque chiffre devient 9, chaque suite de majuscules
+ * A, chaque suite de minuscules a ; le reste ne bouge pas. Les chiffres gardent
+ * leur nombre — `OEUF-053` et `SYN-0424` diffèrent —, les lettres non, sans
+ * quoi chaque nom propre aurait sa forme.
+ */
+export function valuePattern(raw: string): string {
+  return raw.trim().replace(/\d/g, '9').replace(/\p{Lu}+/gu, 'A').replace(/\p{Ll}+/gu, 'a');
+}
+
+/** Au-delà, ce sont des textes libres : leurs formes ne disent rien. */
+const MAX_PATTERNS = 12;
+/** Part minimale des valeurs lisibles pour qu'une colonne de texte soit dite « presque » d'un type. */
+const ALMOST = 0.8;
 
 function isNullToken(raw: string): boolean {
   const word = raw.trim().toLowerCase();
@@ -129,11 +158,11 @@ export function computeDetails(
     }
 
     if (type === 'numeric' && parseNumber(raw, decimalComma) === null) {
-      offenders.set(trimmed, (offenders.get(trimmed) ?? 0) + 1);
+      offenders.set(raw, (offenders.get(raw) ?? 0) + 1);
     }
     if (temporal?.order === 'time' && /^\d{1,2}:\d{2}$/.test(trimmed)) timeWithoutSeconds = true;
     if (temporal && parseTemporal(raw, temporal.order) === null) {
-      offenders.set(trimmed, (offenders.get(trimmed) ?? 0) + 1);
+      offenders.set(raw, (offenders.get(raw) ?? 0) + 1);
     }
   }
 
@@ -171,9 +200,43 @@ export function computeDetails(
     }
   }
   if (digitsOnly && sawLeadingZero) blockers.push('leading zeros are lost unless dtype is "string"');
-  for (const [value, count] of [...offenders.entries()].slice(0, 3)) {
-    blockers.push(`${count} value(s) not ${temporal ? (temporal.order === 'time' ? 'a time' : 'a date') : 'numeric'}: ${value}`);
+  // Les valeurs hors type : celles de la colonne typée, ou, pour du texte, celles
+  // qui l'empêchent d'être un nombre ou une date alors que presque tout l'est.
+  let offenderKind: ColumnDetails['offenderKind'] = temporal ? (temporal.order === 'time' ? 'time' : 'date') : type === 'numeric' ? 'number' : null;
+  let offenderEntries = [...offenders.entries()];
+  if (offenderKind === null && present > 0) {
+    const readers: Array<[NonNullable<ColumnDetails['offenderKind']>, (raw: string) => boolean]> = [
+      ['number', (raw) => parseNumber(raw, decimalComma) !== null],
+      ['date', (raw) => parseTemporal(raw, 'ymd') !== null || parseTemporal(raw, 'dmy') !== null],
+      ['time', (raw) => parseTemporal(raw, 'time') !== null],
+    ];
+    for (const [kind, reads] of readers) {
+      const failing = [...counts.entries()].filter(([raw]) => !reads(raw));
+      const failed = failing.reduce((sum, [, occurrences]) => sum + occurrences, 0);
+      if (failed > 0 && (present - failed) / present >= ALMOST) {
+        offenderKind = kind;
+        offenderEntries = failing;
+        break;
+      }
+    }
   }
+  const offenderList = offenderEntries
+    .map(([value, count]) => ({ value, count }))
+    .sort((left, right) => right.count - left.count);
+  if (offenderList.length === 0) offenderKind = null;
+
+  const byPattern = new Map<string, { count: number; values: string[] }>();
+  for (const [raw, occurrences] of counts) {
+    const pattern = valuePattern(raw);
+    let entry = byPattern.get(pattern);
+    if (!entry) byPattern.set(pattern, (entry = { count: 0, values: [] }));
+    entry.count += occurrences;
+    entry.values.push(raw);
+  }
+  const patterns =
+    byPattern.size > MAX_PATTERNS
+      ? []
+      : [...byPattern.entries()].map(([pattern, entry]) => ({ pattern, ...entry })).sort((left, right) => right.count - left.count);
 
   return {
     empty,
@@ -193,6 +256,9 @@ export function computeDetails(
     temporal,
     timeWithoutSeconds,
     blockers,
+    offenders: offenderList,
+    offenderKind,
+    patterns,
     lengths: [...lengthCounts.entries()]
       .map(([length, count]) => ({ length, count }))
       .sort((left, right) => left.length - right.length),
@@ -210,6 +276,8 @@ export interface Finding {
   column: number;
   text: string;
   values: string[];
+  /** Le genre du constat, pour proposer l'étape qui le corrige. */
+  fix: 'case' | 'trim' | 'empty';
 }
 
 export interface DatasetDetails {
@@ -272,6 +340,7 @@ export function computeDataset(table: CsvTable, details: ColumnDetails[]): Datas
         column: index,
         text: `${name}: ${column.caseVariants} values differ only by case`,
         values: column.caseVariantValues,
+        fix: 'case',
       });
     }
     if (column.spacePadded > 0) {
@@ -279,6 +348,7 @@ export function computeDataset(table: CsvTable, details: ColumnDetails[]): Datas
         column: index,
         text: `${name}: ${column.spacePadded} values padded with spaces`,
         values: column.spacePaddedValues,
+        fix: 'trim',
       });
     }
     if (column.nullTokens.length > 0) {
@@ -287,6 +357,7 @@ export function computeDataset(table: CsvTable, details: ColumnDetails[]): Datas
         column: index,
         text: `${name}: missing written as ${list}`,
         values: column.nullTokens.map((token) => token.value),
+        fix: 'empty',
       });
     }
   });

@@ -13,7 +13,7 @@ import { openHarness } from './harness';
 test.describe('bascule des panneaux flottants', () => {
   test('le bouton de filtre referme le panneau au second clic', async ({ page }) => {
     await openHarness(page);
-    const button = page.locator('.head-cell', { hasText: 'region' }).locator('.head-button').first();
+    const button = page.locator('.head-cell', { hasText: 'region' }).locator('.head-button[aria-label="Filter this column"]');
 
     await button.click();
     await expect(page.locator('#picker')).toBeVisible();
@@ -22,9 +22,9 @@ test.describe('bascule des panneaux flottants', () => {
     await expect(page.locator('#picker')).toBeHidden();
   });
 
-  test('le bouton « ⋯ » referme le menu au second clic', async ({ page }) => {
+  test('le balai referme le menu au second clic', async ({ page }) => {
     await openHarness(page);
-    const dots = page.locator('.band-cell .dots').first();
+    const dots = page.locator('.head-button.clean').first();
 
     await dots.click();
     await expect(page.locator('#menu')).toBeVisible();
@@ -44,11 +44,37 @@ test.describe('bascule des panneaux flottants', () => {
     await expect(page.locator('#theme-popup')).toBeHidden();
   });
 
-  test("« ⋯ » referme Column details plutôt que de le rouvrir", async ({ page }) => {
+  test('le graphique du bandeau ouvre Column details directement', async ({ page }) => {
+    await openHarness(page);
+    await page.locator('.band-cell .dots').first().click();
+    await expect(page.locator('#picker')).toBeVisible();
+    await expect(page.locator('#menu')).toBeHidden();
+  });
+
+  test('le bouton graphique referme Column details au second clic', async ({ page }) => {
+    await openHarness(page);
+    const chart = page.locator('.band-cell .dots').first();
+    await chart.click();
+    await expect(page.locator('#picker')).toBeVisible();
+    await chart.click();
+    await expect(page.locator('#picker')).toBeHidden();
+  });
+
+  test('Clean et Dataset se referment au second clic sur leur bouton', async ({ page }) => {
+    await openHarness(page);
+    for (const id of ['#clean-button', '#dataset-button']) {
+      await page.locator(id).click();
+      await expect(page.locator('#picker')).toBeVisible();
+      await page.locator(id).click();
+      await expect(page.locator('#picker')).toBeHidden();
+    }
+  });
+
+  test('le balai referme Column details plutôt que de le rouvrir', async ({ page }) => {
     // Le cas qui a vraiment piégé ce bug : le panneau ouvert depuis un menu,
     // refermé depuis le bouton qui a ouvert ce menu — pas depuis lui-même.
     await openHarness(page);
-    const dots = page.locator('.band-cell .dots').first();
+    const dots = page.locator('.head-button.clean').first();
 
     await dots.click();
     await page.locator('.menu-item', { hasText: 'Column details' }).click();
@@ -70,7 +96,7 @@ test.describe('bascule des panneaux flottants', () => {
 
   test('un seul panneau ouvert à la fois : ouvrir le thème referme le menu', async ({ page }) => {
     await openHarness(page);
-    await page.locator('.band-cell .dots').first().click();
+    await page.locator('.head-button.clean').first().click();
     await expect(page.locator('#menu')).toBeVisible();
 
     await page.locator('#theme-button').click();

@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 import { parse } from '../core/csv';
-import { computeDataset, computeDetails, readCsvSnippet } from '../core/details';
+import { computeDataset, computeDetails, readCsvSnippet, valuePattern } from '../core/details';
 import { computeAll } from '../core/stats';
 
 function detailsOf(text: string, column = 0) {
@@ -96,5 +96,34 @@ describe('analyse approfondie', () => {
     assert.ok(snippet.includes('na_values=["-"]'), snippet);
     // NULL n'a pas à y figurer : pandas l'écarte déjà.
     assert.ok(!snippet.includes('"NULL"'), snippet);
+  });
+});
+
+describe('diagnostic enrichi', () => {
+  it('donne la forme des valeurs : chiffres comptés, lettres regroupées', () => {
+    assert.equal(valuePattern('SYN-0424'), 'A-9999');
+    assert.equal(valuePattern('OEUF-053'), 'A-999');
+    assert.equal(valuePattern('01/02/2015'), '99/99/9999');
+    assert.equal(valuePattern('Lyon'), 'Aa');
+  });
+
+  it('liste les formes, de la plus fréquente à la plus rare', () => {
+    const table = parse('code,n\nSYN-0424,1\nSYN-0425,2\nOEUF-053,3\n');
+    const details = computeDetails(table, 0, 'text');
+    assert.deepEqual(
+      details.patterns.map((entry) => [entry.pattern, entry.count]),
+      [
+        ['A-9999', 2],
+        ['A-999', 1],
+      ],
+    );
+  });
+
+  it("liste ce qui empêche une colonne de texte d'être numérique", () => {
+    const rows = Array.from({ length: 9 }, (_, index) => `${index}`).join('\n');
+    const table = parse(`prix,n\n${rows.split('\n').map((value) => `${value},1`).join('\n')}\nn/a,1\n`);
+    const details = computeDetails(table, 0, 'text');
+    assert.equal(details.offenderKind, 'number');
+    assert.deepEqual(details.offenders, [{ value: 'n/a', count: 1 }]);
   });
 });

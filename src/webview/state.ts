@@ -2,6 +2,7 @@ import { type ColumnStats } from '../core/stats';
 import { type ColumnType } from '../core/types';
 import { paletteFor, THEMES, themeById, type Palette } from '../core/themes';
 import { type Filter } from '../core/filters';
+import { type Step } from '../core/steps';
 
 /**
  * L'état de la vue, partagé par tous les modules du webview.
@@ -12,6 +13,16 @@ import { type Filter } from '../core/filters';
  */
 export interface State {
   headers: string[];
+  /** Le fichier tel qu'il a été lu. Jamais modifié : les étapes se rejouent dessus. */
+  original: string[][];
+  originalLines: number[];
+  /** Les étapes de nettoyage, dans l'ordre ; voir core/steps.ts. */
+  steps: Step[];
+  /** Ce que chaque étape a touché, au dernier passage. */
+  effects: number[];
+  /** Pour chaque ligne affichée, l'index de sa ligne d'origine. */
+  source: number[];
+  /** Les lignes après les étapes : ce que montrent le tableau et les bandeaux. */
   rows: string[][];
   /** Numéro de ligne du fichier de chaque ligne, comme dans la vue Raw ; voir lineOf. */
   lines: number[];
@@ -54,6 +65,11 @@ export interface State {
 
 export const state: State = {
   headers: [],
+  original: [],
+  originalLines: [],
+  steps: [],
+  effects: [],
+  source: [],
   rows: [],
   lines: [],
   stats: [],

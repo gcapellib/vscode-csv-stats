@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 import { parse } from '../core/csv';
-import { compute, computeAll, foldRanking, HISTOGRAM_BINS, parseNumber, TOP_VALUES, BAND_ROWS } from '../core/stats';
+import { binBounds, compute, computeAll, foldRanking, HISTOGRAM_BINS, parseNumber, TOP_VALUES, BAND_ROWS } from '../core/stats';
 
 function statsOf(text: string) {
   return computeAll(parse(text));
@@ -238,5 +238,22 @@ describe('foldRanking', () => {
     const result = foldRanking(top, 2, 5, 3);
     assert.equal(result.shown.length, 2);
     assert.equal(result.otherCount, 3);
+  });
+});
+
+describe('histogramme et outliers', () => {
+  it("n'écrase plus la masse des valeurs à cause d'un seul extrême", () => {
+    // Des poids de 3 à 7, et un 38 : sur 20 tranches du min au max, tout
+    // tenait dans trois barres.
+    const values = [...Array.from({ length: 40 }, (_, index) => 3 + (index % 5)), 38];
+    const stats = statsOf(`poids\n${values.join('\n')}\n`)[0];
+    assert.equal(stats.outliers, 1);
+    assert.equal(stats.max, 38);
+    assert.ok((stats.histHigh ?? 0) < 38, 'la plage des tranches s’arrête aux moustaches');
+    assert.ok(stats.histogram.filter((count) => count > 0).length >= 5, 'la masse s’étale sur plusieurs barres');
+    // Le 38 rejoint la dernière barre, dont la borne haute va jusqu'au maximum.
+    assert.equal(binBounds(stats, HISTOGRAM_BINS - 1)[1], 38);
+    assert.equal(binBounds(stats, 0)[0], 3);
+    assert.equal(sum(stats.histogram), values.length);
   });
 });
