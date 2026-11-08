@@ -504,5 +504,6 @@ export function readCsvSnippet(fileName: string, table: CsvTable, dataset: Datas
     const source = pad ? `${column}.str.replace(r"^(\\d{1,2}:\\d{2})$", r"\\1:00", regex=True)` : column;
     return `${column} = pd.to_timedelta(${source})`;
   });
-  return [read, ...times].join('\n');
+  if (times.length === 0) return read;
+  return [read, '', '# A time of day has no date: read it as a duration since midnight, which sorts and compares.', ...times].join('\n');
 }

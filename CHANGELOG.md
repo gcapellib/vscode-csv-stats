@@ -2,6 +2,11 @@
 
 Newest first.
 
+## 0.33.5
+
+- **The pandas code reads better with a time column.** The conversion of a time of day to a duration is now set
+  apart by a blank line and a one-line comment saying why, instead of sticking to the closing parenthesis.
+
 ## 0.33.4
 
 - **Icons on the section titles of the Clean panel** (applied steps, similar spellings, rows, columns), like
