@@ -10,7 +10,7 @@ import { currentTable, parserOf } from '../table';
 import { addRow, footer, grid, panelTitle, sectionTitle, tintPanel } from './shared';
 import { elements, textSpan } from '../dom';
 import { valueCounts } from '../table';
-import { hideTooltip, showTooltip } from '../tooltip';
+import { hideTooltip, quickTip, showTooltip } from '../tooltip';
 import { addStep } from '../cleaning';
 import { actionBar, detailsExtras, placeholderSection, withoutNote } from './details-extras';
 import { rowOrderChart } from './row-order';
@@ -212,7 +212,7 @@ export function barChart(
     row.className = 'bar-row';
     const label = textSpan(entry.label);
     label.className = 'bar-label';
-    label.title = entry.label;
+    quickTip(label, entry.label);
     const track = document.createElement('div');
     track.className = 'bar-track';
     const fill = document.createElement('div');

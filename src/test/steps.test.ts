@@ -115,3 +115,82 @@ describe('étapes de nettoyage', () => {
     assert.equal(csv, 'city,prix\nLyon,"1,5"\n');
   });
 });
+
+describe('étapes ajoutées : remplacer dans la cellule, remplir, retirer des lignes', () => {
+  const rows = [
+    ['12 €', 'x', ''],
+    ['7 kg', '', 'b'],
+    ['', 'y', ''],
+    ['3 €', '', 'c'],
+  ];
+  const cols = ['prix', 'k', 'n'];
+  const run = (steps: Step[]) => applySteps(rows, cols, steps, false);
+
+  it('« contient » remplace toute occurrence, pas seulement la cellule entière', () => {
+    const result = run([{ kind: 'replace', column: 0, from: ' €', to: '', mode: 'contains' }]);
+    assert.deepEqual(result.rows.map((row) => row[0]), ['12', '7 kg', '', '3']);
+    assert.deepEqual(result.effects, [2]);
+  });
+
+  it('sans mode, le remplacement reste exact', () => {
+    const result = run([{ kind: 'replace', column: 0, from: '12', to: '1', mode: undefined }]);
+    assert.deepEqual(result.rows.map((row) => row[0]), ['12 €', '7 kg', '', '3 €']);
+  });
+
+  it('regex : groupes et toutes les occurrences ; un motif invalide ne change rien', () => {
+    const regex = run([{ kind: 'replace', column: 0, from: '(\\d+) ?(€|kg)', to: '$1', mode: 'regex' }]);
+    assert.deepEqual(regex.rows.map((row) => row[0]), ['12', '7', '', '3']);
+    const broken = run([{ kind: 'replace', column: 0, from: '(', to: '', mode: 'regex' }]);
+    assert.deepEqual(broken.rows.map((row) => row[0]), ['12 €', '7 kg', '', '3 €']);
+  });
+
+  it('« contient » avec un texte vide ne touche rien', () => {
+    assert.deepEqual(run([{ kind: 'replace', column: 0, from: '', to: 'x', mode: 'contains' }]).effects, [0]);
+  });
+
+  it('fill up remonte la valeur suivante, fill down descend la précédente', () => {
+    const up = run([{ kind: 'fillUp', column: 2 }]);
+    assert.deepEqual(up.rows.map((row) => row[2]), ['b', 'b', 'c', 'c']);
+    assert.deepEqual(up.effects, [2]);
+    const down = run([{ kind: 'fillDown', column: 2 }]);
+    assert.deepEqual(down.rows.map((row) => row[2]), ['', 'b', 'b', 'c']);
+  });
+
+  it('une valeur fixe remplit les vides, y compris ceux faits d’espaces', () => {
+    const result = applySteps([['a'], [' '], ['']], ['h'], [{ kind: 'fillValue', column: 0, value: '0' }], false);
+    assert.deepEqual(result.rows.map((row) => row[0]), ['a', '0', '0']);
+    assert.deepEqual(result.effects, [2]);
+  });
+
+  it('retirer des lignes les désigne par le fichier d’origine, même après un autre retrait', () => {
+    const steps: Step[] = [{ kind: 'dropEmpty', column: 0 }, { kind: 'dropRows', rows: [3], label: 'test' }];
+    const result = run(steps);
+    assert.deepEqual(result.source, [0, 1]);
+    assert.deepEqual(result.effects, [1, 1]);
+    assert.equal(describeEffect(steps[1], 1), '−1 row');
+  });
+
+  it('se décrit et s’exporte en pandas', () => {
+    const nameOf = (column: number) => cols[column];
+    assert.equal(describeStep({ kind: 'fillUp', column: 2 }, nameOf), 'Fill up n');
+    assert.equal(describeStep({ kind: 'dropRows', rows: [1, 2], label: 'prix: outliers' }, nameOf), 'Remove 2 rows: prix: outliers');
+    const lines = stepsToPandas(
+      [
+        { kind: 'replace', column: 0, from: '€', to: '', mode: 'contains' },
+        { kind: 'replace', column: 0, from: '(\\d+)kg', to: '$1', mode: 'regex' },
+        { kind: 'fillUp', column: 2 },
+        { kind: 'fillValue', column: 1, value: '0' },
+        { kind: 'dropRows', rows: [4, 9], label: 'x' },
+      ],
+      cols,
+      () => false,
+    );
+    assert.deepEqual(lines, [
+      'df["prix"] = df["prix"].str.replace("€", "", regex=False)',
+      'df["prix"] = df["prix"].str.replace("(\\\\d+)kg", "\\\\1", regex=True)',
+      'df["n"] = df["n"].bfill()',
+      'df["k"] = df["k"].fillna("0")',
+      'df = df.drop(index=[4, 9], errors="ignore")  # x',
+    ]);
+  });
+});

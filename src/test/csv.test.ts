@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import { decode, detectDelimiter, parse, rawSegments } from '../core/csv';
+import { decode, detectDelimiter, detectEncoding, parse, rawSegments } from '../core/csv';
 
 describe('CsvLoader', () => {
   it('lit un CSV simple à virgule', () => {
@@ -150,5 +150,27 @@ describe('rawSegments', () => {
     for (const line of ['a,b,c', '1,"Lyon, Rhône",2', '1,,3', '', '"",x', 'sans separateur']) {
       assert.equal(recolle(line), line);
     }
+  });
+});
+
+describe('séparateurs et encodages courants', () => {
+  it('reconnaît la tabulation et la barre verticale', () => {
+    assert.equal(detectDelimiter('a\tb\tc\n1\t2\t3\n4\t5\t6\n'), '\t');
+    assert.equal(detectDelimiter('a|b|c\n1|2|3\n4|5|6\n'), '|');
+    assert.equal(detectDelimiter('a,b\n1,2\n3,4\n'), ',');
+  });
+
+  it('lit un fichier windows-1252 (accents, €) au lieu de remplacer par �', () => {
+    const bytes = Uint8Array.from([0x70, 0x72, 0x69, 0x78, 0x3b, 0x76, 0x69, 0x6c, 0x6c, 0x65, 0x0a, 0x31, 0x32, 0x80, 0x3b, 0x4e, 0xee, 0x6d, 0x65, 0x73, 0x0a]);
+    assert.equal(detectEncoding(bytes), 'windows-1252');
+    const table = parse(decode(bytes));
+    assert.deepEqual(table.rows, [['12€', 'Nîmes']]);
+  });
+
+  it('garde l’UTF-8 et lit l’UTF-16 avec marque', () => {
+    assert.equal(detectEncoding(new TextEncoder().encode('é;ü\n1;2\n')), 'utf-8');
+    const utf16 = new Uint8Array([0xff, 0xfe, ...[...'a\tb\n1\t2\n'].flatMap((c) => [c.charCodeAt(0), 0])]);
+    assert.equal(detectEncoding(utf16), 'utf-16le');
+    assert.deepEqual(parse(decode(utf16)).rows, [['1', '2']]);
   });
 });

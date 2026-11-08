@@ -19,7 +19,7 @@ import { formatValue } from '../../core/values';
 import { state } from '../state';
 import { closePicker } from '../actions';
 import { lineOf, parserOf, setColumnFilter, valuesFilter } from '../table';
-import { hideTooltip, showTooltip } from '../tooltip';
+import { hideTooltip, quickTip, showTooltip } from '../tooltip';
 
 const NS = 'http://www.w3.org/2000/svg';
 const WARN = 'var(--vscode-editorWarning-foreground, #cca700)';
@@ -213,7 +213,7 @@ export function rowOrderChart(column: ColumnStats, details: ColumnDetails, colou
   const mark = (symbol: string, colour: string, text: string, onPick: () => void) => {
     const item = document.createElement('button');
     item.className = 'legend-link';
-    item.title = 'Show these rows in the table';
+    quickTip(item, 'Show these rows in the table');
     const glyph = Object.assign(document.createElement('span'), { textContent: symbol });
     glyph.style.color = colour;
     item.append(glyph, ` ${text}`);

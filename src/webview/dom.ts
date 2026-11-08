@@ -36,4 +36,5 @@ export const elements = {
   tooltip: byId('tooltip'),
   menu: byId('menu'),
   picker: byId('picker'),
+  field: byId('field'),
 };

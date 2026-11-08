@@ -13,7 +13,9 @@ import { paint } from './paint';
 import { openFilterPanel } from './panels/filter-panel';
 import { distinctText, uniqueText } from './band';
 import { resizeHandle } from './resize';
-import { palette, state } from './state';
+import { blendHex, readableOn, themeById } from '../core/themes';
+import { themeColour } from './colour';
+import { isDark, palette, state } from './state';
 import { hideTooltip, quickTip } from './tooltip';
 
 /**
@@ -311,12 +313,19 @@ export function rebuildView(): void {
 export function paintHead(): void {
   elements.head.textContent = '';
   elements.head.appendChild(gutterCell());
+  // Une palette à en-têtes colorés : le fond de l'en-tête est celui de VS Code voilé à
+  // 14 % de la couleur de la colonne (voir main.css) ; c'est sur lui que le nom doit se lire.
+  const coloured = themeById(state.themeId).headInk === true;
+  const headGround = coloured ? themeColour('--vscode-editorGroupHeader-tabsBackground', isDark() ? '#252526' : '#f3f3f3') : '';
   for (const modelIndex of state.order) {
     const cell = document.createElement('div');
     cell.className = 'head-cell';
     cell.style.width = `${state.widths[modelIndex]}px`;
     // Le filet et le voile de l'en-tête reprennent la couleur de la colonne.
-    cell.style.setProperty('--col', palette(modelIndex).accent);
+    const accent = palette(modelIndex).accent;
+    cell.style.setProperty('--col', accent);
+    // Le texte de l'en-tête — nom et boutons — prend la couleur de la colonne.
+    if (coloured) cell.style.color = readableOn(accent, blendHex(headGround, accent, 0.14));
     if (state.selectedColumn === modelIndex) cell.classList.add('selected');
     // Comme un clic sur une cellule marque sa ligne : un clic sur l'en-tête
     // marque sa colonne. Les boutons et la poignée gardent leur propre geste.
@@ -334,7 +343,7 @@ export function paintHead(): void {
     name.textContent = state.stats[modelIndex].name;
     // Bandeau replié, les colonnes se resserrent au point de tronquer le titre :
     // le survol reste alors le seul moyen de le lire en entier.
-    name.title = state.stats[modelIndex].name;
+    quickTip(name, state.stats[modelIndex].name);
 
     // Deux boutons permanents plutôt que des gestes à deviner : le tri ne se
     // devinait qu'en cliquant le titre, et le filtre dormait dans le menu « ⋯ ».
@@ -446,7 +455,7 @@ export function paintRows(onlyIfMoved = false): void {
     const shaded = duplicate !== undefined && duplicate.rank % 2 === 1;
     if (duplicate) {
       const others = duplicate.members.filter((member) => member !== rowIndex).map(lineOf);
-      gutter.title = `Same as line${others.length > 1 ? 's' : ''} ${others.join(', ')}`;
+      quickTip(gutter, `Same as line${others.length > 1 ? 's' : ''} ${others.join(', ')}`);
     }
     for (const modelIndex of state.order) {
       const colours = palette(modelIndex);
@@ -468,7 +477,7 @@ export function paintRows(onlyIfMoved = false): void {
       if (before !== null) {
         cell.classList.add('changed');
         cell.style.textDecorationColor = colours.accent;
-        cell.title = before === '' ? 'Was empty' : `Was « ${before} »`;
+        quickTip(cell, before === '' ? 'Was empty' : `Was « ${before} »`);
       }
       // Au `click` et non au `mousedown` : repeindre les lignes dès l'appui
       // remplaçait la cellule sous le curseur et détruisait la sélection de

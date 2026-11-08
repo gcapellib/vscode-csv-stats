@@ -106,15 +106,6 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
         case 'setInsights':
           await this.context.globalState.update(INSIGHTS_KEY, message.visible as boolean);
           break;
-        case 'prompt': {
-          const answer = await vscode.window.showInputBox({
-            title: message.title as string,
-            prompt: message.prompt as string,
-            value: message.value as string,
-          });
-          void panel.webview.postMessage({ type: 'promptResult', token: message.token, value: answer ?? null });
-          break;
-        }
         case 'saveCopy':
           await this.saveCopy(document.uri, String(message.text ?? ''));
           break;
@@ -274,6 +265,7 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
 <div id="tooltip" hidden></div>
 <div id="menu" hidden></div>
 <div id="picker" hidden></div>
+<div id="field" hidden></div>
 <script nonce="${nonce}" src="${script}"></script>
 </body>
 </html>`;

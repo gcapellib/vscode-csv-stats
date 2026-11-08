@@ -332,13 +332,15 @@ body {
    filtré trois fois et qu'on ne sait plus ce qu'on regarde. */
 /* Rempli d'un gris translucide plutôt que d'une couleur de thème : il se
    détache des pastilles cerclées sans virer au noir selon le thème. */
-.chip-clear {
+.chip-clear,
+.chip-drop {
   border-color: rgb(128 128 128 / 45%);
   background: rgb(128 128 128 / 26%);
   font-weight: 600;
 }
 
-.chip-clear:hover {
+.chip-clear:hover,
+.chip-drop:hover {
   background: rgb(128 128 128 / 40%);
 }
 
@@ -1561,4 +1563,143 @@ body.resizing * {
 #clean-button,
 #raw-toggle {
   border-radius: 6px;
+}
+
+/* ── Le volet de saisie et le déroulé des menus ─────────────────────────────
+   Le volet se déplie à côté du menu où l'on a cliqué (prompt.ts), avec le même
+   style que lui. Menus, panneaux et volet se déroulent en un clin d'œil : assez
+   court pour ne jamais faire attendre, assez long pour qu'on voie d'où ça vient. */
+#field {
+  position: fixed;
+  z-index: 21;
+  box-sizing: border-box;
+  width: 280px;
+  padding: 10px 14px 12px;
+  border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border));
+  border-top: 3px solid var(--column-accent, var(--file-accent, var(--vscode-focusBorder, #4a8fe0)));
+  border-radius: 8px;
+  background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  box-shadow: 0 4px 12px rgb(0 0 0 / 35%);
+}
+
+.field-title {
+  margin-bottom: 6px;
+  color: var(--column-accent, var(--file-accent, inherit));
+  font-weight: 600;
+}
+
+.field-label {
+  display: block;
+  margin-top: 8px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.92em;
+}
+
+.field-input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 3px;
+  padding: 4px 6px;
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  border-radius: 4px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font: inherit;
+}
+
+.field-input:focus {
+  outline: 1px solid var(--column-accent, var(--vscode-focusBorder));
+  outline-offset: -1px;
+}
+
+.field-error {
+  margin-top: 8px;
+  color: var(--vscode-errorForeground);
+  font-size: 0.92em;
+}
+
+.field-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.field-ok,
+.field-cancel {
+  padding: 3px 12px;
+  border: 1px solid var(--column-accent, var(--file-accent, var(--vscode-focusBorder)));
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.field-ok {
+  background: var(--column-accent, var(--file-accent, var(--vscode-button-background)));
+  color: var(--vscode-button-foreground, #fff);
+  font-weight: 600;
+}
+
+.field-cancel:hover {
+  background: rgb(128 128 128 / 22%);
+}
+
+@keyframes unroll {
+  from {
+    clip-path: inset(0 0 100% 0);
+    opacity: 0.4;
+  }
+  to {
+    clip-path: inset(0);
+    opacity: 1;
+  }
+}
+
+@keyframes unfold-right {
+  from {
+    clip-path: inset(0 100% 0 0);
+    opacity: 0.4;
+  }
+  to {
+    clip-path: inset(0);
+    opacity: 1;
+  }
+}
+
+@keyframes unfold-left {
+  from {
+    clip-path: inset(0 0 0 100%);
+    opacity: 0.4;
+  }
+  to {
+    clip-path: inset(0);
+    opacity: 1;
+  }
+}
+
+#menu:not([hidden]),
+#picker:not([hidden]),
+#theme-popup:not([hidden]),
+#field[data-side='down']:not([hidden]) {
+  animation: unroll 130ms ease-out;
+}
+
+#field[data-side='right']:not([hidden]) {
+  animation: unfold-right 130ms ease-out;
+}
+
+#field[data-side='left']:not([hidden]) {
+  animation: unfold-left 130ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #menu:not([hidden]),
+  #picker:not([hidden]),
+  #theme-popup:not([hidden]),
+  #field:not([hidden]) {
+    animation: none;
+  }
 }

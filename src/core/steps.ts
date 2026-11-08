@@ -20,6 +20,8 @@ import { parseNumber, type ColumnType } from './types';
 
 export type CaseMode = 'lower' | 'upper' | 'title';
 
+export type ReplaceMode = 'whole' | 'contains' | 'regex';
+
 export type Step =
   | { kind: 'rename'; column: number; name: string }
   | { kind: 'remove'; column: number }
@@ -27,11 +29,24 @@ export type Step =
   | { kind: 'trim'; column: number }
   | { kind: 'clean'; column: number }
   | { kind: 'case'; column: number; mode: CaseMode }
-  | { kind: 'replace'; column: number; from: string; to: string }
+  /**
+   * `whole` (par défaut) : la cellule entière doit valoir `from`. `contains` : toute
+   * occurrence de `from` dans la cellule. `regex` : `from` est une expression régulière
+   * (`$1` pour un groupe), appliquée à toutes les occurrences.
+   */
+  | { kind: 'replace'; column: number; from: string; to: string; mode?: ReplaceMode }
   | { kind: 'empty'; column: number; tokens: string[] }
   | { kind: 'merge'; column: number; from: string[]; to: string }
   | { kind: 'fixEncoding'; column: number }
   | { kind: 'fillDown'; column: number }
+  | { kind: 'fillUp'; column: number }
+  /** Remplace les cellules vides par une valeur fixe. */
+  | { kind: 'fillValue'; column: number; value: string }
+  /**
+   * Retire des lignes précises, désignées par leur index dans le fichier d'origine :
+   * ce sont des lignes repérées (outliers, lignes filtrées), pas une condition.
+   */
+  | { kind: 'dropRows'; rows: number[]; label: string }
   | { kind: 'dropEmpty'; column: number }
   | { kind: 'round'; column: number; digits: number }
   | { kind: 'removeDuplicates'; columns?: number[] }
@@ -63,6 +78,28 @@ function titleCase(text: string): string {
   return text.toLowerCase().replace(/(^|[\s\-'’])(\p{L})/gu, (_, before: string, letter: string) => before + letter.toUpperCase());
 }
 
+/** Une expression régulière valide, ou `null` : le formulaire s'en sert pour refuser une saisie. */
+export function compileRegex(source: string): RegExp | null {
+  if (source === '') return null;
+  try {
+    return new RegExp(source, 'g');
+  } catch {
+    return null;
+  }
+}
+
+function replacer(step: Extract<Step, { kind: 'replace' }>): (raw: string) => string {
+  if (step.mode === 'contains') {
+    // Une chaîne vide « apparaît » partout : sans garde, `split('')` éclaterait la cellule.
+    return step.from === '' ? (raw) => raw : (raw) => raw.split(step.from).join(step.to);
+  }
+  if (step.mode === 'regex') {
+    const pattern = compileRegex(step.from);
+    return pattern ? (raw) => raw.replace(pattern, step.to) : (raw) => raw;
+  }
+  return (raw) => (raw === step.from ? step.to : raw);
+}
+
 /** La transformation d'une cellule, pour les étapes qui ne regardent qu'elle. */
 function cellTransform(step: Step): ((raw: string) => string) | null {
   switch (step.kind) {
@@ -73,7 +110,9 @@ function cellTransform(step: Step): ((raw: string) => string) | null {
     case 'case':
       return step.mode === 'lower' ? (raw) => raw.toLowerCase() : step.mode === 'upper' ? (raw) => raw.toUpperCase() : titleCase;
     case 'replace':
-      return (raw) => (raw === step.from ? step.to : raw);
+      return replacer(step);
+    case 'fillValue':
+      return (raw) => (raw.trim() === '' ? step.value : raw);
     case 'empty': {
       const tokens = new Set(step.tokens.map((token) => token.trim()));
       return (raw) => (tokens.has(raw.trim()) ? '' : raw);
@@ -170,6 +209,20 @@ export function applySteps(original: string[][], headers: string[], steps: Step[
           }
           break;
         }
+        case 'fillUp': {
+          ownRows();
+          let next = '';
+          for (let row = rows.length - 1; row >= 0; row--) {
+            const raw = rows[row][step.column] ?? '';
+            if (raw.trim() === '') {
+              if (next !== '') {
+                setCell(row, step.column, next);
+                effect++;
+              }
+            } else next = raw;
+          }
+          break;
+        }
         case 'round': {
           ownRows();
           for (let row = 0; row < rows.length; row++) {
@@ -187,16 +240,20 @@ export function applySteps(original: string[][], headers: string[], steps: Step[
         }
         case 'removeDuplicates':
         case 'dropEmpty':
+        case 'dropRows':
         case 'removeBlankRows': {
           const seen = new Set<string>();
           const keep: number[] = [];
+          const doomed = step.kind === 'dropRows' ? new Set(step.rows) : null;
           rows.forEach((row, index) => {
             const drop =
-              step.kind === 'removeBlankRows'
-                ? row.every((cell) => cell.trim() === '')
-                : step.kind === 'dropEmpty'
-                  ? (row[step.column] ?? '').trim() === ''
-                  : seen.has(duplicateKey(row, step)) || (seen.add(duplicateKey(row, step)), false);
+              step.kind === 'dropRows'
+                ? doomed!.has(source[index])
+                : step.kind === 'removeBlankRows'
+                  ? row.every((cell) => cell.trim() === '')
+                  : step.kind === 'dropEmpty'
+                    ? (row[step.column] ?? '').trim() === ''
+                    : seen.has(duplicateKey(row, step)) || (seen.add(duplicateKey(row, step)), false);
             if (!drop) keep.push(index);
           });
           effect = rows.length - keep.length;
@@ -234,7 +291,11 @@ export function describeStep(step: Step, nameOf: (column: number) => string): st
     case 'case':
       return `${CASE_LABELS[step.mode]} in ${name}`;
     case 'replace':
-      return `Replace « ${step.from} » with « ${step.to} » in ${name}`;
+      return step.mode === 'regex'
+        ? `Replace pattern /${step.from}/ with « ${step.to} » in ${name}`
+        : step.mode === 'contains'
+          ? `Replace text « ${step.from} » with « ${step.to} » in ${name}`
+          : `Replace « ${step.from} » with « ${step.to} » in ${name}`;
     case 'empty':
       return `Treat ${step.tokens.join(', ')} as empty in ${name}`;
     case 'merge':
@@ -243,6 +304,12 @@ export function describeStep(step: Step, nameOf: (column: number) => string): st
       return `Fix garbled characters in ${name}`;
     case 'fillDown':
       return `Fill down ${name}`;
+    case 'fillUp':
+      return `Fill up ${name}`;
+    case 'fillValue':
+      return `Fill empty cells of ${name} with « ${step.value} »`;
+    case 'dropRows':
+      return `Remove ${step.rows.length} row${step.rows.length === 1 ? '' : 's'}: ${step.label}`;
     case 'dropEmpty':
       return `Remove rows where ${name} is empty`;
     case 'round':
@@ -256,7 +323,7 @@ export function describeStep(step: Step, nameOf: (column: number) => string): st
 
 /** Ce qu'une étape a fait : « −7 rows », « 20 cells », ou rien pour un renommage. */
 export function describeEffect(step: Step, effect: number): string {
-  if (step.kind === 'removeDuplicates' || step.kind === 'removeBlankRows' || step.kind === 'dropEmpty') return `−${effect} row${effect === 1 ? '' : 's'}`;
+  if (step.kind === 'removeDuplicates' || step.kind === 'removeBlankRows' || step.kind === 'dropEmpty' || step.kind === 'dropRows') return `−${effect} row${effect === 1 ? '' : 's'}`;
   if (step.kind === 'rename' || step.kind === 'remove') return '';
   if (step.kind === 'type') return effect === 0 ? '' : `${effect} emptied`;
   return `${effect} cell${effect === 1 ? '' : 's'}`;
@@ -300,7 +367,13 @@ export function stepsToPandas(steps: Step[], headers: string[], dayFirst: (colum
         lines.push(`${column} = ${column}.str.${step.mode === 'title' ? 'title' : step.mode}()`);
         break;
       case 'replace':
-        lines.push(`${column} = ${column}.replace(${JSON.stringify(step.from)}, ${step.to === '' ? 'pd.NA' : JSON.stringify(step.to)})`);
+        if (step.mode === 'contains' || step.mode === 'regex') {
+          // Python écrit `\1` là où JavaScript écrit `$1`.
+          const to = step.mode === 'regex' ? step.to.replace(/\$(\d)/g, '\\$1') : step.to;
+          lines.push(`${column} = ${column}.str.replace(${JSON.stringify(step.from)}, ${JSON.stringify(to)}, regex=${step.mode === 'regex' ? 'True' : 'False'})`);
+        } else {
+          lines.push(`${column} = ${column}.replace(${JSON.stringify(step.from)}, ${step.to === '' ? 'pd.NA' : JSON.stringify(step.to)})`);
+        }
         break;
       case 'empty':
         lines.push(`${column} = ${column}.replace(${JSON.stringify(step.tokens)}, pd.NA)`);
@@ -318,6 +391,16 @@ export function stepsToPandas(steps: Step[], headers: string[], dayFirst: (colum
         break;
       case 'fillDown':
         lines.push(`${column} = ${column}.ffill()`);
+        break;
+      case 'fillUp':
+        lines.push(`${column} = ${column}.bfill()`);
+        break;
+      case 'fillValue':
+        lines.push(`${column} = ${column}.fillna(${JSON.stringify(step.value)})`);
+        break;
+      case 'dropRows':
+        // Les positions du fichier d'origine : l'index d'un DataFrame lu sans `index_col`.
+        lines.push(`df = df.drop(index=[${step.rows.join(', ')}], errors="ignore")  # ${step.label}`);
         break;
       case 'dropEmpty':
         lines.push(`df = df[${column}.notna() & (${column}.astype(str).str.strip() != "")]`);

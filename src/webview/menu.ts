@@ -3,7 +3,7 @@ import { count } from '../core/format';
 import { similarValues } from '../core/insights';
 import { applySteps, type Step } from '../core/steps';
 import { isMeasurable, type ColumnType } from '../core/types';
-import { addStep, changeType, renameColumn, replaceValue, roundColumn, treatAsEmpty } from './cleaning';
+import { addStep, changeType, fillEmpty, renameColumn, replaceText, replaceValue, roundColumn, treatAsEmpty } from './cleaning';
 import { elements } from './dom';
 import { floating, positionFloating } from './floating-setup';
 import { icon } from './icons';
@@ -57,11 +57,13 @@ export function openMenu(modelIndex: number, anchor: HTMLElement): void {
   const effect = (step: Step) => applySteps(state.rows, state.headers, [step], state.delimiter === ';').effects[0] ?? 0;
   const cells = (amount: number) => (amount === 0 ? 'none' : `${count(amount)} cell${amount === 1 ? '' : 's'}`);
 
-  const run = (action: () => void) => () => {
-    closeMenu();
+  // `keepOpen` : l'action demande une saisie, dans un volet qui se déplie à côté du menu ;
+  // le menu reste donc là, et se replie avec le volet.
+  const run = (action: () => void, keepOpen = false) => () => {
+    if (!keepOpen) closeMenu();
     action();
   };
-  const item = (label: string, action: () => void, options: { mark?: 'check' | SVGSVGElement; hint?: string; idle?: boolean } = {}) => {
+  const item = (label: string, action: () => void, options: { mark?: 'check' | SVGSVGElement; hint?: string; idle?: boolean; keepOpen?: boolean } = {}) => {
     const button = document.createElement('button');
     button.className = 'menu-item';
     if (options.idle) button.classList.add('idle');
@@ -80,7 +82,7 @@ export function openMenu(modelIndex: number, anchor: HTMLElement): void {
       hint.textContent = options.hint;
       button.appendChild(hint);
     }
-    button.addEventListener('click', run(action));
+    button.addEventListener('click', run(action, options.keepOpen));
     menu.appendChild(button);
   };
   const heading = (label: string) => {
@@ -89,15 +91,15 @@ export function openMenu(modelIndex: number, anchor: HTMLElement): void {
     element.textContent = label;
     menu.appendChild(element);
   };
-  const chips = (entries: Array<[string, () => void, boolean?]>) => {
+  const chips = (entries: Array<[string, () => void, boolean?, boolean?]>) => {
     const row = document.createElement('div');
     row.className = 'cmenu-chips';
-    for (const [label, action, on] of entries) {
+    for (const [label, action, on, keepOpen] of entries) {
       const chip = document.createElement('button');
       chip.className = on ? 'cmenu-chip on' : 'cmenu-chip';
       if (on) chip.style.background = accent;
       chip.textContent = label;
-      chip.addEventListener('click', run(action));
+      chip.addEventListener('click', run(action, keepOpen));
       row.appendChild(chip);
     }
     menu.appendChild(row);
@@ -151,12 +153,18 @@ export function openMenu(modelIndex: number, anchor: HTMLElement): void {
   const tokens = computeDetails(table, modelIndex, column.type, column.temporal).nullTokens.map((token) => token.value);
   const fill: Step = { kind: 'fillDown', column: modelIndex };
   const filled = effect(fill);
-  item('Replace values…', () => void replaceValue(modelIndex), { mark: applied('replace') ? 'check' : undefined });
+  item('Replace values…', () => void replaceValue(modelIndex), { mark: applied('replace') ? 'check' : undefined, keepOpen: true });
   item('Treat as empty…', () => void treatAsEmpty(modelIndex, tokens), {
+    keepOpen: true,
     mark: applied('empty') ? 'check' : undefined,
     hint: tokens.length > 0 ? tokens.join(', ') : undefined,
   });
+  item('Replace text…', () => void replaceText(modelIndex), { mark: applied('replace') ? 'check' : undefined, hint: 'inside the cell', keepOpen: true });
   item('Fill down', () => addStep(fill), { mark: applied('fillDown') ? 'check' : undefined, hint: cells(filled), idle: filled === 0 && !applied('fillDown') });
+  const fillUp: Step = { kind: 'fillUp', column: modelIndex };
+  const filledUp = effect(fillUp);
+  item('Fill up', () => addStep(fillUp), { mark: applied('fillUp') ? 'check' : undefined, hint: cells(filledUp), idle: filledUp === 0 && !applied('fillUp') });
+  item('Fill empty with…', () => void fillEmpty(modelIndex), { mark: applied('fillValue') ? 'check' : undefined, keepOpen: true });
 
   // Les lignes où cette colonne est vide : le nettoyage le plus courant, et le
   // seul qui retire des lignes au lieu de changer des cellules.
@@ -170,7 +178,7 @@ export function openMenu(modelIndex: number, anchor: HTMLElement): void {
 
   if (column.type === 'numeric') {
     heading('Numbers');
-    item('Round…', () => void roundColumn(modelIndex), { mark: applied('round') ? 'check' : undefined });
+    item('Round…', () => void roundColumn(modelIndex), { mark: applied('round') ? 'check' : undefined, keepOpen: true });
   }
 
   heading('Type');
@@ -186,7 +194,7 @@ export function openMenu(modelIndex: number, anchor: HTMLElement): void {
 
   heading('Column');
   chips([
-    ['Rename…', () => void renameColumn(modelIndex)],
+    ['Rename…', () => void renameColumn(modelIndex), false, true],
     ['Remove column', () => addStep({ kind: 'remove', column: modelIndex })],
   ]);
 

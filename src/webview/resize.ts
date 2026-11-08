@@ -3,6 +3,7 @@ import { paint } from './paint';
 import { state } from './state';
 import { fitWidths } from './table';
 import { settleWidths } from './toolbar';
+import { quickTip } from './tooltip';
 
 /**
  * Redimensionner une colonne à la main.
@@ -15,7 +16,7 @@ import { settleWidths } from './toolbar';
 export function resizeHandle(modelIndex: number): HTMLDivElement {
   const handle = document.createElement('div');
   handle.className = 'col-resizer';
-  handle.title = 'Drag to resize · double-click to widen, again to shrink';
+  quickTip(handle, 'Drag to resize · double-click to widen, again to shrink');
   handle.addEventListener('mousedown', (event) => startResize(event, modelIndex));
   return handle;
 }

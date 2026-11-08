@@ -19,25 +19,41 @@ function escapeText(text: string): string {
 }
 
 /**
- * Une infobulle immédiate sur un bouton, à la place du `title` natif : celui-ci
- * attend près d'une seconde, sans réglage possible, et les boutons d'en-tête —
- * filtre, tri, balai — ne disaient ce qu'ils font qu'à qui patientait. Le
- * libellé reste lisible des lecteurs d'écran par `aria-label`.
+ * Une infobulle immédiate, à la place du `title` natif : celui-ci attend près d'une
+ * seconde, sans réglage possible, et c'est celui de VS Code, pas le nôtre. Elle ne
+ * pose que le texte ; c'est `installTips` qui l'affiche, une seule fois pour toute la
+ * page, si bien que tout ce qui est créé plus tard en profite sans rien brancher.
+ * Le libellé reste lisible des lecteurs d'écran : `aria-label` pour un bouton-icône,
+ * `aria-description` pour ce qui a déjà son texte.
  */
 export function quickTip(element: HTMLElement, text: string): void {
-  element.setAttribute('aria-label', text);
   element.dataset.tip = text;
   element.removeAttribute('title');
-  if (element.dataset.tipBound) return;
-  element.dataset.tipBound = '1';
-  const show = (event: MouseEvent) => {
-    // Le bandeau affiche le résumé de la colonne au survol : sans cet arrêt,
-    // il remplacerait aussitôt l'infobulle du bouton.
-    event.stopPropagation();
-    showTooltip(event, escapeText(element.dataset.tip ?? ''));
+  // Un bouton-icône (un ou deux signes) n'a que ce libellé ; le reste a déjà son texte.
+  element.setAttribute((element.textContent ?? '').trim().length <= 2 ? 'aria-label' : 'aria-description', text);
+}
+
+/**
+ * L'écouteur unique des infobulles. Il passe après ceux du bandeau, qui montrent le
+ * résumé d'une colonne au survol : sur un élément qui a sa propre infobulle, c'est
+ * donc la sienne qui reste affichée. Un `title` qui aurait échappé à `quickTip` est
+ * repris ici au premier survol, avant que le navigateur n'affiche le sien.
+ */
+export function installTips(): void {
+  const tipOf = (event: Event): HTMLElement | null => {
+    const holder = (event.target as HTMLElement | null)?.closest?.<HTMLElement>('[data-tip], [title]') ?? null;
+    if (holder && !holder.dataset.tip) quickTip(holder, holder.getAttribute('title') ?? '');
+    return holder?.dataset.tip ? holder : null;
   };
-  element.addEventListener('mouseenter', show);
-  element.addEventListener('mousemove', show);
-  element.addEventListener('mouseleave', hideTooltip);
-  element.addEventListener('mousedown', hideTooltip);
+  const show = (event: MouseEvent) => {
+    const holder = tipOf(event);
+    if (holder) showTooltip(event, escapeText(holder.dataset.tip ?? ''));
+  };
+  document.addEventListener('mouseover', show);
+  document.addEventListener('mousemove', show);
+  document.addEventListener('mouseout', (event) => {
+    const holder = (event.target as HTMLElement | null)?.closest?.<HTMLElement>('[data-tip]');
+    if (holder && !holder.contains(event.relatedTarget as Node | null)) hideTooltip();
+  });
+  document.addEventListener('mousedown', hideTooltip);
 }

@@ -17,6 +17,7 @@ import { paintChrome } from './toolbar';
 import { panelTitle } from './panels/shared';
 import { vscode } from './vscode-api';
 import { THEMES } from '../core/themes';
+import { quickTip } from './tooltip';
 
 
 /**
@@ -72,7 +73,7 @@ function themeItem(theme: CsvTheme, removable: boolean): HTMLElement {
   const remove = document.createElement('span');
   remove.className = 'theme-remove';
   remove.textContent = '\u00D7';
-  remove.title = theme === draftTheme() ? 'Discard this draw' : 'Remove this palette';
+  quickTip(remove, theme === draftTheme() ? 'Discard this draw' : 'Remove this palette');
   remove.addEventListener('click', (event) => {
     event.stopPropagation();
     if (theme === draftTheme()) {
@@ -147,7 +148,7 @@ function randomRow(): HTMLElement {
   draw.type = 'button';
   draw.className = 'theme-draw';
   draw.textContent = '\u2728 Random palette';
-  draw.title = 'Draw a new palette, alternating coloured background and coloured text';
+  quickTip(draw, 'Draw a new palette, alternating coloured background and coloured text');
   draw.addEventListener('click', (event) => {
     event.stopPropagation();
     const id = `custom-${Date.now()}`;
@@ -172,7 +173,7 @@ function randomRow(): HTMLElement {
   heart.className = 'theme-heart';
   heart.textContent = '\u2661';
   keep.append(heart, textSpan(' Keep'));
-  keep.title = 'Add this palette to your own list';
+  quickTip(keep, 'Add this palette to your own list');
   keep.disabled = draftTheme() === null;
   keep.addEventListener('click', (event) => {
     event.stopPropagation();

@@ -2,7 +2,7 @@
   "name": "csv-stats",
   "displayName": "CSV Stats",
   "description": "Explore CSV files in VS Code: column stats, filtering, colour palettes, and ready-to-use pandas code.",
-  "version": "0.29.4",
+  "version": "0.30.0",
   "publisher": "GabrielCapelli",
   "icon": "media/icon.png",
   "galleryBanner": {
@@ -82,7 +82,8 @@
     "package": "npm run build && vsce package --no-dependencies",
     "lint": "eslint src tests scripts eslint.config.mjs",
     "preview": "npm run build && npm run compile && node scripts/preview.mjs",
-    "test:integration": "npm run build && playwright test"
+    "test:integration": "npm run build && playwright test",
+    "screenshots": "npm run build && SHOTS=1 playwright test tests/integration/screenshots.spec.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

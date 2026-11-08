@@ -8,11 +8,11 @@
  */
 import { count } from '../core/format';
 import { compute } from '../core/stats';
-import { applySteps, columnOf, toCsv, type Step } from '../core/steps';
+import { applySteps, columnOf, compileRegex, toCsv, type Step } from '../core/steps';
 import { type ColumnType } from '../core/types';
 import { refilter } from './actions';
 import { elements } from './dom';
-import { ask } from './prompt';
+import { ask, askFields } from './prompt';
 import { state } from './state';
 import { vscode } from './vscode-api';
 
@@ -64,7 +64,7 @@ export function stepsOn(column: number): number {
 
 export async function renameColumn(column: number): Promise<void> {
   const current = state.stats[column]?.name ?? '';
-  const entered = await ask('Rename column', 'New name for this column:', current);
+  const entered = await ask('Rename column', 'New name for this column', current);
   if (entered === null || entered.trim() === '' || entered.trim() === current) return;
   addStep({ kind: 'rename', column, name: entered.trim() });
 }
@@ -77,24 +77,74 @@ export function changeType(column: number, type: ColumnType): void {
 }
 
 export async function replaceValue(column: number): Promise<void> {
-  const from = await ask('Replace values', 'Value to replace (the whole cell):', state.stats[column]?.top[0]?.value ?? '');
-  if (from === null) return;
-  const to = await ask('Replace values', `Replace « ${from} » with (empty to clear it):`, '');
-  if (to === null) return;
-  addStep({ kind: 'replace', column, from, to });
+  const values = await askFields('Replace values', [
+    { label: 'Value to replace (the whole cell)', value: state.stats[column]?.top[0]?.value ?? '' },
+    { label: 'Replace with (empty to clear it)' },
+  ]);
+  if (values === null) return;
+  addStep({ kind: 'replace', column, from: values[0], to: values[1] });
+}
+
+/**
+ * Chercher dans la cellule, pas la cellule entière : « € » dans « 12 € ». Entre deux barres
+ * obliques, `/\\d+ ?kg/`, le motif est une expression régulière.
+ */
+export async function replaceText(column: number): Promise<void> {
+  const values = await askFields(
+    'Replace text',
+    [{ label: 'Text to find in each cell, or /pattern/' }, { label: 'Replace with (empty to remove it)' }],
+    {
+      validate: ([found]) => {
+        if (found === '') return 'Write the text to find.';
+        const pattern = regexIn(found);
+        return pattern !== null && compileRegex(pattern) === null ? `« ${pattern} » is not a valid regular expression.` : null;
+      },
+    },
+  );
+  if (values === null) return;
+  const [found, to] = values;
+  const pattern = regexIn(found);
+  addStep(pattern !== null ? { kind: 'replace', column, from: pattern, to, mode: 'regex' } : { kind: 'replace', column, from: found, to, mode: 'contains' });
+}
+
+/** Le motif d'un texte écrit /entre barres/, ou `null` : c'est alors du texte simple. */
+function regexIn(text: string): string | null {
+  return text.length > 2 && text.startsWith('/') && text.endsWith('/') ? text.slice(1, -1) : null;
+}
+
+/** Les cellules vides d'une colonne reçoivent une valeur fixe : 0, « unknown »… */
+export async function fillEmpty(column: number): Promise<void> {
+  const value = await ask('Fill empty cells', 'Value to put in every empty cell', '');
+  if (value === null || value.trim() === '') return;
+  addStep({ kind: 'fillValue', column, value });
+}
+
+/**
+ * Retire les lignes que la vue montre en ce moment (un filtre est actif) : outliers,
+ * lignes d'une valeur, doublons. Le filtre n'a plus d'objet une fois les lignes parties.
+ * Les lignes sont désignées par leur place dans le fichier d'origine, pour que l'étape
+ * se rejoue à l'identique.
+ */
+export function removeShownRows(): void {
+  if (state.filters.length === 0 || state.view.length === 0 || state.view.length === state.rows.length) return;
+  const label = state.filters.map((filter) => filter.label).join(' + ');
+  const rows = state.view.map((index) => state.source[index]);
+  state.filters = [];
+  addStep({ kind: 'dropRows', rows, label });
 }
 
 export async function roundColumn(column: number): Promise<void> {
-  const entered = await ask('Round', 'Number of decimals to keep:', '2');
+  const entered = await ask('Round', 'Number of decimals to keep', '2', {
+    validate: ([digits]) => (/^\d{1,2}$/.test(digits.trim()) && Number(digits) <= 15 ? null : 'A whole number from 0 to 15.'),
+  });
   if (entered === null) return;
-  const digits = Number(entered.trim());
-  if (Number.isInteger(digits) && digits >= 0 && digits <= 15) addStep({ kind: 'round', column, digits });
+  addStep({ kind: 'round', column, digits: Number(entered.trim()) });
 }
 
 /** `suggested` : les jetons d'absence déjà repérés dans la colonne, proposés d'office. */
 export async function treatAsEmpty(column: number, suggested: string[] = []): Promise<void> {
   const proposal = suggested.length > 0 ? suggested.join(', ') : 'NULL, -, n/a';
-  const entered = await ask('Treat as empty', 'Values that mean "missing", separated by commas:', proposal);
+  const entered = await ask('Treat as empty', 'Values that mean "missing", separated by commas', proposal);
   if (entered === null) return;
   const tokens = entered
     .split(',')

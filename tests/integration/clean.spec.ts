@@ -11,7 +11,7 @@ test.describe('nettoyage par étapes', () => {
     await page.locator('.head-button.clean').nth(1).click();
     await page.locator('.menu-item', { hasText: 'Trim spaces' }).click();
     await expect(page.locator('.head-button.clean').nth(1)).toHaveAttribute('aria-label', /1 step applied/);
-    await expect(page.locator('.cell.changed').first()).toHaveAttribute('title', /^Was « /);
+    await expect(page.locator('.cell.changed').first()).toHaveAttribute('data-tip', /^Was « /);
 
     // Les doublons, depuis le catalogue du panneau Clean.
     await page.locator('#clean-button').click();

@@ -14,7 +14,8 @@ import { elements } from './dom';
 import { palette, state } from './state';
 import { floating, positionFloating } from './floating-setup';
 import { paint } from './paint';
-import { resolvePrompt } from './prompt';
+import { cancelField } from './prompt';
+import { installTips } from './tooltip';
 import { measureWidths, rebuildView, select, selectedRowsText } from './table';
 import { paintRaw } from './raw';
 import { openMenu, resetMenuColumn } from './menu';
@@ -101,9 +102,6 @@ window.addEventListener('message', (event: MessageEvent) => {
       elements.scroller.remove();
       elements.notice.textContent = message.message as string;
       break;
-    case 'promptResult':
-      resolvePrompt(message.token as string, message.value as string | null);
-      break;
     case 'raw': {
       // Un « \r » final par ligne, quand le fichier vient de Windows : retiré
       // pour l'affichage, la ligne elle-même reste intacte au caractère près.
@@ -124,8 +122,13 @@ window.addEventListener('message', (event: MessageEvent) => {
 // la sienne, ce qui a laissé un bug (le second clic ne refermait rien)
 // survivre plusieurs versions avant d'être corrigé en 0.15.1.
 document.addEventListener('mousedown', (event) => {
+  // Le volet de saisie fait partie du menu qui l'a ouvert : le toucher n'est pas « ailleurs ».
+  if (elements.field.contains(event.target as Node)) return;
   floating.handleOutsideClick(event.target);
+  if (floating.current === null) cancelField();
 });
+floating.onAnyClose = cancelField;
+installTips();
 
 // Un glissé de souris sur « Distinct », « Missing » ou une valeur du bandeau
 // finit par un `click` sur cet élément : sans ce garde, il déclenchait le

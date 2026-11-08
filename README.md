@@ -7,18 +7,20 @@ separator, decimal comma, missing-value tokens, dates.
 
 Right-click a `.csv` file in the explorer → **Open in CSV Stats**.
 
-![The stats band over a 423-row wine dataset, Prism duo palette: a seven-line ranking with Other on the region column, a three-line ranking with no Other on color, and histograms flush with the band's bottom edge](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-band.png)
+![The stats band over a 423-row wine dataset, Dusk palette (each column header takes its column's colour): a seven-line ranking with Other on the region column, a three-line ranking with no Other on color, and histograms flush with the band's bottom edge](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-band.png)
 
 *A band above every column: type, missing, distinct and unique values, then a histogram or the most frequent values.*
 
 ## What's new
 
-- **Random palettes, much more varied** (0.29). *Random palette* draws coloured text, on a
-  plain background or on one veiled with each column's colour, with or without grid lines,
-  and over the whole colour wheel instead of mostly blues and violets.
-- **Palettes and headers** (0.28). Six palettes — four *tone on tone*, where one family of
-  colour glides from column to column, and two with distinct colours — and a column header
-  that wears its column's colour: a rule on top, a light veil behind.
+- **Clean what is inside the cells** (0.30). *Replace text…* finds a piece of text in each
+  cell (`€`, `kg`) or a pattern written `/like this/`; *Fill up*, and *Fill empty with…* a
+  fixed value, join *Fill down*. The field you type in unfolds right beside the menu.
+- **Remove the rows you are looking at** (0.30). With a filter on — outliers, a value, a
+  spelling — *Remove these N rows* takes them out of the cleaned table, as a step you can undo.
+- **More real files open** (0.30). Tab and `|` separators, and files saved by Excel in
+  Windows-1252 or UTF-16, are read correctly. Tooltips are instant, and clicking again
+  closes a menu or field.
 - **Spelling, encoding, gaps** (0.27). *Merge* similar spellings (`Lyon`, `Lyons`, `lyon `)
   from the column's menu or *Clean*; fix garbled characters (`CafÃ©` → `Café`); see where
   an id or date series has holes; and read a measure's **average by category**.
@@ -47,6 +49,14 @@ Right-click a `.csv` file in the explorer → **Open in CSV Stats**.
   between* filter, and `parse_dates` in the generated pandas code.
 - **Fixes** (0.24.3). A column no longer changes type under a filter, and *Read this
   column as* now applies to the filtered rows and survives later filters.
+- **Headers in colour** (0.30). With *Dusk* and *Woodland*, and in about half the random
+  palettes, each column name wears its column's colour, adjusted to stay readable.
+- **Random palettes, much more varied** (0.29). *Random palette* draws coloured text, on a
+  plain background or on one veiled with each column's colour, with or without grid lines,
+  and over the whole colour wheel instead of mostly blues and violets.
+- **Palettes and headers** (0.28). Six palettes — four *tone on tone*, where one family of
+  colour glides from column to column, and two with distinct colours — and a column header
+  that wears its column's colour: a rule on top, a light veil behind.
 
 Every version is listed in the [changelog](https://github.com/gcapellib/vscode-csv-stats/blob/main/CHANGELOG.md).
 
@@ -59,9 +69,10 @@ Every version is listed in the [changelog](https://github.com/gcapellib/vscode-c
   removes each.
 - **Filter panel per column** — a value list with search, like Excel; *contains*
   / *starts with* for text; *greater than* / *between* for numbers and dates.
-- **Cleaning steps** — trim, invisible characters, case, replace values, treat
-  tokens as empty, fill down, change type, rename, remove a column, remove
-  duplicate or blank rows. Each step shows what it changed and can be removed;
+- **Cleaning steps** — trim, invisible characters, case, replace values or text
+  inside a cell (plain or regular expression), treat tokens as empty, fill down,
+  fill up, fill empty cells with a value, change type, rename, remove a column,
+  remove duplicate, blank or filtered rows (outliers included). Each step shows what it changed and can be removed;
   the original is never modified, and every save keeps a new copy.
 - **Column details** — the chart button on each band: empty cells, cells of spaces and `NULL` counted apart,
   placeholder values, the distribution and the column in row order, outliers, formats, gaps in a
@@ -73,6 +84,14 @@ Every version is listed in the [changelog](https://github.com/gcapellib/vscode-c
 - **20 palettes**, and random ones to draw —
   hover to preview on your own data.
 - **Fast** — 100,000 rows scroll smoothly; the file itself is never modified.
+
+![The column menu with its Replace text field unfolded beside it: text to find, replacement, OK and Cancel](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-clean.png)
+
+*Right-click a header: the cleaning steps for that column, and the field they need unfolds right beside the menu.*
+
+![Random palette clicked over and over: the same wine table recoloured by a new palette at every click, backgrounds and inks changing each time](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/random-palettes.gif)
+
+*Random palette: one click, a new palette drawn. Keep the ones you like.*
 
 ![The palette picker open, with the sheet already recoloured to Frost from hovering it in the list](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-theme-preview.png)
 

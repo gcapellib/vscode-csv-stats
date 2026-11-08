@@ -28,6 +28,8 @@ export interface FloatingPanel {
 }
 
 export class FloatingManager {
+  /** Appelé après chaque fermeture : le volet de saisie, qui dépend du panneau ouvert, s'y replie. */
+  onAnyClose: (() => void) | null = null;
   private panels = new Map<string, FloatingPanel>();
   private openId: string | null = null;
   /**
@@ -70,6 +72,7 @@ export class FloatingManager {
     if (!panel) return;
     panel.element.hidden = true;
     panel.onClose?.();
+    this.onAnyClose?.();
   }
 
   /** Un second appel avec le même id referme plutôt que de rouvrir. */

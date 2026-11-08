@@ -1,5 +1,6 @@
 import { count } from '../core/format';
 import { gradientFor, neutralAccent, themeById } from '../core/themes';
+import { removeShownRows } from './cleaning';
 import { clearFilters, closePicker, getOpenPanel, refilter } from './actions';
 import { FOLD_MS } from './constants';
 import { elements } from './dom';
@@ -9,6 +10,7 @@ import { openDataset } from './panels/dataset';
 import { isDark, state } from './state';
 import { measureWidths } from './table';
 import { vscode } from './vscode-api';
+import { quickTip } from './tooltip';
 
 /**
  * Affiche les conditions actives.
@@ -40,13 +42,23 @@ export function paintFilterBar(): void {
   for (const filter of state.filters) {
     const chip = document.createElement('button');
     chip.className = 'chip-filter';
-    chip.title = 'Remove this filter';
+    quickTip(chip, 'Remove this filter');
     chip.append(document.createTextNode(filter.label), cross());
     chip.addEventListener('click', () => {
       state.filters = state.filters.filter((other) => other !== filter);
       refilter();
     });
     elements.filterBar.appendChild(chip);
+  }
+
+  // Les lignes retenues sont celles qu'on regarde : un clic les retire du tableau nettoyé.
+  if (state.view.length > 0 && state.view.length < state.rows.length) {
+    const drop = document.createElement('button');
+    drop.className = 'chip-drop';
+    drop.textContent = `Remove these ${count(state.view.length)} rows`;
+    quickTip(drop, 'Take the rows shown out of the cleaned table (the file is untouched)');
+    drop.addEventListener('click', removeShownRows);
+    elements.filterBar.appendChild(drop);
   }
 
   const clear = document.createElement('button');

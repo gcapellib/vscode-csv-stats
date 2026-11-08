@@ -2,6 +2,28 @@
 
 Newest first.
 
+## 0.30.0
+
+- **Replace text inside cells.** *Replace text…* finds a piece of text in each cell (`€`, `kg`)
+  or a regular expression written `/like this/` (`$1` for a group). *Replace values…* still
+  needs the whole cell.
+- **Fill up, and fill empty cells with a value.** Beside *Fill down*, in the column menu.
+- **Remove the rows shown.** With a filter on, *Remove these N rows* takes them out of the
+  cleaned table (outliers, one value, a spelling…) as a step, removable like the others, with
+  its pandas line.
+- **More files open as they should.** Tab and `|` separators; Windows-1252 and UTF-16 files
+  are decoded instead of showing `�`. The copy you save stays UTF-8.
+- **The field you type in unfolds beside the menu** you clicked, instead of VS Code's box at
+  the top of the window. Enter confirms, Escape cancels, a bad regular expression or a bad
+  number of decimals is refused in place, and clicking the same entry again closes it.
+- **Menus and panels unroll** in 130 ms (not with reduced motion).
+- **Instant tooltips everywhere.** The plug-in's own tooltip replaces VS Code's slow one on
+  every button, row and cell.
+- **Headers in colour.** *Dusk* and *Woodland* draw each column name in its column's colour,
+  adjusted to a 4.5:1 contrast against the header; about half of the *Random palette* draws
+  do too.
+- **Docs:** new screenshots, and a GIF of random palettes. `npm run screenshots` makes them again.
+
 ## 0.29.4
 
 - **A placeholder that dominates is caught.** With 25 of 30 values at `-999` the quartiles

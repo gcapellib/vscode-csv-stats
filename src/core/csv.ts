@@ -27,10 +27,29 @@ export const MAX_ROWS = 500_000;
 const BOM = '﻿';
 
 /** Délimiteurs candidats, par ordre de préférence en cas d'égalité. */
-const CANDIDATE_DELIMITERS = [',', ';'];
+const CANDIDATE_DELIMITERS = [',', ';', '\t', '|'];
 
-export function decode(bytes: Uint8Array): string {
-  const text = new TextDecoder('utf-8').decode(bytes);
+export type Encoding = 'utf-8' | 'utf-16le' | 'utf-16be' | 'windows-1252';
+
+/**
+ * L'encodage d'un fichier : UTF-16 si une marque d'ordre des octets le dit, UTF-8 si
+ * le fichier s'y décode sans erreur, sinon windows-1252 — ce que produisent Excel et
+ * Windows quand ils écrivent « CSV » sans préciser. Le latin-1 en est un cas particulier
+ * (windows-1252 n'y ajoute que des caractères là où latin-1 a des caractères de contrôle).
+ */
+export function detectEncoding(bytes: Uint8Array): Encoding {
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return 'utf-16le';
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return 'utf-16be';
+  try {
+    new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    return 'utf-8';
+  } catch {
+    return 'windows-1252';
+  }
+}
+
+export function decode(bytes: Uint8Array, encoding: Encoding = detectEncoding(bytes)): string {
+  const text = new TextDecoder(encoding).decode(bytes);
   return text.startsWith(BOM) ? text.slice(BOM.length) : text;
 }
 

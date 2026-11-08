@@ -5,6 +5,7 @@ import { textSpan } from '../dom';
 import { state } from '../state';
 import { setColumnFilter, valueCounts, valuesFilter } from '../table';
 import { footerButtons } from './filter-fields';
+import { quickTip } from '../tooltip';
 
 /** Au-delà, le DOM de la liste devient lourd : seules les premières lignes s'affichent. */
 const PICKER_MAX_ROWS = 400;
@@ -74,7 +75,7 @@ export function renderValuesTab(parent: HTMLElement, columnIndex: number): HTMLE
       });
       const name = textSpan(value === '' ? '(blank)' : value);
       name.className = 'picker-value';
-      name.title = value;
+      quickTip(name, value);
       const tally = textSpan(count(occurrences));
       tally.className = 'picker-count';
       row.append(box, name, tally);

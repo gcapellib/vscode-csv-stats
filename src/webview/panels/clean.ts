@@ -10,6 +10,7 @@ import { palette, state } from '../state';
 import { allValueCounts, valuesFilter } from '../table';
 import { findingRow } from './details-extras';
 import { footer, panelTitle, sectionTitle, tintPanel } from './shared';
+import { quickTip } from '../tooltip';
 
 /**
  * Le panneau Clean : les étapes appliquées, le catalogue complet, la copie.
@@ -42,7 +43,7 @@ export function openClean(anchor: HTMLElement, only: number | null = null): void
     const remove = document.createElement('button');
     remove.className = 'clean-remove';
     remove.textContent = '✕';
-    remove.title = 'Remove this step: the steps after it replay without it';
+    quickTip(remove, 'Remove this step: the steps after it replay without it');
     remove.addEventListener('click', () => {
       removeStep(position);
       openClean(anchor, only);

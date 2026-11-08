@@ -3,6 +3,9 @@ import { describe, it } from 'node:test';
 import { count, num, percent } from '../core/format';
 import {
   DEFAULT_THEME,
+  blendHex,
+  contrastRatio,
+  readableOn,
   allThemes,
   customThemes,
   draftTheme,
@@ -568,5 +571,82 @@ describe('couleur sobre du thème', () => {
     const accent = neutralAccent(theme, true);
     assert.match(accent, /^#[0-9a-f]{6}$/i);
     for (const [index] of theme.hues.entries()) assert.ok(spread(accent) < spread(paletteFor(theme, index, true).accent));
+  });
+});
+
+describe('en-têtes de colonnes colorés', () => {
+  function seeded(seed: number): () => number {
+    let value = seed;
+    return () => {
+      value = (value * 1103515245 + 12345) % 2147483648;
+      return value / 2147483648;
+    };
+  }
+  // Les fonds d'en-tête de VS Code les plus courants, clairs et sombres, avant le voile de 14 %.
+  const GROUNDS = ['#1E1E1E', '#252526', '#2D2D30', '#181818', '#F3F3F3', '#FFFFFF', '#ECECEC'];
+
+  /** La teinte en degrés, par oklab approximé par l'écart de canaux : assez pour voir qu'elle ne saute pas. */
+  function tone(hex: string): number {
+    const [r, g, b] = channels(hex);
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    if (max === min) return 0;
+    const delta = max - min;
+    const hue = max === r ? ((g - b) / delta) % 6 : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4;
+    return (hue * 60 + 360) % 360;
+  }
+
+  it('sont réservés à Dusk et Woodland parmi les palettes livrées', () => {
+    for (const id of ['dusk', 'woodland']) assert.equal(themeById(id).headInk, true, id);
+    for (const id of ['blue-violet', 'deep-sea', 'fjord', 'bordeaux-gold', 'syntax', 'ocean']) assert.notEqual(themeById(id).headInk, true, id);
+  });
+
+  it('se lisent : contraste d’au moins 4,5 sur le fond de l’en-tête, en clair comme en sombre', () => {
+    for (const id of ['dusk', 'woodland']) {
+      for (const dark of [false, true]) {
+        for (let column = 0; column < 8; column++) {
+          const { accent } = paletteFor(themeById(id), column, dark);
+          for (const ground of GROUNDS) {
+            const backdrop = blendHex(ground, accent, 0.14);
+            const shown = readableOn(accent, backdrop);
+            assert.ok(contrastRatio(shown, backdrop) >= 4.5, `${id} ${dark ? 'sombre' : 'clair'} colonne ${column} sur ${ground}: ${shown}`);
+          }
+        }
+      }
+    }
+  });
+
+  it('suivent le dégradé : une couleur déjà lisible ne bouge pas, les autres gardent leur teinte', () => {
+    assert.equal(readableOn('#FFFFFF', '#1E1E1E'), '#FFFFFF');
+    for (const id of ['dusk', 'woodland']) {
+      for (const dark of [false, true]) {
+        for (let column = 0; column < 5; column++) {
+          const { accent } = paletteFor(themeById(id), column, dark);
+          const shown = readableOn(accent, blendHex(dark ? '#252526' : '#F3F3F3', accent, 0.14));
+          const gap = Math.abs(tone(shown) - tone(accent));
+          assert.ok(Math.min(gap, 360 - gap) <= 25, `${id} colonne ${column}: ${accent} → ${shown}`);
+        }
+      }
+    }
+  });
+
+  it('un jaune ne vire pas au brun sur fond clair : il perd de sa chroma plutôt que de s’assombrir', () => {
+    const shown = readableOn('#E8C168', '#F3F3F3');
+    assert.ok(contrastRatio(shown, '#F3F3F3') >= 4.5);
+    const [r, g, b] = channels(shown);
+    // Ni brun (rouge dominant, vert moyen, bleu bas) ni olive : le vert ne passe pas sous le rouge de moitié.
+    assert.ok(!(r > g && g > b && b < 0x30 && r < 0xa0), shown);
+  });
+
+  it('sont tirés au sort avec la moitié des palettes tirées, quelle que soit leur famille', () => {
+    let on = 0;
+    let off = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      const theme = randomTheme('h', 'H', seeded(seed));
+      if (theme.headInk) on++;
+      else off++;
+      assert.equal(typeof theme.headInk, 'boolean');
+    }
+    assert.ok(on > 60 && off > 60, `${on} avec, ${off} sans`);
   });
 });

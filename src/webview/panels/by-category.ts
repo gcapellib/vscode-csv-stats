@@ -17,6 +17,7 @@ import { textSpan } from '../dom';
 import { state } from '../state';
 import { parserOf, setColumnFilter, valuesFilter } from '../table';
 import { sectionTitle } from './shared';
+import { quickTip } from '../tooltip';
 
 /** La catégorie choisie pour chaque mesure, gardée d'une ouverture à l'autre. */
 const chosen = new Map<number, number>();
@@ -98,7 +99,7 @@ export function byCategory(column: ColumnStats, details: ColumnDetails, colours:
   for (const group of groups) {
     const row = document.createElement('div');
     row.className = 'bar-row pickable-row';
-    row.title = 'Show these rows in the table';
+    quickTip(row, 'Show these rows in the table');
     const label = textSpan(group.key === '' ? '(blank)' : group.key);
     label.className = 'bar-label';
     const track = document.createElement('div');

@@ -43,6 +43,12 @@ export interface CsvTheme {
   inks?: { light: string[]; dark: string[] };
   /** Les encres forment un dégradé : au-delà de la dernière, on revient en arrière (voir pingPong). */
   gradient?: boolean;
+  /**
+   * Le nom de chaque colonne, dans l'en-tête, prend la couleur de sa colonne au lieu du
+   * blanc du thème de VS Code — éclaircie ou assombrie juste ce qu'il faut pour se lire
+   * sur le fond de l'en-tête (voir `readableOn`).
+   */
+  headInk?: boolean;
   /** Sans traits de séparation entre les cellules et les colonnes : seules les couleurs les distinguent. */
   seamless?: boolean;
   /** Amplitude de la rampe de luminosité sur l'ensemble des teintes. */
@@ -159,8 +165,8 @@ function onLight(dark: string[], gradient: boolean): string[] {
 }
 
 /** Palette pensée pour un fond sombre ; ses encres claires s'en déduisent. */
-function ink(id: string, label: string, dark: string[], gradient = false): CsvTheme {
-  return { ...explicit(id, label, onLight(dark, gradient), dark, '#FBFBFC', '#1E1F22'), gradient, seamless: gradient };
+function ink(id: string, label: string, dark: string[], gradient = false, headInk = false): CsvTheme {
+  return { ...explicit(id, label, onLight(dark, gradient), dark, '#FBFBFC', '#1E1F22'), gradient, seamless: gradient, ...(headInk ? { headInk } : {}) };
 }
 
 /** Teinte d'un « #rrggbb », en degrés — l'inverse partiel de hsb(). */
@@ -211,8 +217,8 @@ const INKED: CsvTheme[] = [
   inked('frost', 'Frost', [193, 354, 92, 213, 40, 311, 14], '#ECEFF4', '#2E3440'),
   // Du ton sur ton : une famille de couleurs qui glisse d'une colonne à l'autre.
   ink('blue-violet', 'Blue to violet', ['#7FB5E6', '#8EA6EC', '#9D98EE', '#AE8BE8', '#BE80DE'], true),
-  ink('dusk', 'Dusk', ['#E8C168', '#EDA46B', '#EA8A83', '#D77FA6', '#B282C8'], true),
-  ink('woodland', 'Woodland', ['#B5D580', '#8CCB8A', '#6BC4A0', '#5BBBB4', '#5BAFC8'], true),
+  ink('dusk', 'Dusk', ['#E8C168', '#EDA46B', '#EA8A83', '#D77FA6', '#B282C8'], true, true),
+  ink('woodland', 'Woodland', ['#B5D580', '#8CCB8A', '#6BC4A0', '#5BBBB4', '#5BAFC8'], true, true),
   ink('deep-sea', 'Deep sea', ['#7FD3D0', '#74C2D6', '#6BAEDC', '#6C98E0', '#7A84DE'], true),
   // Deux palettes à couleurs franches, une par colonne.
   ink('fjord', 'Fjord', ['#8FB8DE', '#9CC9B4', '#D9C08C', '#C5A3D4', '#E0A39A']),
@@ -493,6 +499,8 @@ const VEIL_SHARE = 0.6;
 
 /** Part des tirages sans traits de séparation : les autres gardent leurs lignes. */
 const SEAMLESS_SHARE = 0.5;
+/** La part des tirages dont les en-têtes de colonnes portent la couleur de leur colonne. */
+const HEAD_INK_SHARE = 0.5;
 
 /** Part des tirages qui empruntent le style d'une palette de la liste. */
 const BLEND_SHARE = 0.5;
@@ -718,7 +726,7 @@ function blendTheme(id: string, label: string, random: () => number, spectrum = 
     );
     if (readable) {
       const loopHues = spectrum ? hues : pingPongHues(points);
-      return { ...base, id, label, hues: loopHues, spread: 0, blend: base.label, frozen, seamless: random() < SEAMLESS_SHARE, ...(spectrum ? { spectrum: true } : {}) };
+      return { ...base, id, label, hues: loopHues, spread: 0, blend: base.label, frozen, seamless: random() < SEAMLESS_SHARE, headInk: random() < HEAD_INK_SHARE, ...(spectrum ? { spectrum: true } : {}) };
     }
   }
   return null;
@@ -808,7 +816,7 @@ export function randomTheme(
     light: { ground: grounds.light, colours: light },
     dark: { ground: grounds.dark, colours: darkColours },
   };
-  return { id, label, hues: darkColours.map(hueOf), style: VIVID, spread: 0, sample, seamless: random() < SEAMLESS_SHARE };
+  return { id, label, hues: darkColours.map(hueOf), style: VIVID, spread: 0, sample, seamless: random() < SEAMLESS_SHARE, headInk: random() < HEAD_INK_SHARE };
 }
 
 /** Rang de la couleur d'une colonne : le dégradé, puis le chemin inverse. */
@@ -1068,4 +1076,46 @@ function shiftBrightness(hex: string, amount: number): string {
   const target = clamp(value + amount, 0.03, 1);
   const factor = value === 0 ? 0 : target / value;
   return value === 0 ? toHex(target, target, target) : toHex(red * factor, green * factor, blue * factor);
+}
+
+/** Luminance relative d'un « #rrggbb », celle des rapports de contraste WCAG. */
+function relativeLuminance(hex: string): number {
+  const linear = (channel: number) => (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+  const [red, green, blue] = [1, 3, 5].map((at) => linear(parseInt(hex.slice(at, at + 2), 16) / 255));
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+/** Le rapport de contraste WCAG entre deux couleurs : de 1 (identiques) à 21. */
+export function contrastRatio(first: string, second: string): number {
+  const [high, low] = [relativeLuminance(first), relativeLuminance(second)].sort((a, b) => b - a);
+  return (high + 0.05) / (low + 0.05);
+}
+
+/** Un mélange linéaire de deux couleurs « #rrggbb » : `amount` de la seconde dans la première. */
+export function blendHex(first: string, second: string, amount: number): string {
+  const channel = (at: number) => (parseInt(first.slice(at, at + 2), 16) * (1 - amount) + parseInt(second.slice(at, at + 2), 16) * amount) / 255;
+  return toHex(channel(1), channel(3), channel(5));
+}
+
+/**
+ * La couleur de colonne `ink`, rendue lisible sur le fond `backdrop` : elle garde sa
+ * teinte et sa chroma, et ne change de clarté que de ce qu'il faut pour atteindre le
+ * rapport de contraste demandé — plus clair sur un fond sombre, plus foncé sur un fond
+ * clair. Un jaune qui devrait s'assombrir au point de brunir perd plutôt sa chroma :
+ * un gris chaud lisible vaut mieux qu'un brun.
+ */
+export function readableOn(ink: string, backdrop: string, minimum = 4.5): string {
+  if (contrastRatio(ink, backdrop) >= minimum) return ink;
+  const [lightness, a, b] = toOklab(ink);
+  const chroma = Math.hypot(a, b);
+  const hue = ((Math.atan2(b, a) * 180) / Math.PI + 360) % 360;
+  const towardLight = relativeLuminance(backdrop) < 0.18;
+  for (let step = 1; step <= 100; step++) {
+    const target = lightness + (towardLight ? 1 : -1) * step * 0.01;
+    if (target < 0 || target > 1) break;
+    let candidate = oklch(target, chroma, hue);
+    if (!towardLight && muddy(candidate, false)) candidate = oklch(target, chroma * 0.35, hue);
+    if (contrastRatio(candidate, backdrop) >= minimum) return candidate;
+  }
+  return towardLight ? '#FFFFFF' : '#000000';
 }

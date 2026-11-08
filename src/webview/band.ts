@@ -55,7 +55,7 @@ export function bandCell(modelIndex: number): HTMLElement {
   // code Dataset, qui reproduit ces retraits.
   const position = state.order.indexOf(modelIndex);
   const kind = line('type', `${column.type} \u00b7 #${position}`);
-  kind.title = `Column ${position} of the table as it stands, counted from 0 as pandas does: df.iloc[:, ${position}]`;
+  quickTip(kind, `Column ${position} of the table as it stands, counted from 0 as pandas does: df.iloc[:, ${position}]`);
   cell.appendChild(kind);
   const missing = line('stat', `Missing ${count(column.missing)} (${percent(column.missingShare)})`);
   // Un vide n'est pas une valeur du type de la colonne, c'est un état de la
@@ -63,14 +63,14 @@ export function bandCell(modelIndex: number): HTMLElement {
   // que seule la liste des valeurs du texte permettait jusqu'ici.
   if (column.missing > 0) {
     missing.classList.add('pickable');
-    missing.title = 'Keep only the rows where this column is empty';
+    quickTip(missing, 'Keep only the rows where this column is empty');
     missing.addEventListener('click', () => toggleFilter(valuesFilter(modelIndex, [''])));
   } else {
     // Rien à filtrer : grisé, pour qu'on voie d'un coup d'œil où sont les
     // vides. Identique à un « Missing » cliquable, il trompait — on cliquait
     // « Missing 0 » sans que rien ne se passe.
     missing.classList.add('none');
-    missing.title = 'No empty cells';
+    quickTip(missing, 'No empty cells');
   }
   cell.appendChild(missing);
   // La part des distinctes se rapporte aux valeurs renseignées, pas au total
@@ -83,7 +83,7 @@ export function bandCell(modelIndex: number): HTMLElement {
   const distinct = line('stat', distinctText(column));
   if (column.distinct > 0) {
     distinct.classList.add('pickable');
-    distinct.title = 'Keep one row per distinct value (the first one)';
+    quickTip(distinct, 'Keep one row per distinct value (the first one)');
     distinct.addEventListener('click', () =>
       toggleFilter({ kind: 'distinct', column: modelIndex, label: `${column.name}: one row per value` }),
     );
@@ -96,13 +96,13 @@ export function bandCell(modelIndex: number): HTMLElement {
   const unique = line('stat', uniqueText(column));
   if (column.unique > 0) {
     unique.classList.add('pickable');
-    unique.title = 'Keep only the rows whose value occurs once in this column';
+    quickTip(unique, 'Keep only the rows whose value occurs once in this column');
     unique.addEventListener('click', () =>
       toggleFilter({ kind: 'unique', column: modelIndex, label: `${column.name}: values seen once` }),
     );
   } else {
     unique.classList.add('none');
-    unique.title = 'Every value occurs more than once';
+    quickTip(unique, 'Every value occurs more than once');
   }
   cell.appendChild(unique);
 

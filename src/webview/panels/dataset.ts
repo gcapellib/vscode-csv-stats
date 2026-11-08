@@ -12,6 +12,7 @@ import { footer, panelTitle, sectionTitle, tintPanel } from './shared';
 import { datasetTransformLines as coreDatasetTransformLines } from '../../core/filters';
 import { cleanCopyName, stepsToPandas, type Step } from '../../core/steps';
 import { addStep } from '../cleaning';
+import { quickTip } from '../tooltip';
 
 /**
  * Panneau du fichier entier.
@@ -107,7 +108,7 @@ export function openDataset(anchor: HTMLElement): void {
     const row = document.createElement('button');
     row.className = 'info-name';
     row.textContent = stats?.name ?? name;
-    row.title = 'Open this column';
+    quickTip(row, 'Open this column');
     row.addEventListener('click', () => {
       closePicker();
       openDetails(index, anchor);
@@ -203,7 +204,7 @@ function relatedRow(left: number, right: number, r: number, anchor: HTMLElement)
     button.className = 'info-name';
     button.textContent = state.headers[index];
     button.style.color = palette(index).accent;
-    button.title = 'Open this column';
+    quickTip(button, 'Open this column');
     button.addEventListener('click', () => {
       closePicker();
       openDetails(index, anchor);
@@ -218,7 +219,7 @@ function relatedRow(left: number, right: number, r: number, anchor: HTMLElement)
   bar.appendChild(fill);
   const value = textSpan(`${r > 0 ? '+' : '−'}${Math.abs(r).toFixed(2)}`);
   value.className = 'related-value';
-  row.title = r > 0 ? 'They rise together' : 'One rises when the other falls';
+  quickTip(row, r > 0 ? 'They rise together' : 'One rises when the other falls');
   row.append(name(left), textSpan('↔'), name(right), bar, value);
   return row;
 }
@@ -256,7 +257,7 @@ function withFix(flag: HTMLElement, [label, step]: [string, Step], anchor: HTMLE
 export function finding(text: string, onPick: () => void, columnIndex = -1): HTMLElement {
   const item = document.createElement('button');
   item.className = 'flag pickable';
-  item.title = 'Show these rows in the table';
+  quickTip(item, 'Show these rows in the table');
   item.textContent = text;
   if (columnIndex >= 0) {
     const colours = palette(columnIndex);
