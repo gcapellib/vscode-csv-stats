@@ -47,13 +47,29 @@ test('raw', async ({ page }) => {
 });
 
 test('clean', async ({ page }) => {
+  // Une fenêtre assez haute pour que le menu tienne en entier, puis un recadrage serré :
+  // dans le README l'image est réduite, et un menu perdu dans le tableau devient illisible.
+  await page.setViewportSize({ width: 1276, height: 1000 });
   await openHarness(page, 'samples/wines.csv', 'dusk');
-  await page.locator('.head-cell[data-column="2"]').click({ button: 'right' });
+  const head = page.locator('.head-cell[data-column="2"]');
+  await head.click({ button: 'right' });
   await page.locator('#menu .menu-item', { hasText: 'Replace text…' }).click();
   await page.locator('#field input').nth(0).fill('Napa');
   await page.locator('#field input').nth(1).fill('Napa Valley');
+  await page.mouse.move(2, 2);
   await page.waitForTimeout(350);
-  await page.screenshot({ path: 'media/screenshot-clean.png' });
+  const boxes = await Promise.all([head, page.locator('#menu'), page.locator('#field')].map((target) => target.boundingBox()));
+  const [left, top, right, bottom] = [
+    Math.min(...boxes.map((box) => box!.x)),
+    Math.min(...boxes.map((box) => box!.y)),
+    Math.max(...boxes.map((box) => box!.x + box!.width)),
+    Math.max(...boxes.map((box) => box!.y + box!.height)),
+  ];
+  const pad = 24;
+  await page.screenshot({
+    path: 'media/screenshot-clean.png',
+    clip: { x: Math.max(0, left - pad), y: Math.max(0, top - pad), width: right - left + 2 * pad, height: bottom - top + 2 * pad },
+  });
 });
 
 /**
