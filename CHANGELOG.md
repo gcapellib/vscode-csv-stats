@@ -2,6 +2,16 @@
 
 Newest first.
 
+## 0.32.1
+
+- **Fixed:** in the distribution chart of *Column details*, the quartile labels (`Q1`, `Median`, `Q3`)
+  could be written on top of each other when a column's quartiles sit close together, and the limit
+  and min/max labels under the axis could touch. One rule now places every label of the chart: each
+  takes the first line where it touches none of the others, using the text's real width in the
+  panel's font rather than an estimate, and the chart grows by as many lines as it needs.
+  The rule is the same whatever the file. Tests check it on three datasets, in a narrow and in a very
+  wide font.
+
 ## 0.32.0
 
 - **Column details is a quick look again.** The two charts come first — the distribution and the

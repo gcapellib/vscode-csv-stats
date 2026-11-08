@@ -13,6 +13,8 @@ import { elements, textSpan } from '../dom';
 import { valueCounts } from '../table';
 import { hideTooltip, quickTip, showTooltip } from '../tooltip';
 import { addStep } from '../cleaning';
+import { placeLabels } from '../../core/labels';
+import { textWidth } from '../measure';
 import { actionBar, detailsExtras, placeholderSection, withoutNote } from './details-extras';
 import { rowOrderChart } from './row-order';
 import { byCategory } from './by-category';
@@ -301,11 +303,8 @@ export function markedHistogram(column: ColumnStats, colours: Palette): HTMLElem
   const wrapper = document.createElement('div');
   wrapper.className = 'chart';
   const width = 340;
-  const top = 34;
   const bottom = 170;
-  const height = 206;
   const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   svg.setAttribute('class', 'big-hist');
   const show = (value: number) => formatValue(column, value);
 
@@ -343,6 +342,55 @@ export function markedHistogram(column: ColumnStats, colours: Palette): HTMLElem
   const x0 = plotLeft + (lowOutliers ? zone : 0);
   const x1 = plotRight - (highOutliers ? zone : 0);
   const barLeft = (index: number) => x0 + ((x1 - x0) * index) / bins.length;
+
+  // Les étiquettes se placent d'après les données — des quartiles resserrés, une borne contre le
+  // maximum — et non d'après un gabarit : chacune prend la première ligne où elle ne touche
+  // aucune autre (voir core/labels.ts), et le graphique s'agrandit de ce qu'il faut.
+  const span = fenceHigh - fenceLow || 1;
+  const xOf = (value: number) => x0 + Math.max(0, Math.min(1, (value - fenceLow) / span)) * (x1 - x0);
+  const quartiles: Array<[string, number]> = [
+    ['Q1', column.q1 ?? 0],
+    ['Median', column.median ?? 0],
+    ['Q3', column.q3 ?? 0],
+  ];
+  const quartileBoxes = quartiles.map(([name, value]) => ({
+    x: xOf(value),
+    width: textWidth(`${name} `, 10) + textWidth(show(value), 10, 700) + 2,
+    anchor: 'middle' as const,
+  }));
+  const quartilePlaces = placeLabels(quartileBoxes, 2, width - 2);
+  const top = Math.max(34, 8 + (Math.max(...quartilePlaces.map((place) => place.row)) + 1) * 13);
+
+  // Sous l'axe : les bornes des outliers d'abord, puis le minimum et le maximum.
+  interface AxisLabel {
+    value: string;
+    caption: string;
+    x: number;
+    anchor: 'start' | 'middle' | 'end';
+    warn: boolean;
+  }
+  const axisLabels: AxisLabel[] = [];
+  const outlierMiddle = (edge: number) => edge + (zone - 8) / 2;
+  if (lowOutliers) axisLabels.push({ value: show(fenceLow), caption: 'limit', x: x0 - 4, anchor: 'end', warn: true });
+  if (highOutliers) axisLabels.push({ value: show(fenceHigh), caption: 'limit', x: x1 + 4, anchor: 'start', warn: true });
+  axisLabels.push(
+    lowOutliers
+      ? { value: show(column.min ?? 0), caption: 'min', x: outlierMiddle(plotLeft + 2), anchor: 'middle', warn: false }
+      : { value: show(column.min ?? 0), caption: 'min', x: plotLeft, anchor: 'start', warn: false },
+    highOutliers
+      ? { value: show(column.max ?? 0), caption: 'max', x: outlierMiddle(x1 + 6), anchor: 'middle', warn: false }
+      : { value: show(column.max ?? 0), caption: 'max', x: plotRight, anchor: 'end', warn: false },
+  );
+  const axisBoxes = axisLabels.map((label) => ({
+    x: label.x,
+    width: Math.max(textWidth(label.value, 10, label.warn ? 700 : 400), textWidth(label.caption, 9)),
+    anchor: label.anchor,
+  }));
+  const axisPlaces = placeLabels(axisBoxes, 2, width - 2);
+  const AXIS_ROW = 24;
+  const height = bottom + 36 + Math.max(...axisPlaces.map((place) => place.row)) * AXIS_ROW;
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
   const room = bottom - top;
   const heightOf = (value: number) => (value === 0 ? 0 : Math.max(1, (room * value) / peak));
   const share = (value: number) => percent(column.present === 0 ? 0 : value / column.present);
@@ -427,15 +475,10 @@ export function markedHistogram(column: ColumnStats, colours: Palette): HTMLElem
     svg.appendChild(hatch);
     hits.push(hit(left - 2, left + zone - 6, `<b>${label}</b><br>${plural(value)} (${share(value)})`));
   };
-  const axis = bottom + 14;
-  const tickLabel = (x: number, value: string, caption: string, anchor: 'start' | 'middle' | 'end') => {
-    svg.appendChild(svgText(value, x, axis, { anchor, size: 10, opacity: 0.95 }));
-    svg.appendChild(svgText(caption, x, axis + 11, { anchor, size: 9, opacity: 0.6 }));
-  };
   // La borne des outliers : une bande teintée sur leur zone, un trait plein
   // à la frontière, et la valeur de la borne en couleur sous l'axe.
   const warn = 'var(--vscode-editorWarning-foreground, #cca700)';
-  const fence = (x: number, edge: number, value: string, side: 'start' | 'end') => {
+  const fence = (x: number, edge: number) => {
     const band = document.createElementNS(NS, 'rect');
     band.setAttribute('x', String(Math.min(x, edge)));
     band.setAttribute('y', String(top));
@@ -452,47 +495,35 @@ export function markedHistogram(column: ColumnStats, colours: Palette): HTMLElem
     line.setAttribute('stroke', warn);
     line.setAttribute('stroke-width', '2');
     svg.appendChild(line);
-    const anchor = side === 'start' ? 'end' : 'start';
-    const dx = side === 'start' ? -4 : 4;
-    for (const [content, y, size, weight] of [[value, axis, 10, 700], ['limit', axis + 11, 9, 400]] as const) {
-      const label = svgText(content, x + dx, y, { anchor, size, opacity: 1, weight });
-      label.setAttribute('fill', warn);
-      svg.appendChild(label);
-    }
   };
   if (lowOutliers) {
     outlierBar(plotLeft + 2, lowCount, `Outliers below ${show(fenceLow)}`);
-    tickLabel(plotLeft + 2 + (zone - 8) / 2, show(column.min ?? 0), 'min', 'middle');
-    fence(x0, plotLeft, show(fenceLow), 'end');
-  } else {
-    tickLabel(plotLeft, show(column.min ?? 0), 'min', 'start');
+    fence(x0, plotLeft);
   }
   if (highOutliers) {
     outlierBar(x1 + 6, highCount, `Outliers above ${show(fenceHigh)}`);
-    tickLabel(x1 + 6 + (zone - 8) / 2, show(column.max ?? 0), 'max', 'middle');
-    fence(x1, plotRight, show(fenceHigh), 'start');
-  } else {
-    tickLabel(plotRight, show(column.max ?? 0), 'max', 'end');
+    fence(x1, plotRight);
   }
 
+  // Les étiquettes de l'axe, une fois placées : la valeur, et son nom dessous.
+  axisLabels.forEach((label, i) => {
+    const { left, row } = axisPlaces[i];
+    const x = label.anchor === 'start' ? left : label.anchor === 'end' ? left + axisBoxes[i].width : left + axisBoxes[i].width / 2;
+    const y = bottom + 14 + row * AXIS_ROW;
+    const valueText = svgText(label.value, x, y, { anchor: label.anchor, size: 10, opacity: label.warn ? 1 : 0.95, weight: label.warn ? 700 : undefined });
+    const captionText = svgText(label.caption, x, y + 11, { anchor: label.anchor, size: 9, opacity: label.warn ? 1 : 0.6 });
+    if (label.warn) {
+      valueText.setAttribute('fill', warn);
+      captionText.setAttribute('fill', warn);
+    }
+    svg.append(valueText, captionText);
+  });
+
   // Les traits, et leurs valeurs en haut, alignés dessus.
-  const span = fenceHigh - fenceLow || 1;
-  const xOf = (value: number) => x0 + Math.max(0, Math.min(1, (value - fenceLow) / span)) * (x1 - x0);
-    const ends: number[] = [];
-  const labelled: Array<[string, number]> = [
-    ['Q1', column.q1 ?? 0],
-    ['Median', column.median ?? 0],
-    ['Q3', column.q3 ?? 0],
-  ];
   const labels: SVGElement[] = [];
-  for (const [name, value] of labelled) {
+  for (const [index, [name, value]] of quartiles.entries()) {
     const x = xOf(value);
-    const text = `${name} ${show(value)}`;
-    const textWidth = text.length * 5.8 + 6;
-    const left = Math.min(width - textWidth - 2, Math.max(2, x - textWidth / 2));
-    let row = ends.findIndex((end) => end + 4 <= left);
-    if (row === -1) row = Math.min(ends.length, 1);
-    ends[row] = left + textWidth;
+    const { left, row } = quartilePlaces[index];
     const line = document.createElementNS(NS, 'line');
     line.setAttribute('x1', String(x));
     line.setAttribute('x2', String(x));
@@ -504,7 +535,7 @@ export function markedHistogram(column: ColumnStats, colours: Palette): HTMLElem
     line.setAttribute('opacity', '0.75');
     svg.appendChild(line);
     // Le nom en retrait, la valeur en gras : on lit « Q1 » puis son chiffre, pas un seul mot.
-    const label = svgText('', left + textWidth / 2, 10 + row * 13, { size: 10, opacity: 1 });
+    const label = svgText('', left + quartileBoxes[index].width / 2, 10 + row * 13, { size: 10, opacity: 1 });
     const nameSpan = document.createElementNS(NS, 'tspan');
     nameSpan.setAttribute('opacity', '0.6');
     nameSpan.textContent = `${name} `;
