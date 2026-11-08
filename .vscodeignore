@@ -19,3 +19,4 @@ docs/**
 releases/**
 scripts/**
 .claude/**
+test-data/**
