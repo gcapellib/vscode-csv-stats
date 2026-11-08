@@ -2,6 +2,15 @@
 
 Newest first.
 
+## 0.32.2
+
+- **The row-order curve shows how many outliers, not only whether there are any.** Each stretch of rows
+  now has a small bar above the curve, as tall as its number of outliers. On a long skewed column, where
+  every stretch holds a few, the old row of dots merged into one solid band and said nothing; it now reads
+  as an even comb, while a cluster of outliers stands out as a spike. A single outlier stays a visible tick
+  without ever reaching full height (the scale never goes below 5 per stretch), and a line under the chart
+  says what a bar stands for.
+
 ## 0.32.1
 
 - **Fixed:** in the distribution chart of *Column details*, the quartile labels (`Q1`, `Median`, `Q3`)

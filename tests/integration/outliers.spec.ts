@@ -160,3 +160,17 @@ test('Dataset s’ouvre sans attendre sur un gros fichier : les constats sont pr
   await page.locator('#picker .picker-button', { hasText: 'Close' }).click();
   await expect(page.locator('#picker')).toBeHidden();
 });
+
+test('la courbe par ligne montre les outliers en barres : un seul outlier reste un trait, sans barre pleine', async ({ page }) => {
+  await openHarness(page, 'samples/wines.csv');
+  const column = page.locator('.band-cell').filter({ hasText: 'NUMERIC · #8' });
+  await column.scrollIntoViewIfNeeded();
+  await column.locator('.dots').click();
+  const bars = page.locator('#picker svg.row-strip rect[fill*="editorWarning"]');
+  expect(await bars.count()).toBeGreaterThan(0);
+  const heights = await bars.evaluateAll((nodes) => nodes.map((node) => Number(node.getAttribute('height'))));
+  // Des tranches d'un seul outlier : visibles (au moins 1,5 px), mais loin de la hauteur maximale de la bande.
+  expect(Math.min(...heights)).toBeGreaterThanOrEqual(1.5);
+  expect(Math.max(...heights)).toBeLessThan(16);
+  await expect(page.locator('#picker .chart-scale')).toContainText('each bar');
+});

@@ -7,8 +7,8 @@
  *
  * La courbe suit la moyenne de chaque tranche de lignes, sur la plage normale
  * (celle des limites d'outliers). Les outliers n'écrasent donc pas l'échelle :
- * ils sont des points jaunes collés au bord, et les cellules vides des repères
- * rouges sur l'axe. Les valeurs-balises sont écartées, comme dans l'histogramme.
+ * ils sont des barres jaunes — leur hauteur dit combien il y en a par tranche —, et les
+ * cellules vides des repères rouges sur l'axe. Les valeurs-balises sont écartées, comme dans l'histogramme.
  */
 import { levelShift } from '../../core/insights';
 import { count } from '../../core/format';
@@ -28,6 +28,8 @@ const ERROR = 'var(--vscode-editorErrorForeground, #d03b3b)';
 /** Moins de lignes que cela : la série tient dans l'histogramme. */
 const MIN_ROWS = 30;
 const BUCKETS = 160;
+/** Sous ce nombre d'outliers par tranche, l'échelle ne se resserre pas : un outlier seul ne devient pas une barre pleine. */
+const OUTLIER_SCALE_FLOOR = 5;
 
 interface Bucket {
   from: number;
@@ -105,7 +107,10 @@ export function rowOrderChart(column: ColumnStats, details: ColumnDetails, colou
   const height = 134;
   const left = 4;
   const right = width - 4;
-  const top = 12;
+  // Au-dessus de la courbe, une bande pour les outliers hauts : des barres, jamais plus de 16 px.
+  const stripBase = 22;
+  const stripHeight = 16;
+  const top = 28;
   const axis = 100;
   const pad = (hi - lo) * 0.08;
   const yOf = (value: number) => axis - ((value - (lo - pad)) / (hi - lo + 2 * pad)) * (axis - top);
@@ -141,16 +146,27 @@ export function rowOrderChart(column: ColumnStats, details: ColumnDetails, colou
     svg.appendChild(path);
   }
 
+  // Les outliers de chaque tranche, en barres : leur hauteur dit combien il y en a, pas seulement s'il y en a.
+  // Une série répartie partout se lit comme un peigne régulier ; un amas, comme un pic. Un outlier isolé
+  // reste un trait bien visible (au moins 1,5 px), sans jamais monter en barre pleine : l'échelle ne
+  // descend pas sous 5 outliers par tranche.
+  const tallest = Math.max(0, ...buckets.map((bucket) => Math.max(bucket.above, bucket.below)));
+  const outlierScale = Math.max(OUTLIER_SCALE_FLOOR, tallest);
+  const barWidth = Math.max(1.2, ((right - left) / size) * 0.7);
+  if (tallest > 0) line(left, right, stripBase + 0.5, stripBase + 0.5, 'currentColor', { opacity: '0.25', 'stroke-width': '0.5' });
   for (const bucket of buckets) {
     const x = xOf((bucket.from + bucket.to + 1) / 2);
-    for (const [flag, y] of [[bucket.above, top - 4], [bucket.below, axis - 2]] as const) {
+    // Les hauts dans la bande au-dessus de la courbe ; les bas, posés sur l'axe.
+    for (const [flag, base, room] of [[bucket.above, stripBase, stripHeight], [bucket.below, axis, 14]] as const) {
       if (flag === 0) continue;
-      const dot = document.createElementNS(NS, 'circle');
-      dot.setAttribute('cx', String(x));
-      dot.setAttribute('cy', String(y));
-      dot.setAttribute('r', '3.5');
-      dot.setAttribute('fill', WARN);
-      svg.appendChild(dot);
+      const barHeight = Math.max(1.5, (flag / outlierScale) * room);
+      const bar = document.createElementNS(NS, 'rect');
+      bar.setAttribute('x', String(x - barWidth / 2));
+      bar.setAttribute('y', String(base - barHeight));
+      bar.setAttribute('width', String(barWidth));
+      bar.setAttribute('height', String(barHeight));
+      bar.setAttribute('fill', WARN);
+      svg.appendChild(bar);
     }
     if (bucket.empty > 0) {
       const mark = document.createElementNS(NS, 'rect');
@@ -225,10 +241,19 @@ export function rowOrderChart(column: ColumnStats, details: ColumnDetails, colou
     setColumnFilter(column.index, { ...valuesFilter(column.index, values), label });
   };
   if (outliers > 0) {
-    mark('●', WARN, `${count(outliers)} outlier${outliers === 1 ? '' : 's'}`, pick([...outlierRaws], `${column.name}: outliers`));
+    mark('▮', WARN, `${count(outliers)} outlier${outliers === 1 ? '' : 's'}`, pick([...outlierRaws], `${column.name}: outliers`));
   }
   if (empties > 0) {
     mark('▮', ERROR, `${count(empties)} empty cell${empties === 1 ? '' : 's'}`, pick([''], `${column.name} is empty`));
+  }
+  if (tallest > 0) {
+    const perBar = Math.max(1, Math.round(view.length / size));
+    legend.appendChild(
+      Object.assign(document.createElement('div'), {
+        textContent: `each bar: the outliers among about ${count(perBar)} rows · tallest ${count(tallest)}`,
+        className: 'picker-note',
+      }),
+    );
   }
   if (details.placeholders.length > 0) {
     legend.appendChild(
