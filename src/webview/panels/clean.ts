@@ -1,25 +1,17 @@
-import { similarValues, summarizeGroup } from "../../core/insights";
-import { describeEffect, describeStep, type Step } from "../../core/steps";
-import { isMeasurable } from "../../core/types";
-import { closePicker, setOpenPanel } from "../actions";
-import {
-  addStep,
-  changeType,
-  removeStep,
-  renameColumn,
-  replaceValue,
-  saveCleanCopy,
-  treatAsEmpty,
-} from "../cleaning";
-import { COLUMN_TYPES, TYPE_LABELS } from "../constants";
-import { elements, textSpan } from "../dom";
-import { floating, positionFloating } from "../floating-setup";
-import { icon, type IconName } from "../icons";
-import { palette, state } from "../state";
-import { allValueCounts, valuesFilter } from "../table";
-import { findingRow } from "./details-extras";
-import { footer, panelTitle, sectionTitle, tintPanel } from "./shared";
-import { quickTip } from "../tooltip";
+import { similarValues, summarizeGroup } from '../../core/insights';
+import { describeEffect, describeStep, type Step } from '../../core/steps';
+import { isMeasurable } from '../../core/types';
+import { closePicker, setOpenPanel } from '../actions';
+import { addStep, changeType, removeStep, renameColumn, replaceValue, saveCleanCopy, treatAsEmpty } from '../cleaning';
+import { COLUMN_TYPES, TYPE_LABELS } from '../constants';
+import { elements, textSpan } from '../dom';
+import { floating, positionFloating } from '../floating-setup';
+import { icon, type IconName } from '../icons';
+import { palette, state } from '../state';
+import { allValueCounts, valuesFilter } from '../table';
+import { findingRow } from './details-extras';
+import { footer, panelTitle, sectionTitle, tintPanel } from './shared';
+import { quickTip } from '../tooltip';
 
 /**
  * Le panneau Clean : les étapes appliquées, le catalogue complet, la copie.
@@ -29,42 +21,31 @@ import { quickTip } from "../tooltip";
  * lignes vides). Les étapes se lisent dans l'ordre où elles se rejouent sur
  * l'original, chacune avec ce qu'elle a touché, et se retirent d'un clic.
  */
-export function openClean(
-  anchor: HTMLElement,
-  only: number | null = null,
-): void {
+export function openClean(anchor: HTMLElement, only: number | null = null): void {
   const panel = elements.picker;
-  panel.textContent = "";
-  panel.classList.add("wide");
+  panel.textContent = '';
+  panel.classList.add('wide');
   tintPanel(null);
-  panel.appendChild(
-    panelTitle(
-      "Clean",
-      `${state.fileName || "The file"} stays untouched: the steps replay on the original`,
-    ),
-  );
+  panel.appendChild(panelTitle('Clean', `${state.fileName || 'The file'} stays untouched: the steps replay on the original`));
 
-  panel.appendChild(sectionTitle("Applied steps"));
-  const list = document.createElement("div");
-  list.className = "clean-steps";
+  panel.appendChild(sectionTitle('Applied steps', 'sparkles'));
+  const list = document.createElement('div');
+  list.className = 'clean-steps';
   const nameAt = namesAlongTheRecipe();
   state.steps.forEach((step, position) => {
-    const row = document.createElement("div");
-    row.className = "clean-step";
-    const column = "column" in step ? step.column : -1;
+    const row = document.createElement('div');
+    row.className = 'clean-step';
+    const column = 'column' in step ? step.column : -1;
     if (column >= 0) row.style.borderLeftColor = palette(column).accent;
     row.append(
       textSpan(`${position + 1} · ${describeStep(step, nameAt[position])}`),
-      Object.assign(
-        textSpan(describeEffect(step, state.effects[position] ?? 0)),
-        { className: "clean-effect" },
-      ),
+      Object.assign(textSpan(describeEffect(step, state.effects[position] ?? 0)), { className: 'clean-effect' }),
     );
-    const remove = document.createElement("button");
-    remove.className = "clean-remove";
-    remove.textContent = "✕";
-    quickTip(remove, "Remove this step: the steps after it replay without it");
-    remove.addEventListener("click", () => {
+    const remove = document.createElement('button');
+    remove.className = 'clean-remove';
+    remove.textContent = '✕';
+    quickTip(remove, 'Remove this step: the steps after it replay without it');
+    remove.addEventListener('click', () => {
       removeStep(position);
       openClean(anchor, only);
     });
@@ -73,12 +54,7 @@ export function openClean(
   });
   if (state.steps.length === 0) {
     list.appendChild(
-      Object.assign(
-        textSpan(
-          "No steps yet. Right-click a column header, or use the catalogue below.",
-        ),
-        { className: "picker-note" },
-      ),
+      Object.assign(textSpan('No steps yet. Right-click a column header, or use the catalogue below.'), { className: 'picker-note' }),
     );
   }
   panel.appendChild(list);
@@ -93,154 +69,93 @@ export function openClean(
   // Les graphies d'une même valeur (`Lyon`, `Lyons`) : un nettoyage qu'on propose, pas qu'on devine.
   const similar = similarSpellings(only).slice(0, 8);
   if (similar.length > 0) {
-    panel.appendChild(
-      sectionTitle(
-        only === null
-          ? "Similar spellings"
-          : `Similar spellings · ${state.stats[only]?.name ?? ""}`,
-      ),
-    );
+    panel.appendChild(sectionTitle(only === null ? 'Similar spellings' : `Similar spellings · ${state.stats[only]?.name ?? ''}`, 'merge'));
     for (const { column, group } of similar) {
       const { target, kinds, detail } = summarizeGroup(group);
-      const step: Step = {
-        kind: "merge",
-        column,
-        from: group.variants.map((variant) => variant.value),
-        to: target,
-      };
+      const step: Step = { kind: 'merge', column, from: group.variants.map((variant) => variant.value), to: target };
       const row = findingRow(
-        `${state.stats[column]?.name}: ${target} · ${kinds.slice(0, 3).join(", ")}`,
-        valuesFilter(column, [
-          group.canonical,
-          ...group.variants.map((variant) => variant.value),
-        ]),
+        `${state.stats[column]?.name}: ${target} · ${kinds.slice(0, 3).join(', ')}`,
+        valuesFilter(column, [group.canonical, ...group.variants.map((variant) => variant.value)]),
         column,
         [[`Merge into ${target}`, then(() => addStep(step))]],
       );
       // Les graphies telles qu'elles sont écrites, espaces et caractères invisibles rendus visibles.
-      if (row.firstElementChild)
-        quickTip(row.firstElementChild as HTMLElement, detail);
+      if (row.firstElementChild) quickTip(row.firstElementChild as HTMLElement, detail);
       panel.appendChild(row);
     }
   }
 
-  panel.appendChild(sectionTitle("Rows"));
+  panel.appendChild(sectionTitle('Rows', 'grid'));
   panel.appendChild(
     buttons([
-      [
-        "Remove duplicate rows",
-        then(() => addStep({ kind: "removeDuplicates" })),
-      ],
-      ["Remove blank rows", then(() => addStep({ kind: "removeBlankRows" }))],
+      ['Remove duplicate rows', then(() => addStep({ kind: 'removeDuplicates' }))],
+      ['Remove blank rows', then(() => addStep({ kind: 'removeBlankRows' }))],
     ]),
   );
 
-  panel.appendChild(sectionTitle("Columns"));
-  const picker = document.createElement("select");
-  picker.className = "picker-select clean-column";
+  panel.appendChild(sectionTitle('Columns', 'list'));
+  const picker = document.createElement('select');
+  picker.className = 'picker-select clean-column';
   for (const index of state.order) {
-    const option = document.createElement("option");
+    const option = document.createElement('option');
     option.value = String(index);
-    option.textContent = state.stats[index]?.name ?? "";
+    option.textContent = state.stats[index]?.name ?? '';
     picker.appendChild(option);
   }
-  if (
-    state.selectedColumn !== null &&
-    state.order.includes(state.selectedColumn)
-  )
-    picker.value = String(state.selectedColumn);
+  if (state.selectedColumn !== null && state.order.includes(state.selectedColumn)) picker.value = String(state.selectedColumn);
   const chosen = () => Number(picker.value);
-  const columnRow = document.createElement("div");
-  columnRow.className = "picker-bound";
-  columnRow.append(textSpan("Column"), picker);
+  const columnRow = document.createElement('div');
+  columnRow.className = 'picker-bound';
+  columnRow.append(textSpan('Column'), picker);
   panel.appendChild(columnRow);
 
-  const onColumn = (make: (column: number) => Step) =>
-    then(() => addStep(make(chosen())));
-  const textOnly = () => !isMeasurable(state.stats[chosen()]?.type ?? "text");
+  const onColumn = (make: (column: number) => Step) => then(() => addStep(make(chosen())));
+  const textOnly = () => !isMeasurable(state.stats[chosen()]?.type ?? 'text');
   panel.appendChild(
-    buttons(
-      [
-        [
-          "Trim spaces",
-          onColumn((column) => ({ kind: "trim", column })),
-          textOnly,
-        ],
-        [
-          "Clean invisible characters",
-          onColumn((column) => ({ kind: "clean", column })),
-          textOnly,
-        ],
-        [
-          "lowercase",
-          onColumn((column) => ({ kind: "case", column, mode: "lower" })),
-          textOnly,
-        ],
-        [
-          "UPPERCASE",
-          onColumn((column) => ({ kind: "case", column, mode: "upper" })),
-          textOnly,
-        ],
-        [
-          "Capitalize Each Word",
-          onColumn((column) => ({ kind: "case", column, mode: "title" })),
-          textOnly,
-        ],
-        ["Replace values…", then(() => replaceValue(chosen()))],
-        ["Treat as empty…", then(() => treatAsEmpty(chosen()))],
-        ["Fill down", onColumn((column) => ({ kind: "fillDown", column }))],
-        ["Rename…", then(() => renameColumn(chosen()))],
-        ["Remove column", onColumn((column) => ({ kind: "remove", column }))],
-        ...COLUMN_TYPES.map((type): ButtonSpec => [
-          `Type: ${TYPE_LABELS[type]}`,
-          then(() => changeType(chosen(), type)),
-        ]),
-      ],
-      picker,
-    ),
+    buttons([
+      ['Trim spaces', onColumn((column) => ({ kind: 'trim', column })), textOnly],
+      ['Clean invisible characters', onColumn((column) => ({ kind: 'clean', column })), textOnly],
+      ['lowercase', onColumn((column) => ({ kind: 'case', column, mode: 'lower' })), textOnly],
+      ['UPPERCASE', onColumn((column) => ({ kind: 'case', column, mode: 'upper' })), textOnly],
+      ['Capitalize Each Word', onColumn((column) => ({ kind: 'case', column, mode: 'title' })), textOnly],
+      ['Replace values…', then(() => replaceValue(chosen()))],
+      ['Treat as empty…', then(() => treatAsEmpty(chosen()))],
+      ['Fill down', onColumn((column) => ({ kind: 'fillDown', column }))],
+      ['Rename…', then(() => renameColumn(chosen()))],
+      ['Remove column', onColumn((column) => ({ kind: 'remove', column }))],
+      ...COLUMN_TYPES.map((type): ButtonSpec => [`Type: ${TYPE_LABELS[type]}`, then(() => changeType(chosen(), type))]),
+    ], picker),
   );
 
   panel.appendChild(
     footer([
       [
-        "Save cleaned copy…",
+        'Save cleaned copy…',
         () => {
           saveCleanCopy();
           closePicker();
         },
         true,
       ],
-      ["Close", closePicker, false],
+      ['Close', closePicker, false],
     ]),
   );
-  if (!floating.isOpen("picker")) floating.open("picker", anchor);
+  if (!floating.isOpen('picker')) floating.open('picker', anchor);
   positionFloating(panel, anchor);
-  setOpenPanel("clean");
-  elements.cleanButton.classList.add("active");
+  setOpenPanel('clean');
+  elements.cleanButton.classList.add('active');
 }
 
 /** Les graphies proches de toutes les colonnes de texte, les plus touchées d'abord. */
 function similarSpellings(only: number | null) {
-  const found: Array<{
-    column: number;
-    group: ReturnType<typeof similarValues>[number];
-  }> = [];
+  const found: Array<{ column: number; group: ReturnType<typeof similarValues>[number] }> = [];
   for (const index of state.order) {
     if (only !== null && index !== only) continue;
     const stats = state.stats[index];
-    if (
-      !stats ||
-      stats.type !== "text" ||
-      stats.temporal ||
-      stats.distinct < 2 ||
-      stats.distinct > 2500
-    )
-      continue;
-    for (const group of similarValues(allValueCounts(index)))
-      found.push({ column: index, group });
+    if (!stats || stats.type !== 'text' || stats.temporal || stats.distinct < 2 || stats.distinct > 2500) continue;
+    for (const group of similarValues(allValueCounts(index))) found.push({ column: index, group });
   }
-  const weight = (entry: (typeof found)[number]) =>
-    entry.group.variants.reduce((sum, variant) => sum + variant.count, 0);
+  const weight = (entry: (typeof found)[number]) => entry.group.variants.reduce((sum, variant) => sum + variant.count, 0);
   return found.sort((left, right) => weight(right) - weight(left));
 }
 
@@ -248,15 +163,15 @@ type ButtonSpec = [string, () => void, (() => boolean)?];
 
 /** Les mêmes dessins que le menu de colonne, pour les mêmes gestes. */
 const GLYPH_OF: Record<string, IconName> = {
-  "Remove duplicate rows": "copy",
-  "Remove blank rows": "trash",
-  "Trim spaces": "trim",
-  "Clean invisible characters": "eyeOff",
-  "Replace values…": "exchange",
-  "Treat as empty…": "ban",
-  "Fill down": "fillDown",
-  "Rename…": "edit",
-  "Remove column": "trash",
+  'Remove duplicate rows': 'copy',
+  'Remove blank rows': 'trash',
+  'Trim spaces': 'trim',
+  'Clean invisible characters': 'eyeOff',
+  'Replace values…': 'exchange',
+  'Treat as empty…': 'ban',
+  'Fill down': 'fillDown',
+  'Rename…': 'edit',
+  'Remove column': 'trash',
 };
 
 /**
@@ -264,22 +179,22 @@ const GLYPH_OF: Record<string, IconName> = {
  * masquent quand la colonne choisie est un nombre ou une date.
  */
 function buttons(specs: ButtonSpec[], picker?: HTMLSelectElement): HTMLElement {
-  const grid = document.createElement("div");
-  grid.className = "clean-catalogue";
+  const grid = document.createElement('div');
+  grid.className = 'clean-catalogue';
   const refresh: Array<() => void> = [];
   for (const [label, action, applies] of specs) {
-    const button = document.createElement("button");
-    button.className = "picker-button";
+    const button = document.createElement('button');
+    button.className = 'picker-button';
     const glyph = GLYPH_OF[label];
     if (glyph) button.append(icon(glyph));
     button.append(label);
-    button.addEventListener("click", action);
+    button.addEventListener('click', action);
     if (applies) refresh.push(() => (button.hidden = !applies()));
     grid.appendChild(button);
   }
   const update = () => refresh.forEach((apply) => apply());
   update();
-  picker?.addEventListener("change", update);
+  picker?.addEventListener('change', update);
   return grid;
 }
 
@@ -288,7 +203,7 @@ function namesAlongTheRecipe(): Array<(column: number) => string> {
   const names = [...state.headers];
   return state.steps.map((step) => {
     const snapshot = [...names];
-    if (step.kind === "rename") names[step.column] = step.name;
+    if (step.kind === 'rename') names[step.column] = step.name;
     return (column: number) => snapshot[column] ?? `column ${column + 1}`;
   });
 }

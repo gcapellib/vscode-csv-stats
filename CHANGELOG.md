@@ -2,6 +2,11 @@
 
 Newest first.
 
+## 0.33.4
+
+- **Icons on the section titles of the Clean panel** (applied steps, similar spellings, rows, columns), like
+  the other panels.
+
 ## 0.33.3
 
 - **Icons in the Clean panel too.** Its catalogue buttons (remove duplicate or blank rows, trim, clean invisible
