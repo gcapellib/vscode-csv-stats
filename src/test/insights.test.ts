@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 import { parse } from '../core/csv';
 import { computeDataset, computeDetails } from '../core/details';
-import { fixMojibake, groupMeans, numericPlaceholders, levelShift, correlationMatrix, pandasHints, pearson, sequenceGaps, similarValues, summaryWithout, topCorrelations } from '../core/insights';
+import { differenceOf, summarizeGroup, visibleText, fixMojibake, groupMeans, numericPlaceholders, levelShift, correlationMatrix, pandasHints, pearson, sequenceGaps, similarValues, summaryWithout, topCorrelations } from '../core/insights';
 import { computeAll } from '../core/stats';
 import { applySteps, describeStep, stepsToPandas } from '../core/steps';
 
@@ -156,6 +156,47 @@ describe('matrice de corrélations', () => {
     const matrix = correlationMatrix(rows, [make(0), make(1), make(2, ['-999'])]);
     assert.equal(matrix[0][1], null, 'colonne constante');
     assert.equal(matrix[0][2], null, 'moins de 20 lignes une fois la balise écartée');
+  });
+});
+
+describe('graphies proches : dire ce qui diffère', () => {
+  it('nomme la nature de la différence, les invisibles d’abord', () => {
+    assert.deepEqual(differenceOf('Livraison express', 'Livraison express '), ['spaces']);
+    assert.deepEqual(differenceOf('Livraison express', ' Livraison  express'), ['spaces']);
+    assert.deepEqual(differenceOf('Livraison express', 'Livraison\u00a0express'), ['non-breaking space']);
+    assert.deepEqual(differenceOf('Livraison express', 'Livraison express\u200b'), ['hidden character']);
+    assert.deepEqual(differenceOf('Lyon', 'LYON'), ['capital letters']);
+    assert.deepEqual(differenceOf('Nîmes', 'Nimes'), ['accents']);
+    assert.deepEqual(differenceOf('Lyon', 'Lyons'), ['spelling']);
+    assert.deepEqual(differenceOf('Lyon', 'LYON '), ['spaces', 'capital letters']);
+  });
+
+  it('rend visibles les espaces en bord ou doublées et les caractères invisibles', () => {
+    assert.equal(visibleText('Cadeau '), 'Cadeau\u2423');
+    assert.equal(visibleText(' Cadeau'), '\u2423Cadeau');
+    assert.equal(visibleText('a  b'), 'a \u2423b');
+    assert.equal(visibleText('a\u00a0b'), 'a\u237Db');
+    assert.equal(visibleText('a\u200bb'), 'a\u2039200B\u203Ab');
+    assert.equal(visibleText('Lyon'), 'Lyon');
+  });
+
+  it('résume un groupe : la cible, les natures par poids, et un détail ligne par ligne', () => {
+    const summary = summarizeGroup({
+      canonical: 'Livraison express',
+      count: 9204,
+      variants: [
+        { value: 'Livraison express ', count: 210 },
+        { value: 'LIVRAISON EXPRESS', count: 98 },
+        { value: 'Livraison express\u200b', count: 83 },
+      ],
+    });
+    assert.equal(summary.target, 'Livraison express');
+    assert.deepEqual(summary.kinds, ['spaces', 'capital letters', 'hidden character']);
+    const lines = summary.detail.split('\n');
+    assert.equal(lines[0], 'Merge into « Livraison express »');
+    assert.equal(lines[1], '« Livraison express »  9,204  kept');
+    assert.equal(lines[2], '« Livraison express\u2423 »  210  spaces');
+    assert.equal(lines.length, 5);
   });
 });
 

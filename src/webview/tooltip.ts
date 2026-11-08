@@ -47,7 +47,8 @@ export function installTips(): void {
   };
   const show = (event: MouseEvent) => {
     const holder = tipOf(event);
-    if (holder) showTooltip(event, escapeText(holder.dataset.tip ?? ''));
+    // Un texte d'infobulle peut tenir sur plusieurs lignes (un « \n » devient un saut de ligne).
+    if (holder) showTooltip(event, escapeText(holder.dataset.tip ?? '').replace(/\n/g, '<br>'));
   };
   document.addEventListener('mouseover', show);
   document.addEventListener('mousemove', show);

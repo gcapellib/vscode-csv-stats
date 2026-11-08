@@ -1,4 +1,4 @@
-import { similarValues } from '../../core/insights';
+import { similarValues, summarizeGroup } from '../../core/insights';
 import { describeEffect, describeStep, type Step } from '../../core/steps';
 import { isMeasurable } from '../../core/types';
 import { closePicker, setOpenPanel } from '../actions';
@@ -70,15 +70,17 @@ export function openClean(anchor: HTMLElement, only: number | null = null): void
   if (similar.length > 0) {
     panel.appendChild(sectionTitle(only === null ? 'Similar spellings' : `Similar spellings · ${state.stats[only]?.name ?? ''}`));
     for (const { column, group } of similar) {
-      const variants = group.variants.map((variant) => `${variant.value.trim()} ×${variant.count}`);
-      const shown = variants.slice(0, 3).join(', ') + (variants.length > 3 ? ` +${variants.length - 3}` : '');
-      const target = group.canonical.trim();
+      const { target, kinds, detail } = summarizeGroup(group);
       const step: Step = { kind: 'merge', column, from: group.variants.map((variant) => variant.value), to: target };
-      panel.appendChild(
-        findingRow(`${state.stats[column]?.name}: ${target} ← ${shown}`, valuesFilter(column, [group.canonical, ...group.variants.map((variant) => variant.value)]), column, [
-          [`Merge into ${target}`, then(() => addStep(step))],
-        ]),
+      const row = findingRow(
+        `${state.stats[column]?.name}: ${target} · ${kinds.slice(0, 3).join(', ')}`,
+        valuesFilter(column, [group.canonical, ...group.variants.map((variant) => variant.value)]),
+        column,
+        [[`Merge into ${target}`, then(() => addStep(step))]],
       );
+      // Les graphies telles qu'elles sont écrites, espaces et caractères invisibles rendus visibles.
+      if (row.firstElementChild) quickTip(row.firstElementChild as HTMLElement, detail);
+      panel.appendChild(row);
     }
   }
 

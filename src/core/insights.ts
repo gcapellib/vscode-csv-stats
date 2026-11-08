@@ -421,6 +421,59 @@ export function similarValues(entries: Array<[string, number]>): SimilarGroup[] 
     .sort((left, right) => sumCounts(right.variants) - sumCounts(left.variants));
 }
 
+/** Ce qui sépare une graphie de celle vers laquelle on fusionne, dit en un mot. */
+export type Difference = 'spaces' | 'non-breaking space' | 'hidden character' | 'capital letters' | 'accents' | 'spelling';
+
+const HIDDEN = /[\u0000-\u001F\u007F\u00AD\u200B-\u200D\u2060\uFEFF]/g;
+const UNICODE_SPACES = /[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g;
+const stripAccents = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+/** Pourquoi `variant` n'est pas écrite comme `target` : les différences qu'on ne voit pas à l'écran, d'abord. */
+export function differenceOf(target: string, variant: string): Difference[] {
+  const found: Difference[] = [];
+  if (HIDDEN.test(variant) && !HIDDEN.test(target)) found.push('hidden character');
+  HIDDEN.lastIndex = 0;
+  if (UNICODE_SPACES.test(variant)) found.push('non-breaking space');
+  UNICODE_SPACES.lastIndex = 0;
+  const flat = variant.replace(HIDDEN, '').replace(UNICODE_SPACES, ' ');
+  const tidy = flat.trim().replace(/\s{2,}/g, ' ');
+  if (flat !== tidy) found.push('spaces');
+  if (tidy !== target) {
+    if (tidy.toLowerCase() === target.toLowerCase()) found.push('capital letters');
+    else if (stripAccents(tidy).toLowerCase() === stripAccents(target).toLowerCase()) found.push('accents');
+    else found.push('spelling');
+  }
+  return found.length > 0 ? [...new Set(found)] : ['spelling'];
+}
+
+/** Un texte où les espaces en bord ou doublées et les caractères invisibles se voient : ␣ ⍽ ‹200B›. */
+export function visibleText(raw: string): string {
+  let shown = raw.replace(UNICODE_SPACES, '\u237D').replace(HIDDEN, (char) => `\u2039${char.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}\u203A`);
+  shown = shown.replace(/^ +| +$/g, (run) => '\u2423'.repeat(run.length)).replace(/ {2,}/g, (run) => ' ' + '\u2423'.repeat(run.length - 1));
+  return shown;
+}
+
+export interface GroupSummary {
+  target: string;
+  /** Les natures de différence, de la plus fréquente à la plus rare. */
+  kinds: Difference[];
+  /** Le détail, ligne par ligne, pour une infobulle : chaque graphie telle qu'elle est écrite, son nombre, sa différence. */
+  detail: string;
+}
+
+export function summarizeGroup(group: SimilarGroup): GroupSummary {
+  const target = group.canonical.trim();
+  const weight = new Map<Difference, number>();
+  const lines = [`Merge into « ${target} »`, `« ${visibleText(group.canonical)} »  ${group.count.toLocaleString('en-US')}  kept`];
+  for (const variant of group.variants) {
+    const kinds = differenceOf(target, variant.value);
+    for (const kind of kinds) weight.set(kind, (weight.get(kind) ?? 0) + variant.count);
+    lines.push(`« ${visibleText(variant.value)} »  ${variant.count.toLocaleString('en-US')}  ${kinds.join(', ')}`);
+  }
+  const kinds = [...weight.entries()].sort((left, right) => right[1] - left[1]).map(([kind]) => kind);
+  return { target, kinds, detail: lines.join('\n') };
+}
+
 function sumCounts(variants: Array<{ count: number }>): number {
   return variants.reduce((sum, variant) => sum + variant.count, 0);
 }

@@ -102,7 +102,7 @@ test.describe('les graphies proches', () => {
   test('se fusionnent depuis le menu de la colonne', async ({ page }) => {
     await openColumnMenu(page, CITY);
     await expect(page.locator('#menu .menu-heading', { hasText: 'Similar spellings' })).toBeVisible();
-    const merge = page.locator('#menu .menu-item', { hasText: '→ Lyon' });
+    const merge = page.locator('#menu .menu-item', { hasText: 'Lyon' }).filter({ has: page.locator('.cmenu-note') }).first();
     await expect(merge).toBeVisible();
     await merge.click();
 
@@ -117,17 +117,18 @@ test.describe('les graphies proches', () => {
     await expect(page.locator('.chip-filter')).toContainText('brun');
 
     await openColumnMenu(page, CITY);
-    const hint = await page.locator('#menu .menu-item', { hasText: '→ Lyon' }).locator('.cmenu-hint').innerText();
+    const hint = await page.locator('#menu .menu-item', { hasText: 'Lyon' }).filter({ has: page.locator('.cmenu-note') }).first().locator('.cmenu-hint').innerText();
     await page.keyboard.press('Escape');
     await page.mouse.click(5, 5);
 
     await page.locator('#clean-button').click();
-    const line = page.locator('#picker .finding-row', { hasText: 'ville: Lyon ←' });
+    const line = page.locator('#picker .finding-row', { hasText: 'ville: Lyon' });
     await expect(line).toBeVisible();
     // Lyons ×4 + LYON ×3 = 7 cellules, sur tout le fichier.
     expect(hint).toContain('7 cells');
-    await expect(line).toContainText('×4');
-    await expect(line).toContainText('×3');
+    // Le détail (graphies telles qu'écrites, leur nombre) est dans l'infobulle.
+    await expect(line.locator('.flag')).toHaveAttribute('data-tip', /Lyons.*4/);
+    await expect(line.locator('.flag')).toHaveAttribute('data-tip', /LYON.*3/);
   });
 });
 

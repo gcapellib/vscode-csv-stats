@@ -1831,3 +1831,23 @@ body.resizing * {
   flex-direction: column;
   gap: 4px;
 }
+
+/* ── Un libellé qui dit ce qu'il fait : il passe à la ligne au lieu d'être coupé ──────────────────
+   Le menu d'une colonne s'élargit jusqu'à 460 px (ou presque toute la fenêtre) ; un libellé suivi de
+   sa note se replie sur deux lignes plutôt que de finir en points de suspension. */
+#menu.clean-menu {
+  width: max-content;
+  max-width: min(460px, calc(100vw - 24px));
+}
+
+.cmenu-label.wrap {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.cmenu-note {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+}

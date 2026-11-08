@@ -173,3 +173,19 @@ test('la courbe par ligne montre les outliers en barres : un seul outlier reste 
   expect(Math.min(...heights)).toBeGreaterThanOrEqual(1.5);
   expect(Math.max(...heights)).toBeLessThan(16);
 });
+
+test('graphies proches : le menu dit la nature de la différence, l’infobulle montre les espaces invisibles', async ({ page }) => {
+  await openHarness(page, 'tests/fixtures/dirty.csv');
+  const head = page.locator('.head-cell[data-column="1"]');
+  await head.scrollIntoViewIfNeeded();
+  await head.click({ button: 'right' });
+  const row = page.locator('#menu .menu-item', { hasText: 'Lyon' }).first();
+  await expect(row.locator('.cmenu-note')).not.toHaveText('');
+  await expect(row.locator('.cmenu-label')).toContainText('Lyon');
+  // Rien n'est coupé par des points de suspension : le libellé se replie.
+  const clipped = await row.locator('.cmenu-label').evaluate((node) => node.scrollWidth > node.clientWidth + 1);
+  expect(clipped).toBe(false);
+  await row.hover();
+  await expect(page.locator('#tooltip')).toContainText('Merge into');
+  await expect(page.locator('#tooltip')).toContainText('kept');
+});

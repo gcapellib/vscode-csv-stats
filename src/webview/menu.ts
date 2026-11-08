@@ -1,6 +1,6 @@
 import { computeDetails } from '../core/details';
 import { count } from '../core/format';
-import { similarValues } from '../core/insights';
+import { similarValues, summarizeGroup } from '../core/insights';
 import { applySteps, type Step } from '../core/steps';
 import { isMeasurable, type ColumnType } from '../core/types';
 import { addStep, changeType, fillEmpty, renameColumn, replaceText, replaceValue, roundColumn, treatAsEmpty } from './cleaning';
@@ -12,6 +12,7 @@ import { openDetails } from './panels/column-details';
 import { panelTitle } from './panels/shared';
 import { palette, state } from './state';
 import { allValueCounts } from './table';
+import { quickTip } from './tooltip';
 import { vscode } from './vscode-api';
 
 /**
@@ -63,7 +64,7 @@ export function openMenu(modelIndex: number, anchor: HTMLElement): void {
     if (!keepOpen) closeMenu();
     action();
   };
-  const item = (label: string, action: () => void, options: { mark?: 'check' | SVGSVGElement; hint?: string; idle?: boolean; keepOpen?: boolean } = {}) => {
+  const item = (label: string, action: () => void, options: { mark?: 'check' | SVGSVGElement; hint?: string; idle?: boolean; keepOpen?: boolean; note?: string; tip?: string } = {}) => {
     const button = document.createElement('button');
     button.className = 'menu-item';
     if (options.idle) button.classList.add('idle');
@@ -75,7 +76,14 @@ export function openMenu(modelIndex: number, anchor: HTMLElement): void {
     const name = document.createElement('span');
     name.className = 'cmenu-label';
     name.textContent = label;
+    // Une note en gris après le libellé : ce que l'action fait, en deux mots. Le libellé passe alors à la ligne
+    // plutôt que d'être coupé par des points de suspension.
+    if (options.note) {
+      name.classList.add('wrap');
+      name.append(' ', Object.assign(document.createElement('span'), { className: 'cmenu-note', textContent: options.note }));
+    }
     button.append(mark, name);
+    if (options.tip) quickTip(button, options.tip);
     if (options.hint) {
       const hint = document.createElement('span');
       hint.className = 'cmenu-hint';
@@ -134,11 +142,13 @@ export function openMenu(modelIndex: number, anchor: HTMLElement): void {
     if (groups.length > 0) {
       heading('Similar spellings');
       for (const group of groups.slice(0, 3)) {
-        const target = group.canonical.trim();
-        const names = group.variants.slice(0, 2).map((variant) => variant.value.trim());
-        const more = group.variants.length > 2 ? ', …' : '';
-        item(`${names.join(', ')}${more} → ${target}`, () => addStep({ kind: 'merge', column: modelIndex, from: group.variants.map((variant) => variant.value), to: target }), {
+        // Ce vers quoi on fusionne, et en deux mots ce qui diffère : les variantes se ressemblent à l'écran,
+        // c'est justement ce qu'on ne voit pas (espaces, caractères invisibles). Le détail est dans l'infobulle.
+        const { target, kinds, detail } = summarizeGroup(group);
+        item(target, () => addStep({ kind: 'merge', column: modelIndex, from: group.variants.map((variant) => variant.value), to: target }), {
           hint: cells(cellsOf(group)),
+          note: kinds.slice(0, 3).join(' · '),
+          tip: detail,
         });
       }
       if (groups.length > 3) {

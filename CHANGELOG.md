@@ -2,6 +2,17 @@
 
 Newest first.
 
+## 0.33.1
+
+- **Similar spellings say what differs.** The variants of a value often look the same on screen — they differ
+  by a trailing space, a non-breaking space, an invisible character — so "Livraison express, Livraison
+  express, … → …" told nothing, and was cut off by an ellipsis. Each line now shows the value kept and, in two
+  words, the nature of the difference (*spaces*, *non-breaking space*, *hidden character*, *capital letters*,
+  *accents*, *spelling*), and the tooltip lists every spelling as written, with spaces and invisible
+  characters made visible (`␣`, `⍽`, `‹200B›`), the number of cells of each and what differs.
+- The column menu widens (up to 460 px) and a label wraps onto a second line instead of being cut by an
+  ellipsis. *Clean* shows the same lines.
+
 ## 0.33.0
 
 - **Follow the convention: you decide what is missing.** A placeholder such as `-999` is flagged, with
