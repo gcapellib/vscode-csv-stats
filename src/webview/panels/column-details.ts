@@ -1,4 +1,5 @@
-import { computeDetails, type ColumnDetails } from '../../core/details';
+import { type ColumnDetails } from '../../core/details';
+import { columnDetails } from './dataset-facts';
 import { count, num, percent } from '../../core/format';
 import { type ColumnStats } from '../../core/stats';
 import { type Palette } from '../../core/themes';
@@ -6,8 +7,8 @@ import { formatValue } from '../../core/values';
 import { closePicker, setOpenPanel } from '../actions';
 import { floating, positionFloating } from '../floating-setup';
 import { palette, state } from '../state';
-import { currentTable, parserOf } from '../table';
-import { addRow, footer, grid, panelTitle, sectionTitle, tintPanel } from './shared';
+import { parserOf } from '../table';
+import { addRow, collapsibleSection, footer, grid, panelTitle, sectionTitle, tintPanel } from './shared';
 import { elements, textSpan } from '../dom';
 import { valueCounts } from '../table';
 import { hideTooltip, quickTip, showTooltip } from '../tooltip';
@@ -25,8 +26,7 @@ import { byCategory } from './by-category';
 export function openDetails(columnIndex: number, anchor: HTMLElement): void {
   const column = state.stats[columnIndex];
   if (!column) return;
-  const table = currentTable();
-  const details = computeDetails(table, columnIndex, column.type, column.temporal);
+  const details = columnDetails(columnIndex);
 
   elements.picker.textContent = '';
   elements.picker.classList.add('wide');
@@ -41,71 +41,23 @@ export function openDetails(columnIndex: number, anchor: HTMLElement): void {
       : `computed on all ${count(column.total)} rows`;
   elements.picker.appendChild(scope);
 
-  for (const blocker of details.blockers) {
-    const flag = document.createElement('div');
-    flag.className = 'flag';
-    flag.textContent = blocker;
-    elements.picker.appendChild(flag);
-  }
-
   const reopen = () => openDetails(columnIndex, anchor);
-  for (const part of placeholderSection(column, details, reopen)) elements.picker.appendChild(part);
 
-  elements.picker.appendChild(sectionTitle('Completeness'));
-  const completeness = grid();
-  addRow(completeness, 'Empty', count(details.empty));
-  addRow(completeness, 'Whitespace only', count(details.whitespaceOnly));
-  for (const token of details.nullTokens) {
-    addRow(completeness, `Written as ${token.value}`, `${count(token.count)}${token.known ? ' · pandas NA' : ''}`);
-  }
-  // Sans jeton d'absence, ce total répète exactement ce que le bandeau affiche
-  // sous « Missing ». Il ne s'affiche donc que lorsqu'il en diffère.
-  if (details.nullTokens.length > 0) {
-    addRow(
-      completeness,
-      'Effectively missing',
-      `${count(details.effectiveMissing)} (${percent(column.total === 0 ? 0 : details.effectiveMissing / column.total)})`,
-    );
-  }
-  addRow(
-    completeness,
-    'Values seen once',
-    `${count(details.singletons)}${column.distinct === 0 ? '' : ` of ${count(column.distinct)} distinct`}`,
-  );
-  elements.picker.appendChild(completeness);
-  // Le constat mène à l'étape : les jetons d'absence se traitent comme vides,
-  // d'un clic, sans retaper ce que le panneau vient d'énumérer.
-  if (details.nullTokens.length > 0) {
-    const tokens = details.nullTokens.map((token) => token.value);
-    elements.picker.appendChild(
-      actionBar([
-        [
-          `Treat ${tokens.join(', ')} as empty`,
-          () => {
-            addStep({ kind: 'empty', column: columnIndex, tokens });
-            reopen();
-          },
-        ],
-      ]),
-    );
-  }
-
-  elements.picker.appendChild(sectionTitle('Distribution'));
+  // Une fenêtre de coup d'œil : les deux graphiques d'abord, puis les chiffres, puis ce qui est
+  // à vérifier. Le reste est replié, à un clic.
+  elements.picker.appendChild(sectionTitle('Distribution', 'chart'));
   elements.picker.appendChild(distributionChart(column, details, palette(columnIndex)));
 
   const rowOrder = rowOrderChart(column, details, palette(columnIndex));
   if (rowOrder) {
-    elements.picker.appendChild(sectionTitle('Values by row order'));
+    elements.picker.appendChild(sectionTitle('Values by row order', 'chart'));
     elements.picker.appendChild(rowOrder);
   }
 
-  for (const part of byCategory(column, details, palette(columnIndex), reopen)) elements.picker.appendChild(part);
-
-  for (const part of detailsExtras(column, details, reopen, rowOrder !== null)) elements.picker.appendChild(part);
-
   if (column.mean !== null) {
-    elements.picker.appendChild(sectionTitle('Statistics'));
+    elements.picker.appendChild(sectionTitle('Statistics', 'list'));
     const numbers = grid();
+    numbers.classList.add('compact');
     const show = (value: number) => formatValue(column, value);
     addRow(numbers, 'Min', show(column.min ?? 0));
     addRow(numbers, 'Max', show(column.max ?? 0));
@@ -121,8 +73,9 @@ export function openDetails(columnIndex: number, anchor: HTMLElement): void {
     const without = withoutNote(column, details);
     if (without) elements.picker.appendChild(without);
   } else {
-    elements.picker.appendChild(sectionTitle('Text'));
+    elements.picker.appendChild(sectionTitle('Text', 'list'));
     const text = grid();
+    text.classList.add('compact');
     addRow(text, 'Length min / max', `${count(details.minLength)} / ${count(details.maxLength)}`);
     addRow(text, 'Length mean', num(Math.round(details.meanLength * 10) / 10));
     addRow(text, 'Case variants', count(details.caseVariants));
@@ -148,6 +101,72 @@ export function openDetails(columnIndex: number, anchor: HTMLElement): void {
       ]);
     }
     if (fixes.length > 0) elements.picker.appendChild(actionBar(fixes));
+  }
+
+
+  const blockerFlags: HTMLElement[] = [];
+  for (const blocker of details.blockers) {
+    const flag = document.createElement('div');
+    flag.className = 'flag';
+    flag.textContent = blocker;
+    blockerFlags.push(flag);
+  }
+
+  const extras = detailsExtras(column, details, reopen, rowOrder !== null);
+  for (const flag of blockerFlags) elements.picker.appendChild(flag);
+  for (const part of placeholderSection(column, details, reopen)) elements.picker.appendChild(part);
+  for (const part of extras.findings) elements.picker.appendChild(part);
+
+  const completenessParts = (): HTMLElement[] => {
+    const parts: HTMLElement[] = [];
+    parts.push(sectionTitle('Completeness', 'list'));
+    const completeness = grid();
+    addRow(completeness, 'Empty', count(details.empty));
+    addRow(completeness, 'Whitespace only', count(details.whitespaceOnly));
+    for (const token of details.nullTokens) {
+      addRow(completeness, `Written as ${token.value}`, `${count(token.count)}${token.known ? ' · pandas NA' : ''}`);
+    }
+    // Sans jeton d'absence, ce total répète exactement ce que le bandeau affiche
+    // sous « Missing ». Il ne s'affiche donc que lorsqu'il en diffère.
+    if (details.nullTokens.length > 0) {
+      addRow(
+        completeness,
+        'Effectively missing',
+        `${count(details.effectiveMissing)} (${percent(column.total === 0 ? 0 : details.effectiveMissing / column.total)})`,
+      );
+    }
+    addRow(
+      completeness,
+      'Values seen once',
+      `${count(details.singletons)}${column.distinct === 0 ? '' : ` of ${count(column.distinct)} distinct`}`,
+    );
+    parts.push(completeness);
+    // Le constat mène à l'étape : les jetons d'absence se traitent comme vides,
+    // d'un clic, sans retaper ce que le panneau vient d'énumérer.
+    if (details.nullTokens.length > 0) {
+      const tokens = details.nullTokens.map((token) => token.value);
+      parts.push(
+        actionBar([
+          [
+            `Treat ${tokens.join(', ')} as empty`,
+            () => {
+              addStep({ kind: 'empty', column: columnIndex, tokens });
+              reopen();
+            },
+          ],
+        ]),
+      );
+    }
+    return parts;
+  };
+
+  for (const part of collapsibleSection(
+    'More details',
+    'list',
+    () => [...completenessParts(), ...byCategory(column, details, palette(columnIndex), reopen), ...extras.time, ...extras.hints],
+    () => positionFloating(elements.picker, anchor),
+  )) {
+    elements.picker.appendChild(part);
   }
 
   elements.picker.appendChild(footer([['Close', closePicker, true]]));

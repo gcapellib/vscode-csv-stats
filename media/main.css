@@ -1797,3 +1797,37 @@ body.resizing * {
   border-radius: 4px;
   background: linear-gradient(to right, var(--heat-negative), transparent 50%, var(--heat-positive));
 }
+
+/* Les chiffres d'une colonne se lisent par paires — min et max, moyenne et médiane — sur
+   quatre lignes plutôt que huit : la fenêtre reste un coup d'œil. */
+.detail-grid.compact {
+  grid-template-columns: auto 1fr auto 1fr;
+  gap: 2px 14px;
+}
+
+.detail-grid.compact .detail-value {
+  text-align: right;
+}
+
+/* Une section repliable : son titre est un bouton, avec un chevron à droite. */
+#picker button.section-toggle {
+  width: 100%;
+  border-right: none;
+  border-bottom: none;
+  border-left: none;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.section-chevron {
+  margin-left: auto;
+  opacity: 0.7;
+}
+
+.section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

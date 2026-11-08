@@ -58,7 +58,16 @@ const KIND_TYPE = { number: 'numeric', date: 'date', time: 'time' } as const;
  * date, sa répartition dans le temps. `reopen` rouvre le panneau après une étape,
  * pour qu'on en voie l'effet.
  */
-export function detailsExtras(column: ColumnStats, details: ColumnDetails, reopen: () => void, outliersShown = false): HTMLElement[] {
+export interface Extras {
+  /** Ce qui est à vérifier : chaque constat mène à ses lignes et à l'étape qui le corrige. */
+  findings: HTMLElement[];
+  /** La répartition dans le temps d'une colonne de dates. */
+  time: HTMLElement[];
+  /** Les conseils pour pandas. */
+  hints: HTMLElement[];
+}
+
+export function detailsExtras(column: ColumnStats, details: ColumnDetails, reopen: () => void, outliersShown = false): Extras {
   const index = column.index;
   const name = column.name;
   const parts: HTMLElement[] = [];
@@ -130,7 +139,7 @@ export function detailsExtras(column: ColumnStats, details: ColumnDetails, reope
   }
 
   // 4. Une date se lit aussi par année, mois, jour de la semaine et heure.
-  if (column.temporal) parts.push(...timeBreakdown(column));
+  const time = column.temporal ? timeBreakdown(column) : [];
 
   // 5. Les accents mal décodés : du texte à corriger.
   if (details.garbled.length > 0) {
@@ -174,11 +183,12 @@ export function detailsExtras(column: ColumnStats, details: ColumnDetails, reope
   }
 
   // 8. Ce que pandas gagnerait à lire autrement : des conseils, jamais appliqués d'office.
+  const hints: HTMLElement[] = [];
   if (details.hints.length > 0) {
-    parts.push(sectionTitle('In pandas'));
-    for (const hint of details.hints) parts.push(Object.assign(textSpan(hint), { className: 'picker-note' }));
+    hints.push(sectionTitle('In pandas', 'code'));
+    for (const hint of details.hints) hints.push(Object.assign(textSpan(hint), { className: 'picker-note' }));
   }
-  return parts;
+  return { findings: parts, time, hints };
 }
 
 /**

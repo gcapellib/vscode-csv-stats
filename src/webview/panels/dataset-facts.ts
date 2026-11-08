@@ -71,6 +71,11 @@ function finish(current: Cache): DatasetFacts {
   return current.facts;
 }
 
+/** Le détail d'une colonne, tel que le panneau Dataset l'a déjà calculé : Column details s'ouvre alors sans attendre. */
+export function columnDetails(index: number): ColumnDetails {
+  return detailOf(fresh(), index);
+}
+
 /** Les constats du panneau, calculés s'ils ne le sont pas déjà. */
 export function datasetFacts(): DatasetFacts {
   return finish(fresh());

@@ -53,12 +53,30 @@ test.describe('nettoyer depuis Column details', () => {
 
   test('la moyenne par catégorie propose la couleur et un clic filtre sur elle', async ({ page }) => {
     await openDetails(page, WEIGHT);
+    // Repliée par défaut : c'est un détail, pas le coup d'œil.
+    await expect(page.locator('#picker .category-choice')).toHaveCount(0);
+    await page.locator('#picker .section-toggle', { hasText: 'More details' }).click();
     const section = page.locator('#picker .category-choice select');
     await expect(section).toContainText('couleur');
     await expect(page.locator('#picker .pickable-row')).toHaveCount(3);
     await page.locator('#picker .pickable-row', { hasText: 'brun' }).click();
     await expect(page.locator('#picker')).toBeHidden();
     await expect(page.locator('.chip-filter')).toContainText('brun');
+  });
+
+  test('Column details : les graphiques d’abord, puis les chiffres, puis ce qui est à vérifier', async ({ page }) => {
+    await openDetails(page, TEMPERATURE);
+    const titles = await page.locator('#picker .section-title').allTextContents();
+    const at = (name: string) => titles.findIndex((title) => title.includes(name));
+    expect(at('Distribution')).toBe(0);
+    expect(at('Values by row order')).toBeGreaterThan(at('Distribution'));
+    expect(at('Statistics')).toBeGreaterThan(at('Values by row order'));
+    expect(at('Looks like missing values')).toBeGreaterThan(at('Statistics'));
+    // Le reste est replié, à un clic.
+    expect(titles.at(-1)).toContain('More details');
+    await expect(page.locator('#picker').getByText('Completeness')).toHaveCount(0);
+    await page.locator('#picker .section-toggle').click();
+    await expect(page.locator('#picker').getByText('Completeness')).toBeVisible();
   });
 
   test('les trous d’une suite d’identifiants sont listés', async ({ page }) => {
@@ -136,4 +154,5 @@ test.describe('palettes sans traits', () => {
     expect(colours.every((colour) => /^#[0-9a-f]{6}$/i.test(colour))).toBe(true);
     expect(new Set(colours).size).toBeGreaterThan(1);
   });
+
 });

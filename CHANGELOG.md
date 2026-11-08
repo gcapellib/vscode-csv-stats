@@ -2,6 +2,17 @@
 
 Newest first.
 
+## 0.32.0
+
+- **Column details is a quick look again.** The two charts come first — the distribution and the
+  column in row order — then the statistics, laid out in pairs (min and max, mean and median…) on
+  four lines instead of eight, then what is worth checking (placeholder values, outliers, formats,
+  garbled characters, gaps) each with its fix beside it. Completeness, the average by category, the
+  breakdown over time and the pandas advice move into *More details*, folded until you click it;
+  once opened, it stays open for the next column.
+- It opens at once: the details of each column are shared with *Dataset*, which prepares them
+  in the background.
+
 ## 0.31.2
 
 - **Fixed:** *Column details* listed dozens of "Looks like missing values" on a long float column

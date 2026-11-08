@@ -77,3 +77,40 @@ export function footer(buttons: Array<[string, () => void, boolean]>): HTMLEleme
   }
   return element;
 }
+
+/** Les sections repliables ouvertes : leur état survit à la réouverture du panneau (après une étape, par exemple). */
+const openedSections = new Set<string>();
+
+/**
+ * Une section qui se déplie d'un clic, repliée par défaut : Column details est une fenêtre de coup
+ * d'œil — les graphiques, les chiffres, ce qui est à vérifier —, le reste est à un clic sans
+ * rallonger le panneau. Son contenu ne se construit qu'à la première ouverture.
+ */
+export function collapsibleSection(title: string, glyph: IconName, build: () => HTMLElement[], onToggle: () => void): HTMLElement[] {
+  const header = document.createElement('button');
+  header.type = 'button';
+  header.className = 'section-title section-toggle';
+  const chevron = Object.assign(document.createElement('span'), { className: 'section-chevron' });
+  header.append(icon(glyph, 14), Object.assign(document.createElement('span'), { textContent: title }), chevron);
+  const body = document.createElement('div');
+  body.className = 'section-body';
+  let built = false;
+  const show = (visible: boolean) => {
+    if (visible && !built) {
+      built = true;
+      body.append(...build());
+    }
+    body.hidden = !visible;
+    chevron.textContent = visible ? '\u25BE' : '\u25B8';
+    header.setAttribute('aria-expanded', String(visible));
+  };
+  show(openedSections.has(title));
+  header.addEventListener('click', () => {
+    const visible = body.hidden;
+    if (visible) openedSections.add(title);
+    else openedSections.delete(title);
+    show(visible);
+    onToggle();
+  });
+  return [header, body];
+}

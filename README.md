@@ -13,6 +13,9 @@ Right-click a `.csv` file in the explorer → **Open in CSV Stats**.
 
 ## What's new
 
+- **Column details at a glance** (0.32). The distribution and the column in row order come first,
+  then the statistics in pairs, then what is worth checking with its fix beside it; the rest is
+  one click away, under *More details*.
 - **Correlation heatmap** (0.31). *Dataset* has a *Heatmap* button: every pair of numeric
   columns on one grid, red when they rise together, blue when one falls as the other
   rises, with the seaborn code to copy. Its section titles now line up on the left, in bold,
