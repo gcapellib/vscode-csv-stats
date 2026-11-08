@@ -185,11 +185,15 @@ export function detailsExtras(column: ColumnStats, details: ColumnDetails, reope
  * Les valeurs qui tiennent la place d'une absence : en tête du panneau, parce
  * qu'elles faussent tout ce qui suit (moyenne, histogramme, corrélations).
  */
+/** Au-delà, la liste noie le graphique qui suit. */
+const MAX_PLACEHOLDERS = 3;
+
 export function placeholderSection(column: ColumnStats, details: ColumnDetails, reopen: () => void): HTMLElement[] {
   if (details.placeholders.length === 0) return [];
   const index = column.index;
   const parts: HTMLElement[] = [sectionTitle('Looks like missing values')];
-  for (const entry of details.placeholders) {
+  // Quelques candidats, les plus fréquents : cette fenêtre se lit d'un coup d'œil, elle n'est pas un inventaire.
+  for (const entry of details.placeholders.slice(0, MAX_PLACEHOLDERS)) {
     const share = percent(column.total === 0 ? 0 : entry.count / column.total);
     parts.push(
       findingRow(`${entry.value} ×${count(entry.count)} · ${share} of the rows`, valuesFilter(index, entry.raws), index, [
@@ -202,6 +206,9 @@ export function placeholderSection(column: ColumnStats, details: ColumnDetails, 
         ],
       ]),
     );
+  }
+  if (details.placeholders.length > MAX_PLACEHOLDERS) {
+    parts.push(Object.assign(textSpan(`and ${details.placeholders.length - MAX_PLACEHOLDERS} rarer candidates`), { className: 'picker-note' }));
   }
   const note = column.temporal ? 'A filler date, often written where a date is missing.' : 'Far from the other values and repeated: often written where a measure is missing.';
   parts.push(Object.assign(textSpan(note), { className: 'picker-note' }));

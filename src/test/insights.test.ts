@@ -61,6 +61,16 @@ describe('valeurs-balises', () => {
     assert.ok(found.tokens.every((token) => token === token.trim()));
   });
 
+  it('ne prend pas pour balises les coïncidences d’une longue queue de mesures à deux décimales', () => {
+    // 20 000 mesures, une queue lourde : des valeurs hors des quartiles reviennent 4 ou 5 fois par hasard.
+    const entries: Array<[string, number]> = [];
+    for (let i = 0; i < 6000; i++) entries.push([(10 + i / 100).toFixed(2), 3]);
+    for (let i = 0; i < 300; i++) entries.push([(200 + i / 100).toFixed(2), 5]);
+    entries.push(['-999', 400]);
+    const found = numericPlaceholders(entries, (raw) => Number(raw));
+    assert.deepEqual(found.map((entry) => entry.value), ['-999']);
+  });
+
   it('ne soupçonne pas 999 quand la colonne monte plus haut', () => {
     const lines = ['v'];
     for (let i = 0; i < 60; i++) lines.push(String(i * 25));

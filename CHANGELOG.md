@@ -2,6 +2,17 @@
 
 Newest first.
 
+## 0.31.2
+
+- **Fixed:** *Column details* listed dozens of "Looks like missing values" on a long float column
+  (`73.43 ×6`, `72.39 ×5`…): on 50,000 measures with two decimals, values in the tail repeat by
+  chance. A candidate that is not a known filler (`-999`, `9999`…) now has to weigh at least 0.1 %
+  of the rows and stand at least three times above its neighbouring values, so a `7` in a column of
+  small quantities (it tapers off from `6`) is no longer taken for one, while an isolated `-999`
+  still is.
+- The list shows the three most frequent candidates and says how many more there are, so the chart
+  is never pushed off the screen.
+
 ## 0.31.1
 
 - **Dataset opens at once.** On 50,000 rows it took about 0.7 s on every click, because the panel

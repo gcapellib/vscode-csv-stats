@@ -23,6 +23,18 @@ const KNOWN_DATES = new Set(['1900-01-01', '1970-01-01', '9999-12-31', '0000-00-
 
 /** Un nombre isolé qui revient au moins 3 fois est plus qu'un hasard. */
 const MIN_SPIKE = 3;
+/**
+ * Une valeur inconnue (pas un `-999`) n'est une balise que si elle pèse au moins cette part des
+ * lignes. Sur 50 000 mesures à deux décimales, une valeur de la queue revient 5 ou 6 fois par
+ * simple coïncidence ; une vraie balise, elle, couvre des centaines de lignes.
+ */
+const MIN_SPIKE_SHARE = 0.001;
+/**
+ * Et elle doit se détacher de ses voisines : au moins ce multiple de la valeur voisine la plus
+ * fréquente. Un `7` dans une colonne de petites quantités décroît doucement depuis `6` ; un `-999`,
+ * lui, surgit seul au milieu du vide.
+ */
+const SPIKE_FACTOR = 3;
 
 export interface Quartiles {
   q1: number;
@@ -78,9 +90,14 @@ export function numericPlaceholders(entries: Array<[string, number]>, parse: (ra
   const low = quartiles.q1 - 1.5 * spread;
   const high = quartiles.q3 + 1.5 * spread;
   const found: Placeholder[] = [];
+  const total = pairs.reduce((sum, [, n]) => sum + n, 0);
+  const spike = Math.max(MIN_SPIKE, Math.ceil(total * MIN_SPIKE_SHARE));
+  const ordered = [...pairs].sort((left, right) => left[0] - right[0]);
+  const neighbours = new Map<number, number>();
+  ordered.forEach(([value], position) => neighbours.set(value, Math.max(ordered[position - 1]?.[1] ?? 0, ordered[position + 1]?.[1] ?? 0)));
   for (const [value, count] of pairs) {
     if (value >= low && value <= high) continue;
-    if (count < (KNOWN_NUMERIC.has(value) ? 2 : MIN_SPIKE)) continue;
+    if (KNOWN_NUMERIC.has(value) ? count < 2 : count < spike || count < SPIKE_FACTOR * (neighbours.get(value) ?? 0)) continue;
     found.push(placeholderOf(byValue.get(value) ?? [], count));
   }
   // Une balise qui domine (plus d'un quart des lignes) tire les quartiles vers elle et
