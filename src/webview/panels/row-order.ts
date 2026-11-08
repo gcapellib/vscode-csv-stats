@@ -246,23 +246,6 @@ export function rowOrderChart(column: ColumnStats, details: ColumnDetails, colou
   if (empties > 0) {
     mark('▮', ERROR, `${count(empties)} empty cell${empties === 1 ? '' : 's'}`, pick([''], `${column.name} is empty`));
   }
-  if (tallest > 0) {
-    const perBar = Math.max(1, Math.round(view.length / size));
-    legend.appendChild(
-      Object.assign(document.createElement('div'), {
-        textContent: `each bar: the outliers among about ${count(perBar)} rows · tallest ${count(tallest)}`,
-        className: 'picker-note',
-      }),
-    );
-  }
-  // Les valeurs-balises ne sont pas des mesures : elles sont écartées de cette courbe (sans quoi elles en
-  // écraseraient l'échelle). On dit lesquelles, combien de lignes, pourquoi — et un clic les montre.
-  if (details.placeholders.length > 0) {
-    const rows = details.placeholders.reduce((sum, entry) => sum + entry.count, 0);
-    const values = details.placeholders.slice(0, 3).map((entry) => entry.value).join(', ');
-    const more = details.placeholders.length > 3 ? ', …' : '';
-    mark('▮', 'currentColor', `${values}${more} ignored here (${count(rows)} row${rows === 1 ? '' : 's'}) — looks like a missing-value code`, pick(details.placeholders.flatMap((entry) => entry.raws), `${column.name}: ${values}`));
-  }
   wrapper.appendChild(svg);
   wrapper.appendChild(legend);
   return wrapper;

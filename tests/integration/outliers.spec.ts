@@ -172,5 +172,4 @@ test('la courbe par ligne montre les outliers en barres : un seul outlier reste 
   // Des tranches d'un seul outlier : visibles (au moins 1,5 px), mais loin de la hauteur maximale de la bande.
   expect(Math.min(...heights)).toBeGreaterThanOrEqual(1.5);
   expect(Math.max(...heights)).toBeLessThan(16);
-  await expect(page.locator('#picker .picker-note', { hasText: 'each bar' })).toBeVisible();
 });

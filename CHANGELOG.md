@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 0.32.4
+
+- **Simpler row-order curve.** The two explanatory lines under it ("each bar: the outliers among about 188
+  rows…" and "-999 ignored here…") are gone: the placeholder already has its own section with its fix, and
+  a bar's tooltip gives its outliers. Only the outlier and empty-cell counts remain under the chart.
+
 ## 0.32.3
 
 - **The row-order curve explains what it leaves out.** Under the chart, `-999 left out` said neither why
