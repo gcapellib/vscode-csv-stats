@@ -18,3 +18,5 @@ eslint.config.mjs
 REFACTOR-PLAN.md
 docs/**
 releases/**
+scripts/**
+.claude/**
