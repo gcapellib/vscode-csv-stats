@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 0.33.3
+
+- **Icons in the Clean panel too.** Its catalogue buttons (remove duplicate or blank rows, trim, clean invisible
+  characters, replace, treat as empty, fill down, rename, remove column) and *Merge into…* wear the same
+  icons as the column menu.
+
 ## 0.33.2
 
 - **An icon on every action of the column menu.** Trim, clean invisible characters, merge similar spellings,
