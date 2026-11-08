@@ -9,7 +9,7 @@ export default tseslint.config(
   {
     // Les scripts d'aperçu tournent sous Node, hors du navigateur et de TypeScript.
     files: ['scripts/**/*.mjs'],
-    languageOptions: { globals: { process: 'readonly', URL: 'readonly', console: 'readonly' } },
+    languageOptions: { globals: { process: 'readonly', URL: 'readonly', console: 'readonly', Buffer: 'readonly' } },
   },
   {
     rules: {
