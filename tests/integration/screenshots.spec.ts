@@ -1,7 +1,4 @@
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { test, type Page } from '@playwright/test';
 import { openHarness } from './harness';
 
@@ -83,44 +80,4 @@ test('clean', async ({ page }) => {
     path: 'media/screenshot-clean.png',
     clip: { x: Math.max(0, left - pad), y: Math.max(0, top - pad), width: right - left + 2 * pad, height: bottom - top + 2 * pad },
   });
-});
-
-/**
- * Le GIF des palettes tirées : « Random palette » cliqué à la chaîne, une image par tirage.
- * Le tirage est semé pour qu'on puisse le refaire à l'identique ; changer `SEED` en donne
- * une autre série. Il faut `ffmpeg` pour assembler les images.
- */
-const FRAMES = 54;
-/** Images par seconde : plus bas, le défilé se laisse suivre. */
-const FPS = 3;
-const SEED = 7;
-test('random palettes gif', async ({ browser }) => {
-  test.setTimeout(120_000);
-  const context = await browser.newContext({ viewport: { width: 1200, height: 600 }, deviceScaleFactor: 1 });
-  const page = await context.newPage();
-  await page.addInitScript((seed) => {
-    let value = seed;
-    Math.random = () => {
-      value = (value * 1103515245 + 12345) % 2147483648;
-      return value / 2147483648;
-    };
-  }, SEED);
-  await openHarness(page, 'samples/wines.csv', 'dusk');
-  await page.locator('#theme-button').click();
-  const folder = process.env.FRAMES_DIR ?? mkdtempSync(join(tmpdir(), 'csv-stats-frames-'));
-  mkdirSync(folder, { recursive: true });
-  for (let frame = 0; frame < FRAMES; frame++) {
-    await page.locator('.theme-random button, .theme-random').first().click();
-    await page.mouse.move(1180, 580);
-    await page.waitForTimeout(90);
-    await page.screenshot({ path: join(folder, `f${String(frame).padStart(3, '0')}.png`) });
-  }
-  await context.close();
-  // Une palette de 160 couleurs calculée sur l'ensemble des images, tramage léger : des
-  // aplats nets, sans que le fichier dépasse quelques Mo.
-  execFileSync('ffmpeg', [
-    '-y', '-loglevel', 'error', '-framerate', String(FPS), '-i', join(folder, 'f%03d.png'),
-    '-vf', 'split[a][b];[a]palettegen=max_colors=160:stats_mode=full[p];[b][p]paletteuse=dither=bayer:bayer_scale=4',
-    '-loop', '0', 'media/random-palettes.gif',
-  ]);
 });

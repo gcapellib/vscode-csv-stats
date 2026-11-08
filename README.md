@@ -89,10 +89,6 @@ Every version is listed in the [changelog](https://github.com/gcapellib/vscode-c
 
 *Right-click a header: the cleaning steps for that column, and the field they need unfolds right beside the menu.*
 
-![Random palette clicked over and over: the same wine table recoloured by a new palette at every click, backgrounds and inks changing each time](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/random-palettes.gif)
-
-*Random palette: one click, a new palette drawn. Keep the ones you like.*
-
 ![The palette picker open, with the sheet already recoloured to Frost from hovering it in the list](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-theme-preview.png)
 
 *Hover a palette and the sheet changes at once; only a click keeps it.*

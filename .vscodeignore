@@ -7,7 +7,6 @@ esbuild.mjs
 .gitignore
 **/*.map
 media/screenshot-*.png
-media/*.gif
 harness.html
 tests/**
 test-results/**

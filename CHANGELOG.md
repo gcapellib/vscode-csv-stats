@@ -42,7 +42,7 @@ Newest first.
 - **Headers in colour.** *Dusk* and *Woodland* draw each column name in its column's colour,
   adjusted to a 4.5:1 contrast against the header; about half of the *Random palette* draws
   do too.
-- **Docs:** new screenshots, and a GIF of random palettes. `npm run screenshots` makes them again.
+- **Docs:** new screenshots. `npm run screenshots` makes them again.
 
 ## 0.29.4
 
