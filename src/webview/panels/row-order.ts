@@ -8,11 +8,10 @@
  * La courbe suit la moyenne de chaque tranche de lignes, sur la plage normale
  * (celle des limites d'outliers). Les outliers n'écrasent donc pas l'échelle :
  * ils sont des barres jaunes — leur hauteur dit combien il y en a par tranche —, et les
- * cellules vides des repères rouges sur l'axe. Les valeurs-balises sont écartées, comme dans l'histogramme.
+ * cellules vides des repères rouges sur l'axe.  Une valeur-balise comme -999 y compte pour ce qu'elle est : une valeur du fichier, qui sort ici comme outlier.
  */
 import { levelShift } from '../../core/insights';
 import { count } from '../../core/format';
-import { type ColumnDetails } from '../../core/details';
 import { type ColumnStats } from '../../core/stats';
 import { type Palette } from '../../core/themes';
 import { formatValue } from '../../core/values';
@@ -41,13 +40,12 @@ interface Bucket {
   empty: number;
 }
 
-export function rowOrderChart(column: ColumnStats, details: ColumnDetails, colours: Palette): HTMLElement | null {
+export function rowOrderChart(column: ColumnStats, colours: Palette): HTMLElement | null {
   if (column.type !== 'numeric' || column.temporal || column.q1 === null || column.q3 === null) return null;
   const view = state.view;
   if (view.length < MIN_ROWS) return null;
 
   const parse = parserOf(column.index);
-  const excluded = new Set(details.placeholders.flatMap((entry) => entry.tokens));
   const spread = column.q3 - column.q1;
   const low = column.q1 - 1.5 * spread;
   const high = column.q3 + 1.5 * spread;
@@ -77,7 +75,6 @@ export function rowOrderChart(column: ColumnStats, details: ColumnDetails, colou
       empties++;
       return;
     }
-    if (excluded.has(raw.trim())) return;
     const value = parse(raw);
     if (value === null) return;
     if (value < low) {

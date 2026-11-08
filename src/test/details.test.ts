@@ -24,8 +24,9 @@ describe('analyse approfondie', () => {
     const { details } = detailsOf('prix\n10\nNULL\n-\n30\n');
     const tokens = Object.fromEntries(details.nullTokens.map((token) => [token.value, token.known]));
     assert.equal(tokens['NULL'], true, 'pandas écarte NULL par défaut');
-    assert.equal(tokens['-'], false, 'pandas ignore le tiret : il faut le lui donner');
-    assert.equal(details.effectiveMissing, 2);
+    assert.equal(tokens['-'], false, 'pandas ignore le tiret');
+    // Comme pandas les compterait : NULL, oui ; le tiret reste une valeur tant que l'utilisateur ne l'a pas traité.
+    assert.equal(details.effectiveMissing, 1);
   });
 
   it('annonce le type que pandas donnerait, et ce qui le bloque', () => {
@@ -93,7 +94,8 @@ describe('analyse approfondie', () => {
     const snippet = readCsvSnippet('trajets.csv', table, computeDataset(table, details));
     assert.ok(snippet.includes('sep=";"'), snippet);
     assert.ok(snippet.includes('decimal=","'), snippet);
-    assert.ok(snippet.includes('na_values=["-"]'), snippet);
+    // On ne décide pas à la place de l'utilisateur : le tiret n'est pas une absence pour pandas, ni pour nous.
+    assert.ok(!snippet.includes('na_values'), snippet);
     // NULL n'a pas à y figurer : pandas l'écarte déjà.
     assert.ok(!snippet.includes('"NULL"'), snippet);
     // De l'UTF-8 n'a rien à dire à pandas.

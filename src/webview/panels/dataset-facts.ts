@@ -58,14 +58,15 @@ function finish(current: Cache): DatasetFacts {
   if (current.facts) return current.facts;
   const details = state.headers.map((_, index) => detailOf(current, index));
   const dataset = computeDataset(current.table, details);
-  // Les colonnes numériques qui varient ensemble. Les valeurs-balises sont écartées : -999 casserait tout.
+  // Les colonnes numériques qui varient ensemble.
   const numeric: NumericColumn[] = state.order
     .filter((index) => state.stats[index]?.type === 'numeric' && !state.stats[index]?.temporal)
     .map((index) => ({
       index,
       name: state.headers[index],
       parse: parserOf(index),
-      excluded: new Set(details[index].placeholders.flatMap((entry) => entry.tokens)),
+      // Une valeur-balise est une valeur du fichier, comme pour pandas ; c'est à l'utilisateur de la traiter.
+      excluded: new Set<string>(),
     }));
   current.facts = { table: current.table, details, dataset, numeric, related: topCorrelations(current.table.rows, numeric) };
   return current.facts;

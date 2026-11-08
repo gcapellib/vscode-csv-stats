@@ -8,7 +8,6 @@
  */
 import { groupMeans, type Grouping } from '../../core/insights';
 import { count, percent } from '../../core/format';
-import { type ColumnDetails } from '../../core/details';
 import { type ColumnStats } from '../../core/stats';
 import { type Palette } from '../../core/themes';
 import { formatValue } from '../../core/values';
@@ -31,9 +30,8 @@ interface Candidate {
   grouping: Grouping;
 }
 
-function candidatesFor(column: ColumnStats, details: ColumnDetails): Candidate[] {
+function candidatesFor(column: ColumnStats): Candidate[] {
   const parse = parserOf(column.index);
-  const excluded = new Set(details.placeholders.flatMap((entry) => entry.tokens));
   const found: Candidate[] = [];
   for (const other of state.stats) {
     if (!other || other.index === column.index || other.type !== 'text') continue;
@@ -43,7 +41,7 @@ function candidatesFor(column: ColumnStats, details: ColumnDetails): Candidate[]
       const row = state.rows[rowIndex];
       if (!row) continue;
       const raw = row[column.index] ?? '';
-      if (raw.trim() === '' || excluded.has(raw.trim())) continue;
+      if (raw.trim() === '') continue;
       const value = parse(raw);
       if (value !== null) pairs.push([row[other.index] ?? '', value]);
     }
@@ -53,10 +51,10 @@ function candidatesFor(column: ColumnStats, details: ColumnDetails): Candidate[]
   return found.sort((left, right) => right.grouping.explained - left.grouping.explained);
 }
 
-export function byCategory(column: ColumnStats, details: ColumnDetails, colours: Palette, rerender: () => void): HTMLElement[] {
+export function byCategory(column: ColumnStats, colours: Palette, rerender: () => void): HTMLElement[] {
   // Un identifiant (presque tout distinct) n'est pas une mesure : le comparer par groupe n'apprend rien.
   if (column.type !== 'numeric' || column.temporal || column.present < 30 || column.distinct >= column.present * 0.9) return [];
-  const candidates = candidatesFor(column, details);
+  const candidates = candidatesFor(column);
   if (candidates.length === 0) return [];
   const current = candidates.find((candidate) => candidate.index === chosen.get(column.index)) ?? candidates[0];
 

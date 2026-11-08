@@ -50,7 +50,7 @@ export function openDetails(columnIndex: number, anchor: HTMLElement): void {
   elements.picker.appendChild(sectionTitle('Distribution', 'chart'));
   elements.picker.appendChild(distributionChart(column, details, palette(columnIndex)));
 
-  const rowOrder = rowOrderChart(column, details, palette(columnIndex));
+  const rowOrder = rowOrderChart(column, palette(columnIndex));
   if (rowOrder) {
     elements.picker.appendChild(sectionTitle('Values by row order', 'chart'));
     elements.picker.appendChild(rowOrder);
@@ -165,7 +165,7 @@ export function openDetails(columnIndex: number, anchor: HTMLElement): void {
   for (const part of collapsibleSection(
     'More details',
     'list',
-    () => [...completenessParts(), ...byCategory(column, details, palette(columnIndex), reopen), ...extras.time, ...extras.hints],
+    () => [...completenessParts(), ...byCategory(column, palette(columnIndex), reopen), ...extras.time, ...extras.hints],
     () => positionFloating(elements.picker, anchor),
   )) {
     elements.picker.appendChild(part);

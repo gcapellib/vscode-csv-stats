@@ -3,7 +3,7 @@
 **See what's in a CSV, clean it, and load it into pandas.** Per-column
 statistics, one-click cross-filtering, cleaning steps that never touch the
 original, and a `pd.read_csv` call that matches what is really in the file —
-separator, decimal comma, missing-value tokens, dates.
+separator, decimal comma, dates.
 
 Right-click a `.csv` file in the explorer → **Open in CSV Stats**.
 

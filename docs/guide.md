@@ -116,8 +116,8 @@ unreadable.
 **Completeness, told apart.** An empty cell, a cell of spaces and a cell reading
 `NULL` are three different mistakes, and the panel counts them separately. It
 also names the tokens found — `NULL x68`, `- x62` — and says which ones pandas
-already discards on its own. That distinction matters: only the others belong in
-`na_values`.
+already discards on its own. Only those count as missing; the others stay ordinary
+values until you decide otherwise with *Treat as empty*.
 
 **The chart that says something**, rather than always the same one. A measure
 gets its histogram, enlarged, with the median and quartiles drawn on it — a box
@@ -131,12 +131,14 @@ fifty characters and padding spaces.
 **Placeholder values.** A value that stands in for a missing one — `-999`, `9999`,
 `1900-01-01` — is flagged at the top of the panel, with *Treat as empty* beside it. A
 number counts as one if it falls outside the rest of the column (beyond 1.5 × IQR) and
-repeats, three times at least, or twice for the usual suspects. The statistics are shown
-again without it. Past about a quarter of the rows the placeholder drags the quartiles
+repeats, three times at least, or twice for the usual suspects. **It is only flagged,
+never set aside**: every chart and figure counts it as the value it is in the file, as
+pandas would, and the statistics are shown again without it just below. Setting it aside
+is your step. Past about a quarter of the rows the placeholder drags the quartiles
 with it and is no longer caught.
 
 **The column in row order.** A curve of the values from the first row displayed to the
-last, outliers as yellow dots, empty cells as red marks on the axis, and a dashed line
+last, outliers as yellow bars (as tall as their number), empty cells as red marks on the axis, and a dashed line
 where the level changes — a sensor that shifts, a batch that differs. The axis gives the
 line numbers of the file, those of the table's margin; the outliers and empty cells in the
 legend are buttons that filter the table on them.
@@ -160,7 +162,7 @@ narrower integer or `float32`, `category` — only when it matters. *Dataset* ad
 button: the Pearson correlation of every pair of numeric columns on one grid (red when they
 rise together, blue when one falls as the other rises). Hover a cell for the coefficient; click a
 column name to open it; *Copy pandas code* gives the `sns.heatmap(df[[…]].corr())` that draws the
-same. It uses the rows the filters keep, sets placeholder values such as `-999` aside, and
+same. It uses the rows the filters keep, counts every value as it is in the file — a `-999` included, as `df.corr()` would — and
 leaves a cell empty when two columns share fewer than 20 rows.
 
 **What pandas would make of the column**, and what stands in the way: `int64`,
@@ -170,8 +172,8 @@ leaves a cell empty when two columns share fewer than 20 rows.
 **Dataset** in the toolbar — a toggle, like **Insights** and **Raw** — answers *what is this file, and how do I load it* —
 it does not paraphrase what the columns already say. It leads with the
 `pd.read_csv` call matching what was detected: separator, decimal comma, the
-missing-value tokens pandas does not already know, and the columns to read as
-strings. Every change made through the table follows, in the order it was
+and the columns to read as strings. It never adds `na_values` of its own: what is
+missing is for you to decide, with *Treat as empty*, and the step then appears in the code. Every change made through the table follows, in the order it was
 actually applied — `df.rename(...)` for renamed columns, `df.drop(...)` for
 dropped ones, `df = df[...]` for each active filter, `df.sort_values(...)` for the current sort — because code that only replayed some of them would either
 contradict the panel it came from (rows or columns it no longer shows) or fail

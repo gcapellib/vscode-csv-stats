@@ -333,7 +333,7 @@ export function computeDetails(
     empty,
     whitespaceOnly,
     nullTokens,
-    effectiveMissing: empty + whitespaceOnly + nullTotal,
+    effectiveMissing: empty + whitespaceOnly + nullTokens.filter((token) => token.known).reduce((sum, token) => sum + token.count, 0),
     singletons: [...counts.values()].filter((occurrences) => occurrences === 1).length,
     minLength: minLength === Number.POSITIVE_INFINITY ? 0 : minLength,
     maxLength,
@@ -384,7 +384,6 @@ export interface DatasetDetails {
    */
   duplicateGroups: number[][];
   /** Jetons d'absence à passer à pandas, ceux qu'il ne connaît pas déjà. */
-  extraNaValues: string[];
   /** Colonnes à lire en texte pour préserver leurs zéros de tête. */
   stringColumns: string[];
   /** Colonnes de dates, pour `parse_dates`. */
@@ -411,7 +410,6 @@ export function computeDataset(table: CsvTable, details: ColumnDetails[]): Datas
   // l'ordre d'insertion.
   const duplicateGroups = [...byContent.values()].filter((group) => group.length > 1);
 
-  const extra = new Set<string>();
   const stringColumns: string[] = [];
   const dateColumns: string[] = [];
   const timeColumns: Array<{ name: string; pad: boolean }> = [];
@@ -424,7 +422,6 @@ export function computeDataset(table: CsvTable, details: ColumnDetails[]): Datas
       dateColumns.push(name);
       if (column.temporal.order === 'dmy') dayFirst = true;
     }
-    for (const token of column.nullTokens) if (!token.known) extra.add(token.value);
     if (column.leadingZeros) stringColumns.push(name);
     if (column.caseVariants > 0) {
       findings.push({
@@ -475,7 +472,6 @@ export function computeDataset(table: CsvTable, details: ColumnDetails[]): Datas
     duplicateRows: duplicateRowIndices.length,
     duplicateRowIndices,
     duplicateGroups,
-    extraNaValues: [...extra].sort(),
     stringColumns,
     dateColumns,
     dayFirst,
@@ -492,10 +488,6 @@ export function readCsvSnippet(fileName: string, table: CsvTable, dataset: Datas
   // Les noms de Python : cp1252 pour windows-1252 ; « utf-16 » lit la marque d'ordre des octets.
   if (table.encoding === 'windows-1252') options.push('    encoding="cp1252",');
   else if (table.encoding === 'utf-16le' || table.encoding === 'utf-16be') options.push('    encoding="utf-16",');
-  if (dataset.extraNaValues.length > 0) {
-    const list = dataset.extraNaValues.map((value) => JSON.stringify(value)).join(', ');
-    options.push(`    na_values=[${list}],`);
-  }
   if (dataset.stringColumns.length > 0) {
     const mapping = dataset.stringColumns.map((name) => `${JSON.stringify(name)}: "string"`).join(', ');
     options.push(`    dtype={${mapping}},`);

@@ -2,6 +2,18 @@
 
 Newest first.
 
+## 0.33.0
+
+- **Follow the convention: you decide what is missing.** A placeholder such as `-999` is flagged, with
+  *Treat as empty* beside it, but it is no longer set aside anywhere. The row-order curve, the average by
+  category and the correlation heatmap count it as the value it is in the file, like the statistics and
+  the distribution already did, and like pandas and Power Query do.
+- **`pd.read_csv` no longer adds `na_values` of its own** (it used to add `-`, `?`, `unknown`…). Missing is
+  what pandas already treats as missing; anything else becomes missing through your *Treat as empty* step,
+  which then appears in the code.
+- **Non-null counts in *Dataset* are those pandas would give**: empty cells, cells of spaces and the tokens
+  pandas discards by itself (`NULL`, `N/A`…). A `-` is a value until you treat it.
+
 ## 0.32.4
 
 - **Simpler row-order curve.** The two explanatory lines under it ("each bar: the outliers among about 188
