@@ -2,6 +2,10 @@
 
 Newest first.
 
+## 0.30.5
+
+- The toolbar button reads *Dataset*, not *Dataset…*: like *Clean*, it opens a panel, and neither needs the ellipsis.
+
 ## 0.30.4
 
 - **Docs:** the README no longer points to the animated GIF of random palettes (it showed as a

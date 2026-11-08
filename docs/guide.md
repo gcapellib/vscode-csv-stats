@@ -155,14 +155,14 @@ all at once from *Clean*, into the most frequent spelling. Words of four letters
 may differ by one letter; a short word only by case or accents.
 
 **Advice for pandas**, never applied for you: `Int64` for integers with empty cells, a
-narrower integer or `float32`, `category` — only when it matters. *Dataset…* adds the
+narrower integer or `float32`, `category` — only when it matters. *Dataset* adds the
 **related columns**, the pairs of numeric columns that move together.
 
 **What pandas would make of the column**, and what stands in the way: `int64`,
 `float64` or `object`, with notes such as *leading zeros are lost unless dtype is
 "string"* or *would be numeric if NULL, - counted as missing*.
 
-**Dataset…** in the toolbar — a toggle, like **Insights** and **Raw** — answers *what is this file, and how do I load it* —
+**Dataset** in the toolbar — a toggle, like **Insights** and **Raw** — answers *what is this file, and how do I load it* —
 it does not paraphrase what the columns already say. It leads with the
 `pd.read_csv` call matching what was detected: separator, decimal comma, the
 missing-value tokens pandas does not already know, and the columns to read as
@@ -206,7 +206,7 @@ underlined — hover it to read the value it had in the file.
 **Save cleaned copy…** writes the cleaned table (all rows, not just the filtered
 ones: a filter is for looking) next to the original as `name.clean.csv`, then
 `name.clean-2.csv`, and so on — never over the original, never over an earlier
-copy. The pandas code in *Dataset…* replays the same steps and ends with the
+copy. The pandas code in *Dataset* replays the same steps and ends with the
 matching `to_csv`.
 
 Changing the type is a step too, and behaves like Power Query's: a value that

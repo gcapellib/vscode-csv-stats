@@ -25,7 +25,7 @@ import { quickTip } from '../tooltip';
  * Traduit une condition de filtrage en une ligne pandas.
  *
  * Le panneau affiche des chiffres calculés sur le sous-ensemble filtré ; sans
- * cette traduction, le code copié depuis « Dataset… » relirait les 7 200 lignes
+ * cette traduction, le code copié depuis « Dataset » relirait les 7 200 lignes
  * du fichier au lieu des 12 que le panneau vient d'analyser — une incohérence
  * entre ce que l'outil montre et ce qu'il exporte.
  */

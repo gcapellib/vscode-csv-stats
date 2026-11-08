@@ -249,7 +249,7 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
   <button id="insights-toggle" type="button" aria-expanded="true" title="Show or hide the statistics bands">
     <span class="chevron">▾</span> Insights
   </button>
-  <button id="dataset-button" type="button" title="Duplicates, findings and the matching pandas call">Dataset…</button>
+  <button id="dataset-button" type="button" title="Duplicates, findings and the matching pandas call">Dataset</button>
   <button id="clean-button" type="button" title="Cleaning steps, the full catalogue, and saving a cleaned copy">Clean</button>
   <span id="selection"></span>
   <span id="notice"></span>

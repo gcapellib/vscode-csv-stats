@@ -27,7 +27,7 @@ Right-click a `.csv` file in the explorer → **Open in CSV Stats**.
 - **Column details tells what is wrong** (0.26). Placeholder values (`-999`, `1900-01-01`) with
   *Treat as empty* beside them, the column **in row order** with its outliers and empty
   cells, repeated values in an identifier column, advice for pandas (`Int64`, `category`…),
-  and **related columns** in *Dataset…*.
+  and **related columns** in *Dataset*.
 - **Column details leads to the fix** (0.25.1). Outliers, values that break the
   column's type and inconsistent formats (`A-9999` against `A-999`) are one click
   from their rows, with the cleaning step that fixes them right beside.
@@ -40,7 +40,7 @@ Right-click a `.csv` file in the explorer → **Open in CSV Stats**.
 - **Duplicated rows, side by side** (0.24.4). Every occurrence, original
   included, grouped one under the other on alternating shades of the palette;
   hover a row number to see where the others are.
-- **Findings in colour** (0.24.4). Each finding in *Dataset…* wears its column's
+- **Findings in colour** (0.24.4). Each finding in *Dataset* wears its column's
   colours, so you see at once where to clean.
 - **Unique values** (0.24.3). Next to *Distinct*, the count of values that occur only
   once — often typos hidden under *Other*. Click it to see those rows.
