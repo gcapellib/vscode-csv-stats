@@ -17,3 +17,4 @@ eslint.config.mjs
 .github/**
 REFACTOR-PLAN.md
 docs/**
+releases/**

@@ -5,3 +5,4 @@ dist/
 harness.html
 test-results/
 playwright-report/
+releases/
