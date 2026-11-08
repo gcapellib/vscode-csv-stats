@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 0.32.3
+
+- **The row-order curve explains what it leaves out.** Under the chart, `-999 left out` said neither why
+  nor how many. It now reads "-999 ignored here (594 rows) — looks like a missing-value code", and clicking
+  it shows those rows in the table.
+
 ## 0.32.2
 
 - **The row-order curve shows how many outliers, not only whether there are any.** Each stretch of rows

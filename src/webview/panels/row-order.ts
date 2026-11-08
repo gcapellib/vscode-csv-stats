@@ -255,10 +255,13 @@ export function rowOrderChart(column: ColumnStats, details: ColumnDetails, colou
       }),
     );
   }
+  // Les valeurs-balises ne sont pas des mesures : elles sont écartées de cette courbe (sans quoi elles en
+  // écraseraient l'échelle). On dit lesquelles, combien de lignes, pourquoi — et un clic les montre.
   if (details.placeholders.length > 0) {
-    legend.appendChild(
-      Object.assign(document.createElement('div'), { textContent: `${details.placeholders.map((entry) => entry.value).join(', ')} left out` }),
-    );
+    const rows = details.placeholders.reduce((sum, entry) => sum + entry.count, 0);
+    const values = details.placeholders.slice(0, 3).map((entry) => entry.value).join(', ');
+    const more = details.placeholders.length > 3 ? ', …' : '';
+    mark('▮', 'currentColor', `${values}${more} ignored here (${count(rows)} row${rows === 1 ? '' : 's'}) — looks like a missing-value code`, pick(details.placeholders.flatMap((entry) => entry.raws), `${column.name}: ${values}`));
   }
   wrapper.appendChild(svg);
   wrapper.appendChild(legend);
