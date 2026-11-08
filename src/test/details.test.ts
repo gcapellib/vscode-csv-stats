@@ -96,6 +96,18 @@ describe('analyse approfondie', () => {
     assert.ok(snippet.includes('na_values=["-"]'), snippet);
     // NULL n'a pas à y figurer : pandas l'écarte déjà.
     assert.ok(!snippet.includes('"NULL"'), snippet);
+    // De l'UTF-8 n'a rien à dire à pandas.
+    assert.ok(!snippet.includes('encoding'), snippet);
+  });
+
+  it('redit à pandas la tabulation et l’encodage quand le fichier n’est pas de l’UTF-8', () => {
+    const table = { ...parse('ville\tprix\nLyon\t5\n'), encoding: 'windows-1252' as const };
+    const details = table.headers.map((_, index) => computeDetails(table, index, computeAll(table)[index].type));
+    const snippet = readCsvSnippet('a.csv', table, computeDataset(table, details));
+    assert.ok(snippet.includes('sep="\\t"'), snippet);
+    assert.ok(snippet.includes('encoding="cp1252"'), snippet);
+    const utf16 = readCsvSnippet('a.csv', { ...table, encoding: 'utf-16le' }, computeDataset(table, details));
+    assert.ok(utf16.includes('encoding="utf-16"'), utf16);
   });
 });
 

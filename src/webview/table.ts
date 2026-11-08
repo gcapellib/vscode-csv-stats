@@ -699,6 +699,7 @@ export function currentTable() {
     headers: state.headers,
     rows: state.view.map((index) => state.rows[index]).filter(Boolean),
     delimiter: state.delimiter,
+    encoding: state.encoding,
     truncated: false,
   };
 }

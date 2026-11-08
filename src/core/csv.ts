@@ -17,6 +17,8 @@ export interface CsvTable {
    */
   lines?: number[];
   delimiter: string;
+  /** L'encodage du fichier lu, quand il n'est pas de l'UTF-8 : le `pd.read_csv` doit le redire. */
+  encoding?: Encoding;
   /** Vrai si le fichier dépassait la limite de lignes et a été tronqué. */
   truncated: boolean;
 }

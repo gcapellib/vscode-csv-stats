@@ -1,6 +1,6 @@
 import { statSync } from 'node:fs';
 import * as vscode from 'vscode';
-import { decode, parse } from './core/csv';
+import { decode, detectEncoding, parse } from './core/csv';
 import { computeAll } from './core/stats';
 import { cleanCopyName } from './core/steps';
 
@@ -156,7 +156,8 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
       await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Window, title: `Analysing ${basename(document.uri)}` },
         async () => {
-          const text = decode(raw);
+          const encoding = detectEncoding(raw);
+          const text = decode(raw, encoding);
           const table = parse(text);
           if (table.headers.length === 0) {
             void panel.webview.postMessage({ type: 'failed', message: 'Empty file: no column detected.' });
@@ -169,6 +170,7 @@ class CsvStatsEditorProvider implements vscode.CustomReadonlyEditorProvider<CsvD
             type: 'head',
             headers: table.headers,
             delimiter: table.delimiter,
+            encoding,
             truncated: table.truncated,
             rowCount: table.rows.length,
             fileName: basename(document.uri),

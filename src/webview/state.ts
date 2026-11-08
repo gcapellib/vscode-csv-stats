@@ -1,3 +1,4 @@
+import { type Encoding } from '../core/csv';
 import { type ColumnStats } from '../core/stats';
 import { type ColumnType } from '../core/types';
 import { DEFAULT_THEME, paletteFor, themeById, type Palette } from '../core/themes';
@@ -28,6 +29,8 @@ export interface State {
   lines: number[];
   stats: ColumnStats[];
   delimiter: string;
+  /** L'encodage lu par l'hôte ; `utf-8` n'a rien à redire à pandas. */
+  encoding: Encoding;
   rowCount: number;
   /** Index de colonne du modèle, dans l'ordre d'affichage ; « Drop » en retire. */
   order: number[];
@@ -74,6 +77,7 @@ export const state: State = {
   lines: [],
   stats: [],
   delimiter: ',',
+  encoding: 'utf-8',
   rowCount: 0,
   order: [],
   widths: [],

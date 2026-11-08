@@ -6,6 +6,7 @@
  * les relier : recevoir les messages de l'hôte, enregistrer les panneaux
  * flottants, poser les écouteurs globaux.
  */
+import { type Encoding } from '../core/csv';
 import { count } from '../core/format';
 import { setCustomThemes, themeById, type CsvTheme } from '../core/themes';
 import { type ColumnStats } from '../core/stats';
@@ -60,6 +61,7 @@ window.addEventListener('message', (event: MessageEvent) => {
       state.headers = message.headers as string[];
       state.stats = message.stats as ColumnStats[];
       state.delimiter = message.delimiter as string;
+      state.encoding = (message.encoding as Encoding | undefined) ?? 'utf-8';
       state.rowCount = message.rowCount as number;
       state.fileName = (message.fileName as string) ?? '';
       state.order = state.headers.map((_, index) => index);

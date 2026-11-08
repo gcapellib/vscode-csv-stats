@@ -107,8 +107,9 @@ Every version is listed in the [changelog](https://github.com/gcapellib/vscode-c
 
 ## Good to know
 
-- Comma and semicolon files; in a semicolon file the comma is a decimal
-  separator. UTF-8 expected.
+- Comma, semicolon, tab and `|` files; in a semicolon file the comma is a decimal
+  separator. UTF-8, Windows-1252 (what Excel writes) and UTF-16 are recognised, and
+  the generated `pd.read_csv` says which.
 - Up to 300 MB; beyond 500,000 rows only the first 500,000 are analysed, and the
   tab says so.
 - How every part works, and why: the [guide](https://github.com/gcapellib/vscode-csv-stats/blob/main/docs/guide.md).

@@ -184,10 +184,16 @@ worry.
 Each band has a **chart** button at its top right: it opens *Column details*.
 Each column header has a **sparkle icon**, next to filter and sort — right-clicking the
 header opens the same menu. The sparkle icon is for acting on the column: text (trim,
-invisible characters, case), values (replace, treat as empty, fill down), type,
+invisible characters, case), values (replace a whole cell or text inside it, treat as empty, fill down or up, fill empty
+cells with a value), type,
 rename, remove. The **Clean** button in the toolbar holds the full catalogue,
 including what concerns no single column (duplicate and blank rows), and the
 list of applied steps.
+
+**Removing the rows you are looking at.** While a filter is on — outliers from *Column details*,
+one value, a spelling — the filter bar offers *Remove these N rows*. They leave the cleaned table
+as one step (*Remove 13 rows: …*), and the filter, having served, is cleared. Removing the step
+brings them back; the pandas code drops them by their position in the file.
 
 **One rule:** what changes the data is a *step*; what changes only how you look
 at it — filters, sort, widths, palette — is not. The original file is kept in
@@ -287,7 +293,7 @@ When the columns outnumber the colours, the table walks the gradient back
 
 ## How files are read
 
-- The delimiter is detected between comma and semicolon by counting occurrences
+- The delimiter is detected among comma, semicolon, tab and `|` by counting occurrences
   outside quotes over the first lines: what decides is the **consistency** of the
   count, not its size.
 - In a semicolon file, the comma is treated as a decimal separator; in a comma
@@ -298,7 +304,10 @@ When the columns outnumber the colours, the table walks the gradient back
 - A cell that is empty or made only of spaces counts as missing.
 - A wholly blank line is not a data row: it is skipped, as is the trailing
   newline.
-- A UTF-8 BOM is stripped. UTF-8 is the expected encoding.
+- The encoding is UTF-16 if the file starts with a byte order mark, UTF-8 if it decodes
+  without error, and Windows-1252 otherwise (what Excel and Windows write as « CSV »). A BOM
+  is stripped. The generated `pd.read_csv` gets `encoding="cp1252"` or `"utf-16"`; the saved
+  cleaned copy is always UTF-8.
 - Beyond 500,000 rows the table is truncated, and the tab says so.
 
 The file is read and analysed in the extension host rather than in the view, and

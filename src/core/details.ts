@@ -489,6 +489,9 @@ export function readCsvSnippet(fileName: string, table: CsvTable, dataset: Datas
   const options: string[] = [`    ${JSON.stringify(fileName)},`];
   if (table.delimiter !== ',') options.push(`    sep=${JSON.stringify(table.delimiter)},`);
   if (table.delimiter === ';') options.push('    decimal=",",');
+  // Les noms de Python : cp1252 pour windows-1252 ; « utf-16 » lit la marque d'ordre des octets.
+  if (table.encoding === 'windows-1252') options.push('    encoding="cp1252",');
+  else if (table.encoding === 'utf-16le' || table.encoding === 'utf-16be') options.push('    encoding="utf-16",');
   if (dataset.extraNaValues.length > 0) {
     const list = dataset.extraNaValues.map((value) => JSON.stringify(value)).join(', ');
     options.push(`    na_values=[${list}],`);
