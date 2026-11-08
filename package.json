@@ -80,7 +80,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "node esbuild.mjs",
     "test": "npm run compile && node --test out/test/*.test.js",
-    "package": "npm run build && vsce package --no-dependencies --out releases/",
+    "package": "node -e \"const fs=require('fs');fs.rmSync('releases',{recursive:true,force:true});fs.mkdirSync('releases')\" && npm run build && vsce package --no-dependencies --out releases/",
     "lint": "eslint src tests scripts eslint.config.mjs",
     "preview": "npm run build && npm run compile && node scripts/preview.mjs",
     "test:integration": "npm run build && playwright test",
