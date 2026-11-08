@@ -19,7 +19,7 @@ const shot = async (page: Page, name: string) => {
 };
 
 test('band', async ({ page }) => {
-  await openHarness(page, 'samples/wines.csv', 'dusk');
+  await openHarness(page, 'samples/wines.csv', 'prism-duo');
   await shot(page, 'band');
 });
 

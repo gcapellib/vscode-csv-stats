@@ -2,6 +2,11 @@
 
 Newest first.
 
+## 0.30.2
+
+- **Docs:** the first screenshot is the Prism duo palette again, redone with the current
+  version. The package no longer carries `scripts/` and `.claude/`.
+
 ## 0.30.1
 
 - **Fixed:** the `pd.read_csv` in *Dataset…* now carries `encoding="cp1252"` (or `"utf-16"`)

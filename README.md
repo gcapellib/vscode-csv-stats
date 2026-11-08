@@ -7,7 +7,7 @@ separator, decimal comma, missing-value tokens, dates.
 
 Right-click a `.csv` file in the explorer → **Open in CSV Stats**.
 
-![The stats band over a 423-row wine dataset, Dusk palette (each column header takes its column's colour): a seven-line ranking with Other on the region column, a three-line ranking with no Other on color, and histograms flush with the band's bottom edge](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-band.png)
+![The stats band over a 423-row wine dataset, Prism duo palette: a seven-line ranking with Other on the region column, a three-line ranking with no Other on color, and histograms flush with the band's bottom edge](https://raw.githubusercontent.com/gcapellib/vscode-csv-stats/main/media/screenshot-band.png)
 
 *A band above every column: type, missing, distinct and unique values, then a histogram or the most frequent values.*
 
