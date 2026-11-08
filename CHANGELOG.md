@@ -2,6 +2,11 @@
 
 Newest first.
 
+## 0.30.4
+
+- **Docs:** the README no longer points to the animated GIF of random palettes (it showed as a
+  broken image on the extension's page).
+
 ## 0.30.3
 
 - **Fixed:** a Windows-1252 file (what Excel writes) showed `€`, curly quotes and the long dash
