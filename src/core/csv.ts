@@ -50,8 +50,34 @@ export function detectEncoding(bytes: Uint8Array): Encoding {
   }
 }
 
+/**
+ * Les 32 caractères que windows-1252 met à la place des contrôles C1 d'ISO-8859-1
+ * (0x80 à 0x9F) : le « € » de 0x80, les guillemets courbes, le tiret long… Cinq octets
+ * n'y sont pas définis ; ils restent ce qu'ils sont en ISO-8859-1.
+ */
+const WINDOWS_1252_HIGH = '€\u0081‚ƒ„…†‡ˆ‰Š‹Œ\u008DŽ\u008F\u0090‘’“”•–—˜™š›œ\u009DžŸ';
+
+/**
+ * Lu à la main plutôt que par `TextDecoder('windows-1252')` : certaines versions de Node
+ * (la 20 de la CI, par exemple) le décodent comme de l'ISO-8859-1, et le « € » d'un
+ * fichier Excel devenait un contrôle invisible.
+ */
+function decodeWindows1252(bytes: Uint8Array): string {
+  const parts: string[] = [];
+  const chunk = 8192;
+  for (let start = 0; start < bytes.length; start += chunk) {
+    let text = '';
+    for (let i = start; i < Math.min(bytes.length, start + chunk); i++) {
+      const byte = bytes[i];
+      text += byte >= 0x80 && byte <= 0x9f ? WINDOWS_1252_HIGH[byte - 0x80] : String.fromCharCode(byte);
+    }
+    parts.push(text);
+  }
+  return parts.join('');
+}
+
 export function decode(bytes: Uint8Array, encoding: Encoding = detectEncoding(bytes)): string {
-  const text = new TextDecoder(encoding).decode(bytes);
+  const text = encoding === 'windows-1252' ? decodeWindows1252(bytes) : new TextDecoder(encoding).decode(bytes);
   return text.startsWith(BOM) ? text.slice(BOM.length) : text;
 }
 

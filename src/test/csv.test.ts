@@ -167,6 +167,11 @@ describe('séparateurs et encodages courants', () => {
     assert.deepEqual(table.rows, [['12€', 'Nîmes']]);
   });
 
+  it('lit les 32 signes de windows-1252 qu’ISO-8859-1 n’a pas : €, guillemets courbes, tiret long', () => {
+    // 0x92 ’ · 0x96 – · 0x93/0x94 “ ” · 0x80 € · 0xE9 é (commun aux deux).
+    assert.equal(decode(Uint8Array.from([0x80, 0x92, 0x96, 0x93, 0x94, 0xe9]), 'windows-1252'), '€’–“”é');
+  });
+
   it('garde l’UTF-8 et lit l’UTF-16 avec marque', () => {
     assert.equal(detectEncoding(new TextEncoder().encode('é;ü\n1;2\n')), 'utf-8');
     const utf16 = new Uint8Array([0xff, 0xfe, ...[...'a\tb\n1\t2\n'].flatMap((c) => [c.charCodeAt(0), 0])]);

@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 0.30.3
+
+- **Fixed:** a Windows-1252 file (what Excel writes) showed `€`, curly quotes and the long dash
+  as invisible control characters on Node versions that decode it as ISO-8859-1 (Node 20, the one
+  the CI uses). Those 32 signs are now read from a table, whatever the Node version.
+
 ## 0.30.2
 
 - **Docs:** the first screenshot is the Prism duo palette again, redone with the current
