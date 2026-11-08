@@ -2,6 +2,15 @@
 
 Newest first.
 
+## 0.30.1
+
+- **Fixed:** the `pd.read_csv` in *Dataset…* now carries `encoding="cp1252"` (or `"utf-16"`)
+  when the file was not UTF-8; without it pandas misread the accents of a file the plug-in
+  had read correctly.
+- **Docs:** the README, the guide and the extension's description now cover the cleaning steps
+  and the files that open (tab, `|`, Windows-1252, UTF-16); the description puts cleaning
+  ahead of palettes.
+
 ## 0.30.0
 
 - **Replace text inside cells.** *Replace text…* finds a piece of text in each cell (`€`, `kg`)
