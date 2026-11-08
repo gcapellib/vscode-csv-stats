@@ -50,7 +50,20 @@ test('clean', async ({ page }) => {
   // Une fenêtre assez haute pour que le menu tienne en entier, puis un recadrage serré :
   // dans le README l'image est réduite, et un menu perdu dans le tableau devient illisible.
   await page.setViewportSize({ width: 1276, height: 1000 });
-  await openHarness(page, 'samples/wines.csv', 'dusk');
+  await openHarness(page, 'samples/wines.csv', 'prism-duo');
+  // En thème clair : un menu clair sur des fonds pastel se détache du tableau, là où un menu
+  // sombre se confondait avec des fonds sombres.
+  await page.evaluate(() => {
+    document.body.className = 'vscode-light';
+    const root = document.documentElement.style;
+    for (const [name, value] of Object.entries({
+      'editor-background': '#ffffff', foreground: '#3b3b3b', descriptionForeground: '#717171', 'panel-border': '#d4d4d4',
+      'editorGroupHeader-tabsBackground': '#f3f3f3', 'list-hoverBackground': '#e8e8e8', 'editorWidget-background': '#ffffff',
+      'input-background': '#ffffff', 'input-foreground': '#3b3b3b', 'input-border': '#c8c8c8', 'button-foreground': '#ffffff',
+      'dropdown-background': '#ffffff', 'dropdown-foreground': '#3b3b3b', 'dropdown-border': '#c8c8c8',
+    })) root.setProperty(`--vscode-${name}`, value);
+  });
+  await page.waitForTimeout(200);
   const head = page.locator('.head-cell[data-column="2"]');
   await head.click({ button: 'right' });
   await page.locator('#menu .menu-item', { hasText: 'Replace text…' }).click();
