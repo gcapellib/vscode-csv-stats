@@ -1,5 +1,7 @@
 import { elements, textSpan } from '../dom';
+import { icon, type IconName } from '../icons';
 import { palette } from '../state';
+import { quickTip } from '../tooltip';
 
 /**
  * Le liseré du panneau flottant : l'accent de la colonne dont il parle — filtre,
@@ -31,12 +33,25 @@ export function panelTitle(title: string, subtitle: string, columnIndex: number 
   return wrapper;
 }
 
-export function sectionTitle(text: string): HTMLElement {
+/**
+ * Un titre de section : en gras, à gauche, avec une petite icône comme les entrées du menu
+ * d'une colonne, et si besoin un bouton à son extrémité droite.
+ */
+export function sectionTitle(text: string, glyph?: IconName, action?: { label: string; glyph: IconName; onClick: () => void; tip: string }): HTMLElement {
   const element = document.createElement('div');
   element.className = 'section-title';
+  if (glyph) element.appendChild(icon(glyph, 14));
   // Le texte dans son propre élément : un dégradé posé dessus couvre le mot, pas
   // toute la largeur du panneau.
   element.appendChild(Object.assign(document.createElement('span'), { textContent: text }));
+  if (action) {
+    const button = document.createElement('button');
+    button.className = 'picker-button title-action';
+    button.append(icon(action.glyph, 13), document.createTextNode(action.label));
+    quickTip(button, action.tip);
+    button.addEventListener('click', action.onClick);
+    element.appendChild(button);
+  }
   return element;
 }
 

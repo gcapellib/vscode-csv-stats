@@ -14,7 +14,9 @@ interface Glyph {
   paths: string[];
 }
 
-const GLYPHS: Record<'sparkles' | 'chart' | 'copy', Glyph> = {
+export type IconName = 'sparkles' | 'chart' | 'copy' | 'code' | 'list' | 'exchange' | 'alert' | 'grid' | 'back';
+
+const GLYPHS: Record<IconName, Glyph> = {
   // Tabler « sparkles » : l'icône de nettoyage de la maquette validée.
   sparkles: {
     viewBox: '0 0 24 24',
@@ -32,6 +34,21 @@ const GLYPHS: Record<'sparkles' | 'chart' | 'copy', Glyph> = {
       'M4 20h14',
     ],
   },
+  // Tabler « code » : le code pandas.
+  code: { viewBox: '0 0 24 24', paths: ['M7 8l-4 4l4 4', 'M17 8l4 4l-4 4', 'M14 4l-4 16'] },
+  // Tabler « list » : les colonnes.
+  list: { viewBox: '0 0 24 24', paths: ['M9 6h11', 'M9 12h11', 'M9 18h11', 'M5 6v.01', 'M5 12v.01', 'M5 18v.01'] },
+  // Tabler « arrows-exchange » : deux colonnes liées.
+  exchange: { viewBox: '0 0 24 24', paths: ['M7 10h14l-4 -4', 'M17 14h-14l4 4'] },
+  // Tabler « alert-triangle » : les constats.
+  alert: {
+    viewBox: '0 0 24 24',
+    paths: ['M12 9v4', 'M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z', 'M12 16h.01'],
+  },
+  // Quatre cases : la carte de chaleur.
+  grid: { viewBox: '0 0 24 24', paths: ['M4 4h7v7h-7z', 'M13 4h7v7h-7z', 'M4 13h7v7h-7z', 'M13 13h7v7h-7z'] },
+  // Tabler « arrow-left ».
+  back: { viewBox: '0 0 24 24', paths: ['M5 12h14', 'M5 12l6 6', 'M5 12l6 -6'] },
   // Tabler « copy ».
   copy: {
     viewBox: '0 0 24 24',
@@ -42,7 +59,7 @@ const GLYPHS: Record<'sparkles' | 'chart' | 'copy', Glyph> = {
   },
 };
 
-export function icon(name: keyof typeof GLYPHS, size = 14): SVGSVGElement {
+export function icon(name: IconName, size = 14): SVGSVGElement {
   const glyph = GLYPHS[name];
   const svg = document.createElementNS(SVG, 'svg');
   svg.setAttribute('viewBox', glyph.viewBox);

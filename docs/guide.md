@@ -156,7 +156,12 @@ may differ by one letter; a short word only by case or accents.
 
 **Advice for pandas**, never applied for you: `Int64` for integers with empty cells, a
 narrower integer or `float32`, `category` — only when it matters. *Dataset* adds the
-**related columns**, the pairs of numeric columns that move together.
+**related columns**, the pairs of numeric columns that move together, and a **Heatmap**
+button: the Pearson correlation of every pair of numeric columns on one grid (red when they
+rise together, blue when one falls as the other rises). Hover a cell for the coefficient; click a
+column name to open it; *Copy pandas code* gives the `sns.heatmap(df[[…]].corr())` that draws the
+same. It uses the rows the filters keep, sets placeholder values such as `-999` aside, and
+leaves a cell empty when two columns share fewer than 20 rows.
 
 **What pandas would make of the column**, and what stands in the way: `int64`,
 `float64` or `object`, with notes such as *leading zeros are lost unless dtype is

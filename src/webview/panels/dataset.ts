@@ -9,6 +9,8 @@ import { currentTable, parserOf, setColumnFilter, valuesFilter } from '../table'
 import { topCorrelations } from '../../core/insights';
 import { openDetails } from './column-details';
 import { footer, panelTitle, sectionTitle, tintPanel } from './shared';
+import { openHeatmap } from './heatmap';
+import { icon } from '../icons';
 import { datasetTransformLines as coreDatasetTransformLines } from '../../core/filters';
 import { cleanCopyName, stepsToPandas, type Step } from '../../core/steps';
 import { addStep } from '../cleaning';
@@ -68,7 +70,7 @@ export function openDataset(anchor: HTMLElement): void {
     ),
   );
 
-  elements.picker.appendChild(sectionTitle('Read it with pandas'));
+  elements.picker.appendChild(sectionTitle('Read it with pandas', 'code'));
   // Le code reproduit tout ce qui change la forme du dataframe affiche a
   // l'ecran, pas seulement les filtres : un renommage ou un retrait de
   // colonne non reproduits, et le code genererait un DataFrame different de
@@ -83,15 +85,15 @@ export function openDataset(anchor: HTMLElement): void {
   elements.picker.appendChild(code);
   const copy = document.createElement('button');
   copy.className = 'picker-button';
-  copy.textContent = 'Copy';
+  copy.append(icon('copy', 13), document.createTextNode('Copy'));
   copy.addEventListener('click', () => {
     void navigator.clipboard.writeText(snippet);
-    copy.textContent = 'Copied';
-    window.setTimeout(() => (copy.textContent = 'Copy'), 1200);
+    copy.lastChild!.textContent = 'Copied';
+    window.setTimeout(() => (copy.lastChild!.textContent = 'Copy'), 1200);
   });
   elements.picker.appendChild(copy);
 
-  elements.picker.appendChild(sectionTitle('Columns'));
+  elements.picker.appendChild(sectionTitle('Columns', 'list'));
   const info = document.createElement('div');
   info.className = 'info-table';
   info.append(head('Column'), head('Non-null'), head('Dtype'));
@@ -132,12 +134,22 @@ export function openDataset(anchor: HTMLElement): void {
       excluded: new Set(details[index].placeholders.flatMap((entry) => entry.tokens)),
     }));
   const related = topCorrelations(table.rows, numeric);
-  if (related.length > 0) {
-    elements.picker.appendChild(sectionTitle('Related columns'));
+  // Dès deux colonnes numériques, la carte de chaleur a de quoi se dessiner, même si aucune
+  // paire n'atteint le seuil de la liste.
+  if (numeric.length >= 2) {
+    elements.picker.appendChild(
+      sectionTitle('Related columns', 'exchange', {
+        label: 'Heatmap',
+        glyph: 'grid',
+        tip: 'Correlation between every pair of numeric columns',
+        onClick: () => openHeatmap(anchor, numeric, table.rows, () => openDataset(anchor)),
+      }),
+    );
     for (const pair of related) elements.picker.appendChild(relatedRow(pair.left, pair.right, pair.r, anchor));
+    if (related.length === 0) elements.picker.appendChild(Object.assign(textSpan('No pair of columns is strongly linked (|r| ≥ 0.5).'), { className: 'picker-note' }));
   }
 
-  elements.picker.appendChild(sectionTitle('Findings'));
+  elements.picker.appendChild(sectionTitle('Findings', 'alert'));
   const list = document.createElement('div');
   list.className = 'findings';
 

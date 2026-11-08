@@ -258,6 +258,37 @@ export function topCorrelations(rows: string[][], columns: NumericColumn[], thre
   return found.sort((left, right) => Math.abs(right.r) - Math.abs(left.r)).slice(0, limit);
 }
 
+/**
+ * Toutes les corrélations de Pearson entre colonnes numériques : la matrice qu'un
+ * `df.corr()` donnerait, `null` là où il n'y a pas de quoi la calculer (moins de 20 lignes
+ * communes, ou une colonne constante). La diagonale vaut 1. Mêmes règles que
+ * `topCorrelations` : valeurs-balises écartées, échantillon régulier au-delà de 20 000 lignes.
+ */
+export function correlationMatrix(rows: string[][], columns: NumericColumn[]): Array<Array<number | null>> {
+  const stride = Math.max(1, Math.ceil(rows.length / SAMPLE));
+  const matrix: Array<Array<number | null>> = columns.map((_, i) => columns.map((__, j) => (i === j ? 1 : null)));
+  for (let a = 0; a < columns.length; a++) {
+    for (let b = a + 1; b < columns.length; b++) {
+      const xs: number[] = [];
+      const ys: number[] = [];
+      for (let i = 0; i < rows.length; i += stride) {
+        const rawX = rows[i]?.[columns[a].index] ?? '';
+        const rawY = rows[i]?.[columns[b].index] ?? '';
+        if (columns[a].excluded.has(rawX.trim()) || columns[b].excluded.has(rawY.trim())) continue;
+        const x = columns[a].parse(rawX);
+        const y = columns[b].parse(rawY);
+        if (x === null || y === null) continue;
+        xs.push(x);
+        ys.push(y);
+      }
+      const r = pearson(xs, ys);
+      matrix[a][b] = r;
+      matrix[b][a] = r;
+    }
+  }
+  return matrix;
+}
+
 export interface TypeFacts {
   kind: 'numeric' | 'text' | 'other';
   rows: number;

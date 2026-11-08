@@ -2,6 +2,19 @@
 
 Newest first.
 
+## 0.31.0
+
+- **Correlation heatmap.** A *Heatmap* button beside *Related columns* in *Dataset* draws the
+  Pearson correlation of every pair of numeric columns (up to 40): red when they rise together,
+  blue when one falls as the other rises, the coefficient on each cell when it fits, a tooltip
+  with both names and three decimals. Click a column name to open it, *Copy pandas code* gives
+  the matching seaborn call, *Dataset* goes back. Rows are the ones the filters keep; placeholder
+  values are set aside; a pair with fewer than 20 rows in common stays empty. It shows up as soon
+  as a file has two numeric columns, even when no pair reaches the |r| ≥ 0.5 of the list.
+- **Section titles like the column menu.** In *Dataset*, *Column details* and *Clean*, titles
+  line up on the left, in bold, with a small icon (code, columns, related columns, findings);
+  they were pushed 14 px to the right of the content. *Copy* gets its icon too.
+
 ## 0.30.5
 
 - The toolbar button reads *Dataset*, not *Dataset…*: like *Clean*, it opens a panel, and neither needs the ellipsis.

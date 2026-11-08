@@ -13,6 +13,10 @@ Right-click a `.csv` file in the explorer → **Open in CSV Stats**.
 
 ## What's new
 
+- **Correlation heatmap** (0.31). *Dataset* has a *Heatmap* button: every pair of numeric
+  columns on one grid, red when they rise together, blue when one falls as the other
+  rises, with the seaborn code to copy. Its section titles now line up on the left, in bold,
+  with a small icon, like the column menu.
 - **Clean what is inside the cells** (0.30). *Replace text…* finds a piece of text in each
   cell (`€`, `kg`) or a pattern written `/like this/`; *Fill up*, and *Fill empty with…* a
   fixed value, join *Fill down*. The field you type in unfolds right beside the menu.
@@ -80,6 +84,9 @@ Every version is listed in the [changelog](https://github.com/gcapellib/vscode-c
 - **Dataset** — the matching `pd.read_csv`, followed by every rename, drop,
   filter and sort you made, in order — plus duplicated rows and values that
   differ only by case or padding, each one click away.
+- **Correlation heatmap** — one click on *Heatmap*, in *Dataset*, draws the Pearson
+  correlation of every pair of numeric columns; hover a cell for the coefficient,
+  copy the matching seaborn code.
 - **Raw view** — the file exactly as written, each field in its column's colour.
 - **20 palettes**, and random ones to draw —
   hover to preview on your own data.

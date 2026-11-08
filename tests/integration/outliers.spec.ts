@@ -115,3 +115,31 @@ test('les infobulles sont celles du plug-in, immédiates, jamais le `title` nati
   await expect(page.locator('#tooltip')).toContainText('Duplicates');
   await expect(page.locator('#dataset-button')).not.toHaveAttribute('title', /.+/);
 });
+
+test('Dataset : la carte de chaleur des corrélations se dessine, se parcourt et se referme', async ({ page }) => {
+  await openHarness(page, 'samples/wines.csv');
+  await page.locator('#dataset-button').click();
+  await page.locator('.section-title', { hasText: 'Related columns' }).locator('.title-action').click();
+
+  const cells = page.locator('#picker svg.heatmap .heat-cell');
+  const n = Math.sqrt(await cells.count());
+  expect(Number.isInteger(n) && n >= 2).toBe(true);
+  await expect(page.locator('#picker .picker-title')).toHaveText('Correlations');
+  // Une case hors diagonale dit ses deux colonnes et son coefficient dans l'infobulle du plug-in.
+  const off = cells.nth(1);
+  await off.hover();
+  await expect(page.locator('#tooltip')).toContainText('↔');
+  await page.mouse.move(2, 2);
+  await expect(page.locator('#picker .heat-diagonal')).toHaveCount(n);
+
+  await page.locator('#picker .picker-button', { hasText: 'Copy pandas code' }).click();
+  await page.locator('#picker .picker-button', { hasText: 'Dataset' }).click();
+  await expect(page.locator('#picker .section-title', { hasText: 'Related columns' })).toBeVisible();
+});
+
+test('Dataset : sans deux colonnes numériques, pas de carte de chaleur', async ({ page }) => {
+  await openHarness(page, 'samples/brut.csv');
+  await page.locator('#dataset-button').click();
+  await expect(page.locator('#picker .section-title', { hasText: 'Findings' })).toBeVisible();
+  await expect(page.locator('.title-action')).toHaveCount(0);
+});

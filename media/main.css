@@ -1703,3 +1703,97 @@ body.resizing * {
     animation: none;
   }
 }
+
+/* ── Titres de section : ceux du menu d'une colonne ───────────────────────────
+   À gauche, collés au contenu (le panneau a déjà sa marge), en gras, à la couleur de la
+   colonne — ou, pour le fichier entier, la plus sobre du thème —, avec une petite icône. */
+#picker .section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 4px;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--vscode-panel-border);
+  color: var(--column-accent, var(--vscode-foreground));
+  font-size: 0.9em;
+  font-weight: 600;
+}
+
+.section-title svg {
+  flex: 0 0 auto;
+}
+
+.title-action {
+  margin: 0 0 0 auto;
+  padding: 1px 10px;
+  color: var(--vscode-foreground);
+  font-size: 0.95em;
+  font-weight: 400;
+}
+
+.picker-button svg {
+  margin-right: 5px;
+  vertical-align: -2px;
+}
+
+/* ── La carte de chaleur des corrélations ───────────────────────────────────── */
+:root {
+  --heat-positive: #e5534b;
+  --heat-negative: #4a8fe0;
+}
+
+.heatmap-wrap {
+  margin-top: 6px;
+  overflow: auto;
+}
+
+.heatmap {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.heat-cell {
+  fill: none;
+  stroke: var(--vscode-panel-border);
+  stroke-width: 1;
+}
+
+.heat-cell:hover {
+  stroke: var(--vscode-foreground);
+}
+
+.heat-diagonal {
+  fill: rgb(128 128 128 / 22%);
+}
+
+.heat-value {
+  fill: var(--vscode-foreground);
+  pointer-events: none;
+}
+
+.heat-label {
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.heat-label:hover {
+  text-decoration: underline;
+}
+
+.heat-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.85em;
+}
+
+.heat-scale {
+  flex: 1;
+  height: 8px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  background: linear-gradient(to right, var(--heat-negative), transparent 50%, var(--heat-positive));
+}

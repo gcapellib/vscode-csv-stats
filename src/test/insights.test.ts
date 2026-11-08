@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 import { parse } from '../core/csv';
 import { computeDataset, computeDetails } from '../core/details';
-import { fixMojibake, groupMeans, numericPlaceholders, levelShift, pandasHints, pearson, sequenceGaps, similarValues, summaryWithout, topCorrelations } from '../core/insights';
+import { fixMojibake, groupMeans, numericPlaceholders, levelShift, correlationMatrix, pandasHints, pearson, sequenceGaps, similarValues, summaryWithout, topCorrelations } from '../core/insights';
 import { computeAll } from '../core/stats';
 import { applySteps, describeStep, stepsToPandas } from '../core/steps';
 
@@ -119,6 +119,33 @@ describe('corrélations', () => {
     assert.equal(found[0].left, 0);
     assert.equal(found[0].right, 1);
     assert.ok(found[0].r > 0.99, 'la balise ne doit pas casser la corrélation');
+  });
+});
+
+describe('matrice de corrélations', () => {
+  const parseNumber = (raw: string) => (raw === '' ? null : Number(raw));
+  const make = (index: number, excluded: string[] = []) => ({ index, name: `c${index}`, excluded: new Set(excluded), parse: parseNumber });
+
+  it('est symétrique, vaut 1 sur la diagonale, et reprend les corrélations par paire', () => {
+    const rows: string[][] = [];
+    for (let i = 0; i < 40; i++) rows.push([String(i), String(i * 3 + 1), String(40 - i), String((i * 7) % 5)]);
+    const matrix = correlationMatrix(rows, [0, 1, 2, 3].map((index) => make(index)));
+    for (let i = 0; i < 4; i++) {
+      assert.equal(matrix[i][i], 1);
+      for (let j = 0; j < 4; j++) assert.equal(matrix[i][j], matrix[j][i]);
+    }
+    assert.ok((matrix[0][1] ?? 0) > 0.999);
+    assert.ok((matrix[0][2] ?? 0) < -0.999);
+  });
+
+  it('laisse null ce qui ne se calcule pas : peu de lignes, colonne constante, balise écartée', () => {
+    const few = correlationMatrix([['1', '2'], ['2', '3']], [make(0), make(1)]);
+    assert.equal(few[0][1], null);
+    const rows: string[][] = [];
+    for (let i = 0; i < 40; i++) rows.push([String(i), '5', i < 21 ? '-999' : String(i)]);
+    const matrix = correlationMatrix(rows, [make(0), make(1), make(2, ['-999'])]);
+    assert.equal(matrix[0][1], null, 'colonne constante');
+    assert.equal(matrix[0][2], null, 'moins de 20 lignes une fois la balise écartée');
   });
 });
 
