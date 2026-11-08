@@ -2,6 +2,16 @@
 
 Newest first.
 
+## 0.31.1
+
+- **Dataset opens at once.** On 50,000 rows it took about 0.7 s on every click, because the panel
+  recomputed every column's details, the findings and the related pairs each time. They are now
+  kept for as long as the rows, the filters and the types stay the same, and prepared in the
+  background, one column at a time, a moment after a file loads or a filter changes: about
+  25 ms to open. Past 200,000 rows nothing is prepared ahead, so filtering never stalls.
+- **Test files:** `node scripts/make-test-csv.mjs` writes large dirty CSVs (comma, Excel-style
+  Windows-1252, tab) to `test-data/`.
+
 ## 0.31.0
 
 - **Correlation heatmap.** A *Heatmap* button beside *Related columns* in *Dataset* draws the

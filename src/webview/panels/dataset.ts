@@ -1,12 +1,12 @@
-import { computeDataset, computeDetails, readCsvSnippet } from '../../core/details';
+import { readCsvSnippet } from '../../core/details';
 import { count } from '../../core/format';
 import { closePicker, setOpenPanel } from '../actions';
 import { elements, textSpan } from '../dom';
 import { floating, positionFloating } from '../floating-setup';
 import { gradientFor, themeById } from '../../core/themes';
 import { isDark, palette, state } from '../state';
-import { currentTable, parserOf, setColumnFilter, valuesFilter } from '../table';
-import { topCorrelations } from '../../core/insights';
+import { setColumnFilter, valuesFilter } from '../table';
+import { datasetFacts } from './dataset-facts';
 import { openDetails } from './column-details';
 import { footer, panelTitle, sectionTitle, tintPanel } from './shared';
 import { openHeatmap } from './heatmap';
@@ -51,11 +51,7 @@ export function datasetTransformLines(): string[] {
 }
 
 export function openDataset(anchor: HTMLElement): void {
-  const table = currentTable();
-  const details = state.headers.map((_, index) =>
-    computeDetails(table, index, state.stats[index]?.type ?? 'text', state.stats[index]?.temporal ?? null),
-  );
-  const dataset = computeDataset(table, details);
+  const { table, details, dataset, numeric, related } = datasetFacts();
 
   elements.picker.textContent = '';
   elements.picker.classList.add('wide');
@@ -123,17 +119,6 @@ export function openDataset(anchor: HTMLElement): void {
   }
   elements.picker.appendChild(info);
 
-  // Les colonnes numériques qui varient ensemble — ce qu'on cherche juste après
-  // avoir regardé chacune. Les valeurs-balises sont écartées : -999 casserait tout.
-  const numeric = state.order
-    .filter((index) => state.stats[index]?.type === 'numeric' && !state.stats[index]?.temporal)
-    .map((index) => ({
-      index,
-      name: state.headers[index],
-      parse: parserOf(index),
-      excluded: new Set(details[index].placeholders.flatMap((entry) => entry.tokens)),
-    }));
-  const related = topCorrelations(table.rows, numeric);
   // Dès deux colonnes numériques, la carte de chaleur a de quoi se dessiner, même si aucune
   // paire n'atteint le seuil de la liste.
   if (numeric.length >= 2) {

@@ -2,7 +2,7 @@
   "name": "csv-stats",
   "displayName": "CSV Stats",
   "description": "Explore and clean CSV files in VS Code: column stats, filtering, cleaning steps that never touch the original, and ready-to-use pandas code.",
-  "version": "0.31.0",
+  "version": "0.31.1",
   "publisher": "GabrielCapelli",
   "icon": "media/icon.png",
   "galleryBanner": {

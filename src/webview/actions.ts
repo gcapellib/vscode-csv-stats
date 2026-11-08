@@ -3,6 +3,7 @@ import { floating } from './floating-setup';
 import { paint } from './paint';
 import { state } from './state';
 import { rebuildView, recomputeStats } from './table';
+import { warmDatasetFacts } from './panels/dataset-facts';
 import { paintFilterBar } from './toolbar';
 
 /**
@@ -56,5 +57,6 @@ export function refilter(): void {
   // l'ouverture.
   paintFilterBar();
   paint();
+  warmDatasetFacts();
 }
 

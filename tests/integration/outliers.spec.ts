@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { test, expect } from '@playwright/test';
 import { openHarness } from './harness';
 
@@ -142,4 +143,20 @@ test('Dataset : sans deux colonnes numériques, pas de carte de chaleur', async 
   await page.locator('#dataset-button').click();
   await expect(page.locator('#picker .section-title', { hasText: 'Findings' })).toBeVisible();
   await expect(page.locator('.title-action')).toHaveCount(0);
+});
+
+test('Dataset s’ouvre sans attendre sur un gros fichier : les constats sont préparés d’avance', async ({ page }) => {
+  test.setTimeout(90_000);
+  execFileSync('node', ['scripts/make-test-csv.mjs', '30000', '42']);
+  await openHarness(page, 'test-data/boutique.csv');
+  // Le temps que le calcul d'arrière-plan passe, colonne par colonne.
+  await page.waitForTimeout(3500);
+  const started = Date.now();
+  await page.locator('#dataset-button').click();
+  await page.locator('#picker .picker-title').waitFor();
+  const opened = Date.now() - started;
+  expect(opened, `ouverture en ${opened} ms`).toBeLessThan(250);
+  // Un filtre invalide ce qui était préparé : l'ouverture suivante recalcule, et reste correcte.
+  await page.locator('#picker .picker-button', { hasText: 'Close' }).click();
+  await expect(page.locator('#picker')).toBeHidden();
 });

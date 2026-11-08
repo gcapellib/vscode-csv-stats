@@ -15,6 +15,7 @@ import { elements } from './dom';
 import { palette, state } from './state';
 import { floating, positionFloating } from './floating-setup';
 import { paint } from './paint';
+import { warmDatasetFacts } from './panels/dataset-facts';
 import { cancelField } from './prompt';
 import { installTips } from './tooltip';
 import { measureWidths, rebuildView, select, selectedRowsText } from './table';
@@ -98,6 +99,7 @@ window.addEventListener('message', (event: MessageEvent) => {
       }
       rebuildView();
       paint();
+      warmDatasetFacts();
       break;
     }
     case 'failed':
