@@ -424,6 +424,8 @@ export function similarValues(entries: Array<[string, number]>): SimilarGroup[] 
 /** Ce qui sépare une graphie de celle vers laquelle on fusionne, dit en un mot. */
 export type Difference = 'spaces' | 'non-breaking space' | 'hidden character' | 'capital letters' | 'accents' | 'spelling';
 
+// Les caractères de contrôle sont voulus : c'est justement ce qu'on cherche à rendre visible.
+// eslint-disable-next-line no-control-regex
 const HIDDEN = /[\u0000-\u001F\u007F\u00AD\u200B-\u200D\u2060\uFEFF]/g;
 const UNICODE_SPACES = /[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g;
 const stripAccents = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');

@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 0.33.2
+
+- **An icon on every action of the column menu.** Trim, clean invisible characters, merge similar spellings,
+  replace values or text, treat as empty, fill down / up / with a value, remove rows, round: each gesture has a
+  small drawn icon, like *Column details* and *Copy column name*. An applied step still shows its check mark.
+
 ## 0.33.1
 
 - **Similar spellings say what differs.** The variants of a value often look the same on screen — they differ
